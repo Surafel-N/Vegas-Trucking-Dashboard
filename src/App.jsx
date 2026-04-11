@@ -575,11 +575,10 @@ const handleLogout = () => {
   // ----------------------------------------------------
 
   const syncWithGoogleSheets = async () => {
-    alert("🚀 Le moteur de synchronisation démarre ! Regarde la console.");
-    console.log("Démarrage de syncWithGoogleSheets...");
+    console.log("🚀 Tentative de synchro Google Sheets...");
 
     if (!window.google?.accounts?.oauth2) {
-      alert("Bibliothèque Google Identity Services non chargée.");
+      alert("La bibliothèque Google n'est pas encore chargée. Réessayez dans 2 secondes.");
       return;
     }
 
@@ -589,11 +588,11 @@ const handleLogout = () => {
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly",
-        prompt: 'consent',
+        scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
         callback: async (tokenResponse) => {
           if (tokenResponse && tokenResponse.access_token) {
             try {
+              console.log("✅ Accès autorisé, récupération des données...");
               const spreadsheetId = "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
               const ranges = [
                 "'AMARA TRUCK 76'!A2:O",
@@ -604,22 +603,14 @@ const handleLogout = () => {
               const queryRanges = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryRanges}`;
 
-              console.log("Fetching Sheets data via native fetch...");
               const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${tokenResponse.access_token}`,
-                  'Accept': 'application/json'
-                }
+                headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
               });
 
-              if (!response.ok) {
-                const errorBody = await response.text();
-                console.error("Fetch API Error:", response.status, errorBody);
-                throw new Error(`Erreur API: ${response.status} ${response.statusText}`);
-              }
+              if (!response.ok) throw new Error("Erreur réponse Sheets API");
 
               const data = await response.json();
+              // ... reste du traitement des données ...
               const valueRanges = data.valueRanges || [];
               
               const driverKeys = [
