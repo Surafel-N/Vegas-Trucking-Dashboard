@@ -1,4 +1,5 @@
-import { CalendarRange, Filter, RotateCcw, UserRound, AlertTriangle } from "lucide-react";
+import { CalendarRange, Filter, RotateCcw, UserRound, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 
 export function FilterBar({
   chauffeurs,
@@ -20,19 +21,31 @@ export function FilterBar({
   onReset,
   onClearAllStorage
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <section className="panel-enter rounded-2xl md:rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 md:p-6 text-white shadow-[0_28px_80px_-50px_rgba(0,0,0,0.9)] shrink-0">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-medium text-white/46">
-            <Filter className="size-4" />
-            Filtres
+        <div className="flex items-center justify-between w-full xl:w-auto">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-white/46">
+              <Filter className="size-4" />
+              Filtres
+            </div>
+            <h2 className="mt-1 md:mt-2 text-xl md:text-2xl font-semibold tracking-tight text-white">Control deck</h2>
+            <p className="mt-1 text-xs md:text-sm text-white/44 hidden sm:block">Pilotez tout le dashboard depuis ici.</p>
           </div>
-          <h2 className="mt-1 md:mt-2 text-xl md:text-2xl font-semibold tracking-tight text-white">Control deck</h2>
-          <p className="mt-1 text-xs md:text-sm text-white/44">Le chauffeur, le mois et la plage de dates pilotent tout le dashboard.</p>
+          
+          <button 
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex md:hidden items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-white/10"
+          >
+            {isOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            {isOpen ? "Réduire" : "Filtres"}
+          </button>
         </div>
 
-        <div className="flex gap-2 md:gap-3">
+        <div className={`flex gap-2 md:gap-3 ${isOpen ? 'flex' : 'hidden md:flex'}`}>
           {onClearAllStorage && (
             <button
               type="button"
@@ -56,7 +69,7 @@ export function FilterBar({
         </div>
       </div>
 
-      <div className="mt-4 md:mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+      <div className={`mt-4 md:mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 ${isOpen ? 'grid' : 'hidden md:grid'}`}>
         <label className="space-y-2">
           <span className="text-sm font-medium text-white/58">Chauffeur</span>
           <div className="relative">

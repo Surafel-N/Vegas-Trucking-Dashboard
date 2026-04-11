@@ -169,7 +169,8 @@ function Header({ activeSection, onSectionChange, isAuthenticated, authUser, onL
         </div>
       </div>
       
-      <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar mx-2 flex-1 scroll-smooth">
+      {/* Navigation visible uniquement sur Desktop */}
+      <nav className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar mx-2 flex-1 scroll-smooth">
         {activeMenu.map((item) => {
           const Icon = iconMap[item.id] || Grid2X2;
           const isActive = activeSection === item.id;
@@ -192,20 +193,20 @@ function Header({ activeSection, onSectionChange, isAuthenticated, authUser, onL
 
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
         <button
-          onClick={(e) => { e.preventDefault(); syncTicketsIA(); }}
-          disabled={isSyncingTickets}
+          onClick={(e) => { e.preventDefault(); syncTicketsIA && syncTicketsIA(); }}
+          disabled={isSyncingTickets || !syncTicketsIA}
           title="Sync Tickets IA"
-          className="relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#4285F4]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#4285F4] transition-all hover:bg-[#4285F4]/20 disabled:opacity-50"
+          className={`relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#4285F4]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#4285F4] transition-all hover:bg-[#4285F4]/20 disabled:opacity-30 ${!syncTicketsIA ? 'hidden' : ''}`}
         >
           <Cloud className={`size-4 md:size-3 ${isSyncingTickets ? "animate-bounce" : ""}`} />
           <span className="hidden lg:block">{isSyncingTickets ? "Analyse..." : "Sync IA"}</span>
         </button>
 
         <button
-          onClick={(e) => { e.preventDefault(); syncWithGoogleSheets(); }}
-          disabled={isSyncing}
+          onClick={(e) => { e.preventDefault(); syncWithGoogleSheets && syncWithGoogleSheets(); }}
+          disabled={isSyncing || !syncWithGoogleSheets}
           title="Sync Sheets"
-          className="relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#cf5d56]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#cf5d56] transition-all hover:bg-[#cf5d56]/20 disabled:opacity-50"
+          className={`relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#cf5d56]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#cf5d56] transition-all hover:bg-[#cf5d56]/20 disabled:opacity-30 ${!syncWithGoogleSheets ? 'hidden' : ''}`}
         >
           <RefreshCcw className={`size-4 md:size-3 ${isSyncing ? "animate-spin" : ""}`} />
           <span className="hidden lg:block">{isSyncing ? "Synchro..." : "Sync Sheets"}</span>
@@ -224,6 +225,41 @@ function Header({ activeSection, onSectionChange, isAuthenticated, authUser, onL
         )}
       </div>
     </header>
+  );
+}
+
+function BottomNav({ activeSection, onSectionChange, menuConfig = [] }) {
+  const iconMap = {
+    dashboard: BarChart3, analytics: BarChart3, drivers: Users, trips: Truck,
+    depenses: Wallet, encaissements: Banknote, documents: ReceiptText,
+    closing: ShieldCheck, reports: ReceiptText, audit: ShieldCheck,
+    "quick-entry": PlusCircle, admin: Settings, settings: Settings2,
+  };
+
+  // On affiche seulement les sections principales en bas sur mobile
+  const priorityOrder = ["dashboard", "analytics", "trips", "depenses", "documents", "reports", "settings"];
+  const mobileMenu = menuConfig
+    .filter(m => m.enabled && priorityOrder.includes(m.id))
+    .sort((a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id))
+    .slice(0, 5); // Max 5 items pour la barre du bas
+
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-around bg-black/80 backdrop-blur-2xl border-t border-white/10 px-2 py-3 pb-safe">
+      {mobileMenu.map((item) => {
+        const Icon = iconMap[item.id] || Grid2X2;
+        const isActive = activeSection === item.id;
+        return (
+          <button 
+            key={item.id} 
+            onClick={() => onSectionChange(item.id)}
+            className={`flex flex-col items-center gap-1 transition-all ${isActive ? "text-[#cf5d56]" : "text-white/40"}`}
+          >
+            <Icon className={`size-6 ${isActive ? "scale-110" : "scale-100"}`} />
+            <span className="text-[10px] font-bold uppercase tracking-tighter">{item.label.split(' ')[0]}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -809,7 +845,7 @@ const handleLogout = () => {
         onClearAllStorage={rolePermissions.canDelete ? handleClearAllStorage : null} 
       />
 
-<main className="h-[calc(100svh-4rem)] md:h-[calc(100svh-10rem)] overflow-auto p-4 md:p-6 md:pt-0 pb-10 md:pb-6">
+<main className="h-[calc(100svh-4rem)] md:h-[calc(100svh-10rem)] overflow-auto p-4 md:p-6 md:pt-0 pb-24 md:pb-6">
         <ErrorBoundary>
           <div className="panel-enter">
             
@@ -848,7 +884,14 @@ const handleLogout = () => {
             
           </div>
         </ErrorBoundary>
-      </main>
-    </div>
-  );
-} 
+        </main>
+
+        <BottomNav 
+        activeSection={activeSection} 
+        onSectionChange={handleSectionChange} 
+        menuConfig={uiConfig.menu} 
+        />
+        </div>
+        );
+        } 
+ 
