@@ -44,6 +44,9 @@ type DashboardProps = {
   onReset?: () => void;
   isDateFiltered?: boolean;
   filteredData?: any[];
+  calendarData?: any[];
+  globalMonth?: string;
+  onMonthChange?: (month: string) => void;
 };
 
 const DEFAULT_ORDER = ['fleet', 'insights', 'stats', 'middle', 'archives'];
@@ -61,7 +64,10 @@ export function Dashboard({
   onDateSelect,
   onReset,
   isDateFiltered,
-  filteredData = []
+  filteredData = [],
+  calendarData = [],
+  globalMonth,
+  onMonthChange
 }: DashboardProps) {
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -163,10 +169,12 @@ export function Dashboard({
               {/* À GAUCHE du Super-Bloc : LogisticsCalendar */}
               <div className="w-full md:w-auto overflow-x-auto">
                 <LogisticsCalendar 
-                  records={filteredData} 
+                  records={calendarData} 
                   onDateSelect={onDateSelect}
                   onReset={onReset}
                   isDateFiltered={isDateFiltered}
+                  globalMonth={globalMonth}
+                  onMonthChange={onMonthChange}
                 />
               </div>
 

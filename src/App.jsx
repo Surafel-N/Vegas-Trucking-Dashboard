@@ -310,6 +310,18 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
     });
   }, [trips, chauffeur, month, year, destination, startDate, endDate]);
 
+  const calendarData = useMemo(() => {
+    return trips.filter((t) => {
+      const chauffeurMatch = chauffeur === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === String(chauffeur).trim();
+      const recordYear = t.year || (t.date ? new Date(t.date + 'T00:00:00').getFullYear() : null);
+      const yearMatch = !year || (recordYear !== null && String(recordYear) === String(year));
+      const destinationMatch = destination === ALL_DESTINATIONS || t.destination === destination;
+      const startMatch = !startDate || t.date >= startDate;
+      const endMatch = !endDate || t.date <= endDate;
+      return chauffeurMatch && yearMatch && destinationMatch && startMatch && endMatch;
+    });
+  }, [trips, chauffeur, year, destination, startDate, endDate]);
+
   const dashboardData = useMemo(() => computeDashboard(filteredData), [filteredData]);
   const dashboardMetrics = useMemo(() => getDashboardMetrics(filteredData), [filteredData]);
   const monthlyComparison = useMemo(() => getMonthlyComparison(allRecords, year), [allRecords, year]);
@@ -806,7 +818,7 @@ const handleLogout = () => {
                 {!filteredData.length ? ( 
                   <EmptyState selectedYear={year} invalidRange={invalidRange} /> 
                 ) : (
-                  <Dashboard dashboardData={dashboardData} formatCurrency={formatCurrency} formatCompactNumber={formatCompactNumber} onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} uiConfig={uiConfig} selectedYear={year} onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} onReset={() => { setStartDate(globalBounds.min); setEndDate(globalBounds.max); }} isDateFiltered={startDate !== globalBounds.min || endDate !== globalBounds.max} filteredData={filteredData} />
+                  <Dashboard dashboardData={dashboardData} formatCurrency={formatCurrency} formatCompactNumber={formatCompactNumber} onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} uiConfig={uiConfig} selectedYear={year} onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} onReset={() => { setStartDate(globalBounds.min); setEndDate(globalBounds.max); }} isDateFiltered={startDate !== globalBounds.min || endDate !== globalBounds.max} filteredData={filteredData} calendarData={calendarData} globalMonth={month} onMonthChange={setMonth} />
                 )}
               </div>
             )}

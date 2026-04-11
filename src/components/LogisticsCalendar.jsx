@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
-export function LogisticsCalendar({ records, onDateSelect, onReset, isDateFiltered }) {
+export function LogisticsCalendar({ records, onDateSelect, onReset, isDateFiltered, globalMonth, onMonthChange }) {
   const chauffeurOptions = useMemo(() => {
     const options = ["Tous"];
     const labels = [...new Set((records || []).map(r => r.driverLabel))].filter(Boolean).sort();
@@ -10,12 +10,26 @@ export function LogisticsCalendar({ records, onDateSelect, onReset, isDateFilter
 
   const [selectedPicker, setSelectedPicker] = useState("Tous");
   const [currentDate, setCurrentDate] = useState(() => {
+    if (globalMonth && globalMonth !== "Tous les mois") {
+      const now = new Date();
+      return new Date(now.getFullYear(), Number(globalMonth) - 1, 1);
+    }
     if (records && records.length > 0) {
       const last = new Date(records[records.length - 1].date);
       return new Date(last.getFullYear(), last.getMonth(), 1);
     }
     return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   });
+
+  // Sync internal state when globalMonth changes (Control Deck -> Calendar)
+  useEffect(() => {
+    if (globalMonth && globalMonth !== "Tous les mois") {
+      const m = Number(globalMonth) - 1;
+      if (m !== currentDate.getMonth()) {
+        setCurrentDate(new Date(currentDate.getFullYear(), m, 1));
+      }
+    }
+  }, [globalMonth]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed
@@ -59,7 +73,12 @@ export function LogisticsCalendar({ records, onDateSelect, onReset, isDateFilter
   }, [year, month]);
 
   const changeMonth = (offset) => {
-    setCurrentDate(new Date(year, month + offset, 1));
+    const nextDate = new Date(year, month + offset, 1);
+    setCurrentDate(nextDate);
+    // Sync Calendar -> Control Deck
+    if (onMonthChange) {
+      onMonthChange(String(nextDate.getMonth() + 1));
+    }
   };
 
   const daysOfWeek = ["L", "M", "M", "J", "V", "S", "D"];
