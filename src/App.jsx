@@ -578,7 +578,13 @@ const handleLogout = () => {
     console.log("🚀 Tentative de synchro Google Sheets...");
 
     if (!window.google?.accounts?.oauth2) {
-      alert("La bibliothèque Google n'est pas encore chargée. Réessayez dans 2 secondes.");
+      alert("❌ Erreur : La bibliothèque Google n'est pas chargée. Vérifiez votre connexion internet.");
+      return;
+    }
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert("❌ Erreur : VITE_GOOGLE_CLIENT_ID est manquant dans les réglages Netlify.");
       return;
     }
 
@@ -586,20 +592,17 @@ const handleLogout = () => {
     const batchId = `sync-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 
     try {
+      console.log("Initialisation du client Google avec ID:", clientId);
       const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        client_id: clientId,
         scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+        prompt: 'consent',
         callback: async (tokenResponse) => {
           if (tokenResponse && tokenResponse.access_token) {
             try {
-              console.log("✅ Accès autorisé, récupération des données...");
+              console.log("✅ Accès autorisé par Google.");
               const spreadsheetId = "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
-              const ranges = [
-                "'AMARA TRUCK 76'!A2:O",
-                "'BRAHIMA TRUCK 45'!A2:O",
-                "'SORO TRUCK 52'!A2:O"
-              ];
-              
+              const ranges = ["'AMARA TRUCK 76'!A2:O", "'BRAHIMA TRUCK 45'!A2:O", "'SORO TRUCK 52'!A2:O"];
               const queryRanges = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryRanges}`;
 
@@ -607,10 +610,91 @@ const handleLogout = () => {
                 headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
               });
 
-              if (!response.ok) throw new Error("Erreur réponse Sheets API");
-
+              if (!response.ok) throw new Error("Erreur Sheets API: " + response.status);
               const data = await response.json();
-              // ... reste du traitement des données ...
+              
+              if (!data.valueRanges) {
+                alert("Données Google Sheets vides ou inaccessibles.");
+                return;
+              }
+
+              // Traitement des données (logique inchangée)
+              const driverKeys = [{ chauffeur: "AMARA", sdv: "SDV 1" }, { chauffeur: "BRAHIMA", sdv: "SDV 2" }, { chauffeur: "SORO", sdv: "SDV 3" }];
+              let importedTrips = [];
+
+              data.valueRanges.forEach((vr, idx) => {
+                const rows = vr.values || [];
+                const { chauffeur, sdv } = driverKeys[idx];
+                const driverLabel = `${sdv} (${chauffeur})`;
+
+                rows.forEach(row => {
+                  const rawDate = String(row[0] || "").trim();
+                  let isoDate = null;
+                  const moisMap = { "janvier": "01", "fevrier": "02", "février": "02", "mars": "03", "avril": "04", "mai": "05", "juin": "06", "juillet": "07", "aout": "08", "août": "08", "septembre": "09", "octobre": "10", "novembre": "11", "decembre": "12", "décembre": "12" };
+                  const dateTextMatch = rawDate.toLowerCase().match(/(?:\w+)?\s*(\d{1,2})\s+([a-zéû]+)\s+(\d{2,4})/);
+                  if (dateTextMatch) {
+                    const d = dateTextMatch[1].padStart(2, '0');
+                    const m = moisMap[dateTextMatch[2]];
+                    let y = dateTextMatch[3];
+                    if (y.length === 2) y = "20" + y;
+                    if (m) isoDate = `${y}-${m}-${d}`;
+                  } else {
+                    const dateNumMatch = rawDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+                    if (dateNumMatch) {
+                      let d = dateNumMatch[1].padStart(2, '0');
+                      let m = dateNumMatch[2].padStart(2, '0');
+                      let y = dateNumMatch[3];
+                      if (y.length === 2) y = "20" + y;
+                      isoDate = `${y}-${m}-${d}`;
+                    }
+                  }
+                  if (!isoDate) return;
+                  const dateObj = new Date(isoDate);
+                  const parseNum = (v) => {
+                    if (!v) return 0;
+                    let clean = String(v).replace(/\s/g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, "");
+                    return parseFloat(clean) || 0;
+                  };
+                  let tonnage = parseNum(row[10]); 
+                  let totalGross = parseNum(row[11]); 
+                  let totalExpense = parseNum(row[9]); 
+                  importedTrips.push({
+                    id: `gsheet-${chauffeur}-${isoDate}-${totalGross}-${Math.random().toString(36).substr(2, 5)}`,
+                    batchId, importDate: new Date().toISOString(), chauffeur, driverLabel, sdv, date: isoDate, day: dateObj.getDate(), month: dateObj.getMonth() + 1, year: dateObj.getFullYear(),
+                    start: row[1] || "Non renseigné", destination: row[2] || "Non renseigné", fuel_cost_cfa: parseNum(row[3]), road_fees_cfa: parseNum(row[5]),
+                    tonnage, total_gross_cfa: totalGross, total_expense_cfa: totalExpense, total_net_cfa: totalGross - totalExpense,
+                    voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0), tripType: "Google Sheets", comments: row[13] || "", km: parseNum(row[14])
+                  });
+                });
+              });
+
+              if (importedTrips.length > 0) {
+                setManualTrips(prev => [...prev, ...importedTrips]);
+                alert(`${importedTrips.length} trajets synchronisés !`);
+              } else {
+                alert("Aucun nouveau trajet trouvé.");
+              }
+            } catch (err) {
+              console.error("Fetch Error:", err);
+              alert("Erreur de récupération : " + err.message);
+            } finally {
+              setIsSyncing(false);
+            }
+          }
+        },
+        error_callback: (err) => {
+          console.error("Google Auth Error Detail:", err);
+          alert(`Erreur Google (${err.error}) : ${err.error_description || "Vérifiez que l'URL du site est autorisée dans Google Cloud Console."}`);
+          setIsSyncing(false);
+        }
+      });
+      client.requestAccessToken();
+    } catch (err) {
+      console.error("Sync Initialization Exception:", err);
+      alert("Erreur fatale d'initialisation. Détails: " + JSON.stringify(err));
+      setIsSyncing(false);
+    }
+  };
               const valueRanges = data.valueRanges || [];
               
               const driverKeys = [
