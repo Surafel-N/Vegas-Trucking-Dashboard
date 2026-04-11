@@ -1,0 +1,842 @@
+import LoginScreen from "./components/LoginScreen.jsx";
+import { useState, useMemo, useEffect, startTransition } from "react";
+
+import {
+  AlertTriangle,
+  BarChart3,
+  LogOut,
+  ReceiptText,
+  Settings,
+  Settings2,
+  ShieldCheck,
+  Truck,
+  UserRound,
+  Users,
+  Wallet,
+  Banknote,
+  Grid2X2,
+  PlusCircle,
+  RefreshCcw,
+  Cloud,
+  ExternalLink,
+} from "lucide-react";
+import {
+  ALL_CHAUFFEURS,
+  ALL_DESTINATIONS,
+  ALL_MONTHS,
+  formatCompactNumber,
+  formatCurrency,
+  formatDate,
+  formatPercent,
+  formatTonnage,
+  getDashboardMetrics,
+  getDateBounds,
+  getMonthOptions,
+  getYearOptions,
+  loadSDVFiles,
+} from "./lib/dashboard";
+import { computeDashboard } from "./utils/computeDashboard";
+import SmartBulkImporter from './components/SmartBulkImporter';
+import {
+  loadFinanceRecords,
+  saveFinanceRecords,
+  buildUploadRecord,
+} from "./utils/financeRecords";
+import { ROLE_MANAGER, ROLE_VIEWER, ROLE_ADMIN, getRolePermissions } from "./utils/auth";
+import { getMonthlyComparison } from "./utils/getMonthlyComparison";
+import ExpenseModule from './components/ExpenseModule';
+import { KpiCard } from "./components/KpiCard";
+import { FilterBar } from "./components/FilterBar";
+import { Charts } from "./components/Charts";
+import { FleetStatus } from "./components/FleetStatus";
+import { LogisticsCalendar } from "./components/LogisticsCalendar";
+import { FleetTrackerWidget } from "./components/FleetTrackerWidget";
+import { MostProfitableDay } from "./components/MostProfitableDay";
+import { ReportsModule } from "./components/ReportsModule";
+import { SettingsModule } from "./components/SettingsModule";
+import { TransportTable } from "./components/TransportTable";
+import { Dashboard } from "./components/Dashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { FinanceWorkspace } from "./components/FinanceWorkspace";
+import { DocumentsIngestionModule } from "./components/DocumentsIngestionModule";
+import { TripsModule } from "./components/TripsModule";
+import { DailyClosingModule } from "./components/DailyClosingModule";
+import { AuditLogModule } from "./components/AuditLogModule";
+import { DriversModule } from "./components/DriversModule";
+import ManualEntryModule from "./components/ManualEntryModule";
+
+// IMPORT DU NOUVEAU MODULE DE VALIDATION IA
+import AITicketValidationModule from "./components/AITicketValidationModule";
+
+const APP_STORAGE_KEYS = {
+  auth: "sdv_auth_session_v1",
+  trips: "sdv_manual_trips_v1",
+  closings: "sdv_closings_v1",
+  categories: "sdv_categories_v1",
+  audit: "sdv_audit_logs_v1",
+  inbox: "sdv_documents_inbox_v1",
+  drivers: "sdv_cms_drivers_v1",
+  vehicles: "sdv_cms_vehicles_v1",
+  destinations: "sdv_cms_destinations_v1",
+  rules: "sdv_cms_rules_v1",
+  ui: "sdv_cms_ui_v1",
+  pending_ai_tickets: "sdv_pending_ai_tickets_v1" // Nouvelle clé
+};
+
+const DEFAULT_BUSINESS_RULES_UI = {
+  voyageThreshold: 100,
+  fuelCostPerKm: 0,
+  targetMargin: 0.2,
+};
+
+const DEFAULT_UI_CONFIG = {
+  widgets: [
+    { id: "profit", label: "Total Bénéfice", enabled: true },
+    { id: "tonnage", label: "Tonnage Total", enabled: true },
+    { id: "costs", label: "Total dépenses", enabled: true },
+    { id: "revenue", label: "Total Revenu", enabled: true },
+    { id: "voyages", label: "Total Voyages", enabled: true },
+    { id: "calendar", label: "Calendrier", enabled: true },
+    { id: "expenses", label: "Dépenses Cloud", enabled: true },
+    { id: "mileage", label: "Kilométrage Flotte", enabled: true },
+  ],
+  menu: [
+    { id: "dashboard", label: "Dashboard", enabled: true },
+    { id: "analytics", label: "Analytics", enabled: true },
+    { id: "drivers", label: "Chauffeurs", enabled: true },
+    { id: "trips", label: "Trajets", enabled: true },
+    { id: "depenses", label: "Dépenses", enabled: true },
+    { id: "encaissements", label: "Encaissements", enabled: true },
+    { id: "documents", label: "Validation IA", enabled: true }, // RENOMMÉ ICI
+    { id: "closing", label: "Clôture jour", enabled: true },
+    { id: "reports", label: "Rapports", enabled: true },
+    { id: "audit", label: "Audit", enabled: true },
+    { id: "quick-entry", label: "Saisie Rapide", enabled: true },
+    { id: "admin", label: "Importation", enabled: true },
+    { id: "settings", label: "Réglages", enabled: true },
+  ],
+};
+const DEFAULT_DRIVERS = [
+  { id: "drv-amara", sdv: "SDV 1", name: "AMARA", phone: "+225 07 07 00 00 01", license: "SDV-AMARA-01", status: "active", vehicle: "AA-672-PS-09" },
+  { id: "drv-brahima", sdv: "SDV 2", name: "BRAHIMA", phone: "+225 07 07 00 00 02", license: "SDV-BRAHIMA-02", status: "active", vehicle: "BB-221-TR-07" },
+  { id: "drv-soro", sdv: "SDV 3", name: "SORO", phone: "+225 07 07 00 00 03", license: "SDV-SORO-03", status: "active", vehicle: "CC-478-KL-01" },
+];
+const DEFAULT_DESTINATIONS_LIST = ["Abidjan", "San Pedro", "Lauzoua", "Yamoussoukro", "Bouake"];
+const DEFAULT_VEHICLES = [
+  { id: "veh-1", plate: "AA-672-PS-09", model: "Renault Kerax", status: "active" },
+  { id: "veh-2", plate: "BB-221-TR-07", model: "Volvo FMX", status: "active" },
+  { id: "veh-3", plate: "CC-478-KL-01", model: "Scania G440", status: "active" },
+];
+
+function loadJson(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed === null ? fallback : parsed;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function saveJson(key, data) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) { }
+}
+
+function Header({ activeSection, onSectionChange, isAuthenticated, authUser, onLogout, menuConfig = [], syncWithGoogleSheets, isSyncing, syncTicketsIA, isSyncingTickets, pendingCount }) {
+  const iconMap = {
+    dashboard: BarChart3, analytics: BarChart3, drivers: Users, trips: Truck,
+    depenses: Wallet, encaissements: Banknote, documents: ReceiptText,
+    closing: ShieldCheck, reports: ReceiptText, audit: ShieldCheck,
+    "quick-entry": PlusCircle, admin: Settings, settings: Settings2,
+  };
+
+  const activeMenu = menuConfig.filter(m => m.enabled);
+
+  return (
+    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-black/50 px-4 md:px-6 backdrop-blur-xl shrink-0">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#cf5d56]">
+          <Truck className="size-6 text-white" />
+        </div>
+        <div className="hidden sm:block">
+          <h1 className="text-sm font-bold text-white md:text-lg">SDV Chauffeur</h1>
+          <p className="text-[10px] text-white/50">Logistics & Performance</p>
+        </div>
+      </div>
+      
+      <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar mx-2 flex-1 scroll-smooth">
+        {activeMenu.map((item) => {
+          const Icon = iconMap[item.id] || Grid2X2;
+          const isActive = activeSection === item.id;
+          return (
+            <button 
+              key={item.id} onClick={() => onSectionChange(item.id)}
+              className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${isActive ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white"}`}
+            >
+              <Icon className="size-4 shrink-0" /> 
+              <span className={isActive ? "block" : "hidden md:block"}>{item.label}</span>
+              {item.id === 'documents' && pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <button
+          onClick={(e) => { e.preventDefault(); syncTicketsIA(); }}
+          disabled={isSyncingTickets}
+          title="Sync Tickets IA"
+          className="relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#4285F4]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#4285F4] transition-all hover:bg-[#4285F4]/20 disabled:opacity-50"
+        >
+          <Cloud className={`size-4 md:size-3 ${isSyncingTickets ? "animate-bounce" : ""}`} />
+          <span className="hidden lg:block">{isSyncingTickets ? "Analyse..." : "Sync IA"}</span>
+        </button>
+
+        <button
+          onClick={(e) => { e.preventDefault(); syncWithGoogleSheets(); }}
+          disabled={isSyncing}
+          title="Sync Sheets"
+          className="relative z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 rounded-full bg-[#cf5d56]/10 p-2 md:px-4 md:py-2 text-xs font-bold text-[#cf5d56] transition-all hover:bg-[#cf5d56]/20 disabled:opacity-50"
+        >
+          <RefreshCcw className={`size-4 md:size-3 ${isSyncing ? "animate-spin" : ""}`} />
+          <span className="hidden lg:block">{isSyncing ? "Synchro..." : "Sync Sheets"}</span>
+        </button>
+
+        {isAuthenticated && (
+          <div className="flex items-center gap-2 md:gap-3 border-l border-white/10 pl-2 md:pl-4 ml-1 md:ml-0">
+            <div className="text-right hidden xl:block">
+              <p className="text-sm font-medium text-white">{authUser?.username || "Admin"}</p>
+              <p className="text-[10px] uppercase tracking-wider text-white/40">{authUser?.role || "Manager"}</p>
+            </div>
+            <button onClick={onLogout} className="rounded-full bg-white/5 p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white">
+              <LogOut className="size-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function EmptyState({ invalidRange, selectedYear }) {
+  return (
+    <section className="rounded-[30px] border border-[#cf5d56]/18 bg-[#181818] p-8 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#cf5d56]/12 p-3 text-[#ff8f84]">
+        <AlertTriangle className="size-8" />
+      </div>
+      <h3 className="mt-6 text-xl font-semibold tracking-tight text-white">
+        {invalidRange ? "Plage de dates invalide" : `Aucune donnée pour l'année ${selectedYear}`}
+      </h3>
+      <p className="mt-4 text-sm text-white/50 leading-relaxed max-w-md mx-auto">
+        Utilisez le sélecteur d'année ou allez dans l'onglet 'Importation' pour ajouter de nouveaux trajets.
+      </p>
+    </section>
+  );
+}
+
+export default function App() {
+const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, null));
+  const [activeSection, setActiveSection] = useState("dashboard");
+  
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingTickets, setIsSyncingTickets] = useState(false);
+
+  // File d'attente IA
+  const [pendingTickets, setPendingTickets] = useState(() => loadJson(APP_STORAGE_KEYS.pending_ai_tickets, []));
+
+  const [drivers, setDrivers] = useState(() => loadJson(APP_STORAGE_KEYS.drivers, DEFAULT_DRIVERS));
+  const [vehicles, setVehicles] = useState(() => loadJson(APP_STORAGE_KEYS.vehicles, DEFAULT_VEHICLES));
+  const [destinationsList, setDestinationsList] = useState(() => loadJson(APP_STORAGE_KEYS.destinations, DEFAULT_DESTINATIONS_LIST));
+  const [businessRules, setBusinessRules] = useState(() => loadJson(APP_STORAGE_KEYS.rules, DEFAULT_BUSINESS_RULES_UI));
+  const [uiConfig, setUiConfig] = useState(() => loadJson(APP_STORAGE_KEYS.ui, DEFAULT_UI_CONFIG));
+
+  const [manualTrips, setManualTrips] = useState(() => loadJson(APP_STORAGE_KEYS.trips, []));
+  const [expenseRecords, setExpenseRecords] = useState(() => loadFinanceRecords("expenses"));
+  const [incomeRecords, setIncomeRecords] = useState(() => loadFinanceRecords("incomes"));
+  const [documentRecords, setDocumentRecords] = useState(() => loadFinanceRecords("documents"));
+  const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
+  const [auditLogs, setAuditLogs] = useState(() => loadJson(APP_STORAGE_KEYS.audit, []));
+
+  const [categories, setCategories] = useState(() =>
+    loadJson(APP_STORAGE_KEYS.categories, { expense: ["Carburant", "Péage"], income: ["Recette trajet"] }),
+  );
+// On vérifie si l'utilisateur est un Admin
+  const isAdmin = authUser?.role === "admin";
+  const transportBundle = useMemo(() => {
+    try { return loadSDVFiles(businessRules); } catch (e) { return { records: [], stats: [] }; }
+  }, [businessRules]);
+
+  const allRecords = transportBundle.records;
+  
+  const trips = useMemo(() => [
+    ...(allRecords || []).map(row => ({ ...row, tripType: "Régulier" })),
+    ...(manualTrips || []),
+  ], [allRecords, manualTrips]);
+
+  const yearOptions = useMemo(() => getYearOptions(trips), [trips]);
+  const [chauffeur, setChauffeur] = useState(ALL_CHAUFFEURS);
+  const [month, setMonth] = useState(ALL_MONTHS);
+  const [year, setYear] = useState(() => yearOptions[yearOptions.length - 1] || String(new Date().getFullYear()));
+  const [destination, setDestination] = useState(ALL_DESTINATIONS);
+  
+  const globalBounds = useMemo(() => getDateBounds(trips), [trips]);
+  const [startDate, setStartDate] = useState(globalBounds.min);
+  const [endDate, setEndDate] = useState(globalBounds.max);
+
+  const chauffeurOptions = useMemo(() => [ALL_CHAUFFEURS, ...drivers.map(d => `${d.sdv} (${d.name})`)], [drivers]);
+  const monthOptions = useMemo(() => getMonthOptions(trips), [trips]);
+  const destinationOptions = useMemo(() => [ALL_DESTINATIONS, ...destinationsList], [destinationsList]);
+
+  const filteredData = useMemo(() => {
+    return trips.filter((t) => {
+      const chauffeurMatch = chauffeur === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === String(chauffeur).trim();
+      const recordMonth = t.month || (t.date ? new Date(t.date + 'T00:00:00').getMonth() + 1 : null);
+      const monthMatch = month === ALL_MONTHS || (recordMonth !== null && String(recordMonth) === String(Number(month)));
+      const recordYear = t.year || (t.date ? new Date(t.date + 'T00:00:00').getFullYear() : null);
+      const yearMatch = !year || (recordYear !== null && String(recordYear) === String(year));
+      const destinationMatch = destination === ALL_DESTINATIONS || t.destination === destination;
+      const startMatch = !startDate || t.date >= startDate;
+      const endMatch = !endDate || t.date <= endDate;
+      return chauffeurMatch && monthMatch && yearMatch && destinationMatch && startMatch && endMatch;
+    });
+  }, [trips, chauffeur, month, year, destination, startDate, endDate]);
+
+  const dashboardData = useMemo(() => computeDashboard(filteredData), [filteredData]);
+  const dashboardMetrics = useMemo(() => getDashboardMetrics(filteredData), [filteredData]);
+  const monthlyComparison = useMemo(() => getMonthlyComparison(allRecords, year), [allRecords, year]);
+  const invalidRange = startDate && endDate && startDate > endDate;
+  const rolePermissions = getRolePermissions(authUser?.role || ROLE_VIEWER);
+
+  const filteredMenu = useMemo(() => {
+    return uiConfig.menu.filter(item => {
+      if (!item.enabled) return false;
+      if (authUser?.role === "viewer") {
+        // Le visiteur ne voit que Dashboard, Analytics, Audit et Rapports (en lecture seule)
+        return ["dashboard", "analytics", "reports", "audit"].includes(item.id);
+      }
+      return true;
+    });
+  }, [uiConfig.menu, authUser?.role]);
+
+  useEffect(() => {
+    // Suppression du filtre forcé sur 2026 pour permettre de conserver les données de 2025 et autres.
+  }, []);
+
+  const chauffeurKpis = useMemo(() => [
+    { label: "Revenue", value: formatCurrency(dashboardMetrics.totalRevenue), tone: "teal" },
+    { label: "Costs", value: formatCurrency(dashboardMetrics.totalCosts), tone: "red" },
+    { label: "Profit", value: formatCurrency(dashboardMetrics.totalProfit), tone: "green" },
+    { label: "Tonnage", value: formatTonnage(dashboardMetrics.totalTonnage), tone: "slate" },
+  ], [dashboardMetrics]);
+
+  useEffect(() => { saveJson(APP_STORAGE_KEYS.drivers, drivers); }, [drivers]);
+  useEffect(() => { saveJson(APP_STORAGE_KEYS.trips, manualTrips); }, [manualTrips]);
+  useEffect(() => { saveJson(APP_STORAGE_KEYS.pending_ai_tickets, pendingTickets); }, [pendingTickets]);
+
+  const handleClearAllStorage = () => {
+    if (confirm("🚨 Attention : Cela va supprimer absolument TOUTES les données (2026, imports, réglages). Confirmer ?")) {
+      localStorage.clear(); window.location.reload();
+    }
+  };
+const handleLogout = () => {
+    setAuthUser(null);
+    localStorage.removeItem(APP_STORAGE_KEYS.auth);
+    setActiveSection("dashboard");
+  };
+  const deleteImportBatch = (batchId) => {
+    const batchCount = manualTrips.filter(t => t.batchId === batchId).length;
+    if (confirm(`Voulez-vous vraiment supprimer cet import de ${batchCount} trajets ?`)) {
+      setManualTrips(prev => prev.filter(t => t.batchId !== batchId));
+      setAuditLogs(prev => prev.filter(log => log.batchId !== batchId));
+      alert("Import supprimé avec succès.");
+    }
+  };
+
+  // ----------------------------------------------------
+  // NOUVELLES FONCTIONS IA
+  // ----------------------------------------------------
+
+  const handleApproveAITicket = (ticketInfo) => {
+    const finalData = ticketInfo.finalData;
+    const dateObj = finalData.date ? new Date(finalData.date) : new Date();
+    
+    const gross = parseFloat(finalData.total_gross_cfa) || 0;
+    const expense = parseFloat(finalData.total_expense_cfa) || 0;
+    const tonnage = parseFloat(finalData.tonnage) || 0;
+
+    const newTrip = {
+      id: `ai-${Date.now()}`,
+      batchId: 'ai-manual-validation',
+      importDate: new Date().toISOString(),
+      driverLabel: finalData.driverLabel,
+      date: finalData.date,
+      day: dateObj.getDate(),
+      month: dateObj.getMonth() + 1,
+      year: dateObj.getFullYear(),
+      start: "Non renseigné",
+      destination: "Non renseigné",
+      fuel_cost_cfa: 0,
+      road_fees_cfa: 0,
+      tonnage: tonnage,
+      total_gross_cfa: gross,
+      total_expense_cfa: expense,
+      total_net_cfa: gross - expense,
+      voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0),
+      tripType: "IA Validé",
+      comments: `Ticket scanné validé manuellement`,
+      km: 0
+    };
+
+    setManualTrips(prev => [...prev, newTrip]);
+    setAuditLogs(prev => [{
+      id: `log-${Date.now()}`, timestamp: new Date().toISOString(), type: "Validation IA", count: 1, batchId: 'ai-manual-validation'
+    }, ...prev]);
+  };
+
+  const syncTicketsIA = async () => {
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!API_KEY) {
+      alert("⚠️ Clé Gemini introuvable. As-tu bien créé le fichier .env ?");
+      return;
+    }
+
+    setIsSyncingTickets(true);
+    console.log("🚀 Lancement de la lecture IA...");
+
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/drive.readonly",
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            try {
+              const folderId = '1imyGSmHQLno6yNwUl5cHJbjfD_kI24zJ';
+              const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,thumbnailLink)`;
+
+              const driveRes = await fetch(listUrl, {
+                headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
+              });
+              const driveData = await driveRes.json();
+              const files = driveData.files || [];
+
+              if (files.length === 0) {
+                alert("🤷‍♂️ Aucun ticket trouvé dans le dossier Drive.");
+                setIsSyncingTickets(false);
+                return;
+              }
+
+              alert(`✅ ${files.length} ticket(s) trouvé(s) ! L'IA commence la lecture. Patiente un peu...`);
+              const newPendingTickets = [];
+
+              for (const file of files) {
+                console.log(`Lecture du fichier ${file.name}...`);
+                
+                const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+                  headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
+                });
+                const blob = await fileRes.blob();
+                
+                const base64data = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                  reader.readAsDataURL(blob);
+                });
+
+                const geminiPrompt = `
+                  Tu es un expert en logistique en Côte d'Ivoire.
+                  Analyse ce ticket de pesée ou de transport et extrais les informations suivantes sous format JSON strict.
+                  - "chauffeur": Le nom du chauffeur (cherche AMARA, BRAHIMA ou SORO).
+                  - "date": La date du ticket au format YYYY-MM-DD.
+                  - "tonnage": Le poids (en nombre).
+                  - "total_gross_cfa": Le montant total payé ou recette brute (en nombre).
+                  - "total_expense_cfa": Les frais, avances ou péages (en nombre).
+                  Si tu ne trouves pas une info, mets 0 ou null.
+                  Renvoie UNIQUEMENT le code JSON, sans texte autour.
+                `;
+
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+                const geminiRes = await fetch(geminiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [ { text: geminiPrompt }, { inline_data: { mime_type: blob.type, data: base64data } } ] }]
+                  })
+                });
+
+                const geminiData = await geminiRes.json();
+                let aiResponseText = geminiData.candidates[0].content.parts[0].text;
+                
+                aiResponseText = aiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const extractedData = JSON.parse(aiResponseText);
+
+                let finalDriverLabel = "";
+                const cName = String(extractedData.chauffeur || "").toUpperCase();
+                if (cName.includes("AMARA")) finalDriverLabel = "SDV 1 (AMARA)";
+                else if (cName.includes("BRAHIMA")) finalDriverLabel = "SDV 2 (BRAHIMA)";
+                else if (cName.includes("SORO")) finalDriverLabel = "SDV 3 (SORO)";
+
+                newPendingTickets.push({
+                  id: file.id,
+                  receivedAt: new Date().toISOString(),
+                  source: 'Drive Bot',
+                  imageUrl: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s800') : null,
+                  aiData: {
+                    driverLabel: finalDriverLabel,
+                    date: extractedData.date || new Date().toISOString().split('T')[0],
+                    tonnage: parseFloat(extractedData.tonnage) || 0,
+                    total_gross_cfa: parseFloat(extractedData.total_gross_cfa) || 0,
+                    total_expense_cfa: parseFloat(extractedData.total_expense_cfa) || 0
+                  }
+                });
+              }
+
+              setPendingTickets(prev => [...newPendingTickets, ...prev]);
+              alert("🎉 Lecture terminée ! Allez dans 'Validation IA' pour vérifier et intégrer les tickets.");
+
+            } catch (error) {
+              console.error("Erreur de traitement:", error);
+              alert("❌ Erreur pendant la lecture. Regarde la console.");
+            } finally {
+              setIsSyncingTickets(false);
+            }
+          }
+        },
+        error_callback: (err) => {
+          console.error("Erreur Auth:", err);
+          setIsSyncingTickets(false);
+        }
+      });
+      client.requestAccessToken();
+    } catch (err) {
+      console.error("Erreur d'initialisation:", err);
+      setIsSyncingTickets(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // ANCIENNE SYNCHRONISATION GOOGLE SHEETS (Intacte !)
+  // ----------------------------------------------------
+
+  const syncWithGoogleSheets = async () => {
+    alert("🚀 Le moteur de synchronisation démarre ! Regarde la console.");
+    console.log("Démarrage de syncWithGoogleSheets...");
+
+    if (!window.google?.accounts?.oauth2) {
+      alert("Bibliothèque Google Identity Services non chargée.");
+      return;
+    }
+
+    setIsSyncing(true);
+    const batchId = `sync-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly",
+        prompt: 'consent',
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            try {
+              const spreadsheetId = "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
+              const ranges = [
+                "'AMARA TRUCK 76'!A2:O",
+                "'BRAHIMA TRUCK 45'!A2:O",
+                "'SORO TRUCK 52'!A2:O"
+              ];
+              
+              const queryRanges = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryRanges}`;
+
+              console.log("Fetching Sheets data via native fetch...");
+              const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${tokenResponse.access_token}`,
+                  'Accept': 'application/json'
+                }
+              });
+
+              if (!response.ok) {
+                const errorBody = await response.text();
+                console.error("Fetch API Error:", response.status, errorBody);
+                throw new Error(`Erreur API: ${response.status} ${response.statusText}`);
+              }
+
+              const data = await response.json();
+              const valueRanges = data.valueRanges || [];
+              
+              const driverKeys = [
+                { chauffeur: "AMARA", sdv: "SDV 1" },
+                { chauffeur: "BRAHIMA", sdv: "SDV 2" },
+                { chauffeur: "SORO", sdv: "SDV 3" }
+              ];
+              let importedTrips = [];
+
+              valueRanges.forEach((vr, idx) => {
+                const rows = vr.values || [];
+                const { chauffeur, sdv } = driverKeys[idx];
+                const driverLabel = `${sdv} (${chauffeur})`;
+
+                console.log(`Processing ${rows.length} rows for ${chauffeur}...`);
+
+                rows.forEach(row => {
+                  const rawDate = String(row[0] || "").trim();
+                  let isoDate = null;
+
+                  const moisMap = {
+                    "janvier": "01", "fevrier": "02", "février": "02",
+                    "mars": "03", "avril": "04", "mai": "05", "juin": "06",
+                    "juillet": "07", "aout": "08", "août": "08", "septembre": "09",
+                    "octobre": "10", "novembre": "11", "decembre": "12", "décembre": "12"
+                  };
+
+                  const dateTextMatch = rawDate.toLowerCase().match(/(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zéû]+)\s+(\d{2,4})/);
+
+                  if (dateTextMatch) {
+                    const d = dateTextMatch[1].padStart(2, '0');
+                    const mText = dateTextMatch[2];
+                    const m = moisMap[mText];
+                    let y = dateTextMatch[3];
+                    if (y.length === 2) y = "20" + y;
+                    if (m) isoDate = `${y}-${m}-${d}`;
+                  } else {
+                    const dateNumMatch = rawDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+                    if (dateNumMatch) {
+                      let d = dateNumMatch[1].padStart(2, '0');
+                      let m = dateNumMatch[2].padStart(2, '0');
+                      let y = dateNumMatch[3];
+                      if (y.length === 2) y = "20" + y;
+                      isoDate = `${y}-${m}-${d}`;
+                    }
+                  }
+
+                  if (!isoDate || isoDate < "2026-02-01") return;
+
+                  const dateObj = new Date(isoDate);
+
+                  const parseNum = (v) => {
+                    if (!v) return 0;
+                    let clean = String(v).replace(/\s/g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, "");
+                    return parseFloat(clean) || 0;
+                  };
+
+                  let tonnage = parseNum(row[10]); 
+                  let totalGross = parseNum(row[11]); 
+                  let totalExpense = parseNum(row[9]); 
+
+                  if (tonnage > 1000) {
+                    totalGross = tonnage; 
+                    tonnage = 0; 
+                  }
+
+                  const tripObj = {
+                    id: `gsheet-${chauffeur}-${isoDate}-${totalGross}-${Math.random().toString(36).substr(2, 5)}`,
+                    batchId,
+                    importDate: new Date().toISOString(),
+                    chauffeur,
+                    driverLabel,
+                    sdv,
+                    date: isoDate,
+                    day: dateObj.getDate(),
+                    month: dateObj.getMonth() + 1,
+                    year: dateObj.getFullYear(),
+                    start: row[1] || "Non renseigné",
+                    destination: row[2] || "Non renseigné",
+                    fuel_cost_cfa: parseNum(row[3]),
+                    road_fees_cfa: parseNum(row[5]),
+                    tonnage: tonnage,
+                    total_gross_cfa: totalGross,
+                    total_expense_cfa: totalExpense,
+                    total_net_cfa: totalGross - totalExpense,
+                    voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0),
+                    tripType: "Google Sheets",
+                    comments: row[13] || "",
+                    km: parseNum(row[14])
+                  };
+
+                  importedTrips.push(tripObj);
+                });
+              });
+
+              if (importedTrips.length > 0) {
+                const importedKeys = new Set(importedTrips.map(t => t.date + '_' + t.driverLabel));
+                const hasOverlap = manualTrips.some(t => importedKeys.has(t.date + '_' + t.driverLabel));
+                
+                let proceed = true;
+                let cleanupRequired = false;
+
+                if (hasOverlap) {
+                  const overwrite = window.confirm(
+                    "⚠️ CONFLIT DÉTECTÉ : Des trajets existent déjà dans l'application pour ces dates et ces chauffeurs.\n\n" +
+                    "Voulez-vous ÉCRASER et remplacer les anciennes données par ces nouvelles ?\n" +
+                    "(OK = Écraser, Annuler = Ignorer les doublons)"
+                  );
+                  
+                  if (overwrite) {
+                    cleanupRequired = true;
+                  } else {
+                    proceed = false;
+                  }
+                }
+
+                if (proceed) {
+                  setManualTrips(prev => {
+                    let finalTrips = [...prev];
+                    if (cleanupRequired) {
+                      finalTrips = prev.filter(t => !importedKeys.has(t.date + '_' + t.driverLabel));
+                    }
+                    return [...finalTrips, ...importedTrips];
+                  });
+
+                  setAuditLogs(prev => [{
+                    id: `log-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    type: "Sync Sheets",
+                    count: importedTrips.length,
+                    batchId: batchId
+                  }, ...prev]);
+
+                  alert(`${importedTrips.length} trajets synchronisés avec succès !`);
+                }
+              } else {
+                alert("Déjà à jour. Aucun nouveau trajet trouvé.");
+              }
+            } catch (err) {
+              console.error("Fetch/Parsing Error:", err);
+              alert(`Erreur technique: ${err.message}`);
+            } finally {
+              setIsSyncing(false);
+            }
+          }
+        },
+        error_callback: (err) => {
+          console.error("Auth Error:", err);
+          alert("Erreur d'authentification Google.");
+          setIsSyncing(false);
+        }
+      });
+      client.requestAccessToken();
+    } catch (err) {
+      console.error("Sync Initialization Error:", err);
+      alert("Impossible de démarrer la synchronisation.");
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSectionChange = (section) => {
+    startTransition(() => { setActiveSection(section); });
+  };
+// --- MUR DE SÉCURITÉ ---
+  if (!authUser) {
+    return (
+      <LoginScreen onLogin={(user) => {
+        setAuthUser(user);
+        saveJson(APP_STORAGE_KEYS.auth, user);
+      }} />
+    );<Header 
+        activeSection={activeSection}
+        onSectionChange={handleSectionChange}
+        isAuthenticated={!!authUser}
+        authUser={authUser}
+        onLogout={() => setAuthUser(null)}
+        menuConfig={uiConfig.menu}
+        // 👇 ICI : On envoie la fonction de synchro SEULEMENT si c'est l'admin
+        syncWithGoogleSheets={isAdmin ? syncWithGoogleSheets : null}
+        isSyncing={isSyncing}
+        syncTicketsIA={isAdmin ? syncTicketsIA : null}
+        isSyncingTickets={isSyncingTickets}
+        pendingCount={isAdmin ? (pendingTickets?.length || 0) : 0}
+      />
+  }
+
+  // -----------------------
+  return (
+    <div className="relative h-screen w-screen overflow-hidden bg-black font-sans antialiased text-white">
+      <Header 
+        activeSection={activeSection} 
+        onSectionChange={handleSectionChange} 
+        isAuthenticated={!!authUser} 
+        authUser={authUser} 
+        onLogout={() => setAuthUser(null)} 
+        menuConfig={filteredMenu} 
+        syncWithGoogleSheets={rolePermissions.canSync ? syncWithGoogleSheets : null}
+        isSyncing={isSyncing}
+        syncTicketsIA={rolePermissions.canSync ? syncTicketsIA : null}
+        isSyncingTickets={isSyncingTickets}
+        pendingCount={rolePermissions.canSync ? pendingTickets.length : 0} 
+        />
+
+      <FilterBar 
+        chauffeurs={chauffeurOptions} 
+        months={monthOptions} 
+        years={yearOptions} 
+        destinations={destinationOptions} 
+        chauffeur={chauffeur} 
+        month={month} 
+        year={year} 
+        destination={destination} 
+        startDate={startDate} 
+        endDate={endDate} 
+        onChauffeurChange={setChauffeur} 
+        onMonthChange={setMonth} 
+        onYearChange={setYear} 
+        onDestinationChange={setDestination} 
+        onStartDateChange={setStartDate} 
+        onEndDateChange={setEndDate} 
+        onReset={() => {}} 
+        uiConfig={uiConfig} 
+        onClearAllStorage={rolePermissions.canDelete ? handleClearAllStorage : null} 
+      />
+
+<main className="h-[calc(100svh-4rem)] md:h-[calc(100svh-10rem)] overflow-auto p-4 md:p-6 md:pt-0 pb-10 md:pb-6">
+        <ErrorBoundary>
+          <div className="panel-enter">
+            
+            {activeSection === "dashboard" && (
+              <div className="space-y-6">
+                {!filteredData.length ? ( 
+                  <EmptyState selectedYear={year} invalidRange={invalidRange} /> 
+                ) : (
+                  <Dashboard dashboardData={dashboardData} formatCurrency={formatCurrency} formatCompactNumber={formatCompactNumber} onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} uiConfig={uiConfig} selectedYear={year} onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} onReset={() => { setStartDate(globalBounds.min); setEndDate(globalBounds.max); }} isDateFiltered={startDate !== globalBounds.min || endDate !== globalBounds.max} filteredData={filteredData} />
+                )}
+              </div>
+            )}
+
+            {activeSection === "analytics" && <Charts dashboardData={dashboardData} monthlyComparison={monthlyComparison} formatCurrency={formatCurrency} />}
+            {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={rolePermissions.canEdit ? setDrivers : null} />}
+            {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={rolePermissions.canEdit ? (t) => setManualTrips([...manualTrips, t]) : null} />}
+            {activeSection === "depenses" && <ExpenseModule expenses={expenseRecords} setExpenses={rolePermissions.canEdit ? setExpenseRecords : null} drivers={drivers} formatCurrency={formatCurrency} />}
+            {activeSection === "encaissements" && <FinanceWorkspace type="income" records={incomeRecords} setRecords={rolePermissions.canEdit ? setIncomeRecords : null} categories={categories} setCategories={rolePermissions.canEdit ? setCategories : null} />}
+            
+            {/* L'ONGLET VALIDATION IA */}
+            {activeSection === "documents" && (
+              <AITicketValidationModule 
+                pendingTickets={pendingTickets} 
+                setPendingTickets={rolePermissions.canEdit ? setPendingTickets : null} 
+                onApprove={rolePermissions.canEdit ? handleApproveAITicket : null}
+                drivers={drivers}
+              />
+            )}
+
+            {activeSection === "closing" && <DailyClosingModule closings={dailyClosings} setClosings={rolePermissions.canEdit ? setDailyClosings : null} />}
+            {activeSection === "reports" && <ReportsModule records={manualTrips} setRecords={rolePermissions.canDelete ? setManualTrips : null} chauffeurs={chauffeurOptions} auditLogs={auditLogs} onDeleteBatch={rolePermissions.canDelete ? deleteImportBatch : null} canDelete={rolePermissions.canDelete} />}
+            {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
+            {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}
+            {activeSection === "admin" && <SmartBulkImporter setTrips={rolePermissions.canEdit ? setManualTrips : null} setAuditLogs={rolePermissions.canEdit ? setAuditLogs : null} />}
+            {activeSection === "settings" && <SettingsModule drivers={drivers} setDrivers={rolePermissions.canEdit ? setDrivers : null} vehicles={vehicles} setVehicles={rolePermissions.canEdit ? setVehicles : null} destinationsList={destinationsList} setDestinationsList={rolePermissions.canEdit ? setDestinationsList : null} businessRules={businessRules} setBusinessRules={rolePermissions.canEdit ? setBusinessRules : null} uiConfig={uiConfig} setUiConfig={rolePermissions.canEdit ? setUiConfig : null} categories={categories} setCategories={rolePermissions.canEdit ? setCategories : null} canManageCategories={rolePermissions.canManageCategories} trips={trips} onBulkImport={rolePermissions.canEdit ? (newTrips) => setManualTrips([...manualTrips, ...newTrips]) : null} onClearAllStorage={rolePermissions.canDelete ? handleClearAllStorage : null} />}
+            
+          </div>
+        </ErrorBoundary>
+      </main>
+    </div>
+  );
+} 
