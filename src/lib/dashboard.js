@@ -242,7 +242,7 @@ function parseFileRecords(source, rules) {
       return {
         id: `${sourceFile}-${dateData.isoDate}-${chauffeur}-${Math.random().toString(36).substr(2, 9)}`,
         chauffeur,
-        driverLabel: `${sdv} (${chauffeur})`,
+        driverLabel: `${chauffeur} ${sdv}`,
         sdv,
         sourceFile,
         date: dateData.isoDate,
@@ -264,7 +264,11 @@ function parseFileRecords(source, rules) {
 }
 
 export function loadSDVFiles(rules) {
-  const records = SDV_SOURCES.flatMap((source) => parseFileRecords(source, rules)).sort((a, b) => a.date.localeCompare(b.date));
+  const records = SDV_SOURCES.flatMap((source) => {
+    const parsed = parseFileRecords(source, rules);
+    console.log(`[CSV Data] ${source.chauffeur}: ${parsed.length} records parsed from ${source.sourceFile}`);
+    return parsed;
+  }).sort((a, b) => a.date.localeCompare(b.date));
 
   return {
     records,
@@ -341,7 +345,7 @@ export function getDateBounds(records) {
 }
 
 export function getChauffeurOptions() {
-  return [ALL_CHAUFFEURS, ...SDV_SOURCES.map((source) => `${source.sdv} (${source.chauffeur})`)];
+  return [ALL_CHAUFFEURS, ...SDV_SOURCES.map((source) => `${source.chauffeur} ${source.sdv}`)];
 }
 
 export function getMonthOptions(records) {

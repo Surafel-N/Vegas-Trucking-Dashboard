@@ -1,36 +1,21 @@
 import { useState } from 'react';
 import { 
-  Wrench, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Save, 
-  X, 
-  Calendar, 
-  Truck, 
-  Info,
-  Image as ImageIcon,
-  ExternalLink,
-  Sparkles,
-  Loader2,
-  CheckCircle2,
-  FolderOpen,
-  Eye
+  Wrench, Plus, Trash2, Edit2, Save, X, Calendar, Truck, Info,
+  Image as ImageIcon, ExternalLink, Sparkles, Loader2, CheckCircle2,
+  FolderOpen, Eye, FileText, RotateCcw
 } from 'lucide-react';
 
-export function MaintenanceAdminModule({ records = [], setRecords, drivers = [], googleClientId }) {
+export function MaintenanceAdminModule({ records = [], setRecords, drivers = [], googleClientId, oilChanges = {}, setOilChanges }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [driveUrl, setDriveUrl] = useState('');
   const [debugKey, setDebugKey] = useState('');
-  
-  // File d'attente pour validation IA
   const [pendingAI, setPendingAI] = useState([]);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    vehicle: drivers[0]?.sdv ? `${drivers[0].sdv} (${drivers[0].name})` : '',
+    vehicle: '',
     description: '',
     cost: '',
     imageUrl: '',
@@ -42,18 +27,24 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
     return match ? match[1] : null;
   };
 
+  const getBase64FromDrive = async (fileId, token) => {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) { return null; }
+  };
+
   const handleDriveFolderAnalysis = async () => {
     const folderId = extractFolderId(driveUrl);
-    if (!folderId) {
-      alert("Lien Google Drive invalide. Utilisez un lien de dossier (ex: .../folders/ID)");
-      return;
-    }
-
-    if (!window.google?.accounts?.oauth2) {
-      alert("Bibliothèque Google non chargée.");
-      return;
-    }
-
+    if (!folderId) { alert("Lien Drive invalide."); return; }
     setIsAnalyzing(true);
 
     try {
@@ -67,31 +58,27 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
         client.requestAccessToken();
       });
 
-      if (!tokenResponse.access_token) throw new Error("Accès refusé");
-
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,thumbnailLink,webContentLink)`;
-      const listRes = await fetch(listUrl, {
-        headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
-      });
+      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`;
+      const listRes = await fetch(listUrl, { headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` } });
       const listData = await listRes.json();
       const files = listData.files || [];
-      const images = files.filter(f => f.mimeType.startsWith('image/')).slice(0, 10);
+      
+      const validFiles = files.filter(f => f.mimeType.startsWith('image/') || f.mimeType === 'application/pdf').slice(0, 5);
+      if (validFiles.length === 0) throw new Error("Aucune image ou PDF trouvé.");
 
-      if (images.length === 0) {
-        alert("Aucune image trouvée.");
-        setIsAnalyzing(false);
-        return;
-      }
-
-      const imageDataArray = await Promise.all(images.map(async (img) => {
-        const base64 = await getBase64FromDrive(img.id, tokenResponse.access_token);
-        return { inline_data: { mime_type: "image/jpeg", data: base64 } };
-      }));
+      const imageDataArray = (await Promise.all(validFiles.map(async (f) => {
+        const b64 = await getBase64FromDrive(f.id, tokenResponse.access_token);
+        if (!b64) return null;
+        return { 
+          id: f.id, name: f.name, mime: f.mimeType, b64, 
+          display: `data:${f.mimeType};base64,${b64}` 
+        };
+      }))).filter(Boolean);
 
       const geminiKey = debugKey || import.meta.env.VITE_GEMINI_API_KEY;
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
       const modelsData = await modelsRes.json();
-      const flashModel = modelsData.models?.find(m => m.name.includes('1.5-flash'))?.name || 'models/gemini-1.5-flash';
+      const flashModel = modelsData.models?.find(m => m.name.includes('flash'))?.name || 'models/gemini-1.5-flash';
 
       const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/${flashModel}:generateContent?key=${geminiKey}`, {
         method: 'POST',
@@ -99,49 +86,35 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Identifie visuellement la facture parmi ces images et extrais au format JSON : { \"invoiceFileName\": \"nom\", \"date\": \"YYYY-MM-DD\", \"vehicle\": \"TRUCK NAME\", \"description\": \"...\", \"cost\": 0 }. Réponds UNIQUEMENT en JSON." },
-              ...imageDataArray
+              { text: "Voici des fichiers (images ou PDF) d'un dossier de maintenance. L'un d'eux est la facture. Identifie-le et extrais en JSON : { \"invoiceFileName\": \"nom\", \"date\": \"YYYY-MM-DD\", \"vehicle\": \"AMARA TRUCK 76, BRAHIMA TRUCK 45 ou SORO TRUCK 52\", \"description\": \"...\", \"cost\": 0 }. Réponds uniquement en JSON." },
+              ...imageDataArray.map(img => ({ inline_data: { mime_type: img.mime, data: img.b64 } }))
             ]
           }],
           generationConfig: { response_mime_type: "application/json" }
         })
       });
 
-      if (!aiResponse.ok) throw new Error("Erreur Google API");
+      if (!aiResponse.ok) throw new Error("Erreur IA");
 
       const aiData = await aiResponse.json();
-      const rawText = aiData.candidates[0].content.parts[0].text;
-      const extracted = JSON.parse(rawText.trim());
-
-      const invoiceFile = images.find(img => img.name === extracted.invoiceFileName) || images[0];
+      const extracted = JSON.parse(aiData.candidates[0].content.parts[0].text.trim());
+      const usedImage = imageDataArray.find(img => img.name === extracted.invoiceFileName) || imageDataArray[0];
 
       setPendingAI([{
         id: `pending-${Date.now()}`,
         ...extracted,
-        invoiceUrl: invoiceFile.thumbnailLink?.replace('=s220', '=s1000') || invoiceFile.webContentLink,
-        workPhotos: images.filter(f => f.id !== invoiceFile.id).map(f => f.thumbnailLink?.replace('=s220', '=s1000') || f.webContentLink),
+        invoiceUrl: usedImage.display,
+        isPdf: usedImage.mime === 'application/pdf',
+        workPhotos: imageDataArray.filter(img => img.id !== usedImage.id).map(img => img.display),
         folderUrl: driveUrl
       }, ...pendingAI]);
 
       setDriveUrl('');
     } catch (err) {
-      console.error("Erreur Analyse:", err);
-      alert("Erreur lors de l'analyse : " + err.message);
+      alert("Erreur : " + err.message);
     } finally {
       setIsAnalyzing(false);
     }
-  };
-
-  const getBase64FromDrive = async (fileId, token) => {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(blob);
-    });
   };
 
   const approveAI = (id) => {
@@ -153,7 +126,8 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
       vehicle: item.vehicle,
       description: item.description,
       cost: parseFloat(item.cost) || 0,
-      imageUrl: item.invoiceUrl,
+      imageUrl: item.invoiceUrl === 'pdf' ? null : item.invoiceUrl,
+      isPdf: item.isPdf,
       workPhotos: item.workPhotos || [],
       folderUrl: item.folderUrl
     }, ...records]);
@@ -173,19 +147,20 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
     setEditingId(record.id); setIsAdding(true);
   };
 
+  const handleOilChangeUpdate = (truck, mileage) => {
+    if (!setOilChanges) return;
+    setOilChanges({
+      ...oilChanges,
+      [truck]: { 
+        mileage: parseFloat(mileage) || 0,
+        date: new Date().toISOString().split('T')[0]
+      }
+    });
+  };
+
   const handleDelete = (id) => { if (window.confirm("Supprimer ?")) setRecords(records.filter(r => r.id !== id)); };
 
-  const vehicleOptions = drivers.map(d => `${d.sdv} (${d.name})`);
-
-  const checkModels = async () => {
-    const geminiKey = debugKey || import.meta.env.VITE_GEMINI_API_KEY;
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
-      const data = await res.json();
-      if (data.models) alert("Modèles trouvés ! Regardez la console.");
-      else alert("Aucun modèle trouvé.");
-    } catch (err) { alert("Erreur diagnostic."); }
-  };
+  const vehicleOptions = drivers.map(d => `${d.name} ${d.sdv}`);
 
   return (
     <div className="space-y-6">
@@ -195,16 +170,47 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
             <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500"><Wrench className="size-6" /></div>
             Maintenance Avancée
           </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-white/40 text-sm">Gestion manuelle ou via Drive.</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-white/40 text-sm">Gestion IA & Drive Explorer</p>
             <input type="password" placeholder="Debug Key..." value={debugKey} onChange={e => setDebugKey(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[9px] w-32 outline-none focus:border-orange-500/50" />
           </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={checkModels} className="bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-xl text-[10px] font-bold border border-white/5">Vérifier Clé</button>
-          <button onClick={() => setIsAdding(true)} className="bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10"><Plus className="size-4" /> Saisie manuelle</button>
-        </div>
+        <button onClick={() => setIsAdding(true)} className="bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10"><Plus className="size-4" /> Saisie manuelle</button>
       </header>
+
+      {/* CONFIGURATION VIDANGE */}
+      <section className="panel-enter rounded-[30px] border border-orange-500/20 bg-[#111] p-6 shadow-xl">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><RotateCcw className="size-5" /></div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Suivi des Vidanges (Intervalle 10,000 KM)</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {drivers.map(d => {
+            const truckLabel = `${d.name} ${d.sdv}`;
+            const current = oilChanges[truckLabel] || { mileage: 0 };
+            return (
+              <div key={d.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-black text-white/70">{truckLabel}</p>
+                  <span className="text-[9px] font-bold text-white/20">KM Dernier Service</span>
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    placeholder="Kilométrage..." 
+                    defaultValue={current.mileage || ''}
+                    onBlur={(e) => handleOilChangeUpdate(truckLabel, e.target.value)}
+                    className="flex-1 h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-orange-500/50 transition-all"
+                  />
+                  <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 shadow-lg shadow-orange-500/5">
+                    <CheckCircle2 className="size-4" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="panel-enter rounded-[30px] border border-blue-500/20 bg-[#111] p-6 shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-3 mb-4">
@@ -223,35 +229,30 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
             <div className="flex flex-col lg:flex-row gap-6">
               <div className="w-full lg:w-48 shrink-0">
                 <p className="text-[9px] font-bold text-white/30 uppercase mb-2">Facture identifiée</p>
-                <img src={item.invoiceUrl} className="aspect-[3/4] w-full rounded-2xl object-cover border border-white/10" alt="Invoice" />
+                {item.isPdf ? (
+                  <div className="aspect-[3/4] w-full rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-3 text-white/40">
+                    <FileText className="size-12" />
+                    <span className="text-[10px] font-bold uppercase">Document PDF</span>
+                  </div>
+                ) : (
+                  <img src={item.invoiceUrl} className="aspect-[3/4] w-full rounded-2xl object-cover border border-white/10 shadow-2xl" alt="Invoice" />
+                )}
               </div>
               <div className="flex-1 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[9px] font-bold text-white/30 uppercase ml-1">Date</label>
-                    <input type="date" value={item.date} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, date: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-white/30 uppercase ml-1">Véhicule</label>
-                    <select value={item.vehicle} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, vehicle: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-blue-400 font-bold">
-                      {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="text-[9px] font-bold text-white/30 uppercase ml-1">Description</label>
-                    <input type="text" value={item.description} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, description: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-white/30 uppercase ml-1">Coût (CFA)</label>
-                    <input type="number" value={item.cost} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, cost: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white font-black" />
-                  </div>
+                  <input type="date" value={item.date} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, date: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white" />
+                  <select value={item.vehicle} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, vehicle: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-blue-400 font-bold">
+                    {vehicleOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  <input type="text" value={item.description} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, description: e.target.value} : p))} className="sm:col-span-2 w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white" />
+                  <input type="number" value={item.cost} onChange={e => setPendingAI(pendingAI.map(p => p.id === item.id ? {...p, cost: e.target.value} : p))} className="w-full h-10 bg-black/40 border border-white/5 rounded-xl px-3 text-xs text-white font-black" />
                 </div>
                 {item.workPhotos?.length > 0 && (
-                  <div>
-                    <p className="text-[9px] font-bold text-white/30 uppercase mb-2">Photos des travaux ({item.workPhotos.length})</p>
-                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                      {item.workPhotos.map((url, i) => <img key={i} src={url} className="size-14 rounded-lg object-cover border border-white/5 shrink-0" alt="Work" />)}
-                    </div>
+                  <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                    {item.workPhotos.map((url, i) => (
+                      url === 'pdf' ? <div key={i} className="size-14 rounded-lg bg-white/5 flex items-center justify-center"><FileText className="size-6 text-white/20" /></div>
+                      : <img key={i} src={url} className="size-14 rounded-lg object-cover border border-white/5 shrink-0" alt="Work" />
+                    ))}
                   </div>
                 )}
               </div>
@@ -290,7 +291,6 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right space-x-2">
-                  <button onClick={() => handleEdit(row)} className="p-2 text-white/10 hover:text-white transition-all opacity-0 group-hover:opacity-100"><Edit2 className="size-4" /></button>
                   <button onClick={() => handleDelete(row.id)} className="p-2 text-white/10 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><Trash2 className="size-4" /></button>
                 </td>
               </tr>
@@ -301,24 +301,23 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
 
       {isAdding && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <section className="w-full max-w-2xl panel-enter rounded-[40px] border border-white/10 bg-[#181818] p-8 shadow-2xl relative">
+          <section className="w-full max-w-xl panel-enter rounded-[40px] border border-white/10 bg-[#181818] p-8 shadow-2xl relative">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-black text-white flex items-center gap-3"><Wrench className="size-5 text-orange-500" /> Saisie Manuelle</h3>
-              <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="p-2 bg-white/5 rounded-full text-white/40 hover:text-white"><X className="size-5" /></button>
+              <button onClick={() => setIsAdding(false)} className="p-2 bg-white/5 rounded-full text-white/40 hover:text-white"><X className="size-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white" />
-                <select required value={formData.vehicle} onChange={e => setFormData({...formData, vehicle: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white">
+              <div className="grid grid-cols-2 gap-6">
+                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white focus:border-orange-500/50" />
+                <select required value={formData.vehicle} onChange={e => setFormData({...formData, vehicle: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white focus:border-orange-500/50">
+                  <option value="">Choisir...</option>
                   {vehicleOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
-                <input type="text" required placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="md:col-span-2 w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white" />
-                <input type="number" required placeholder="Coût" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white font-bold" />
-                <input type="url" placeholder="Lien photo" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white" />
               </div>
-              <div className="flex justify-end gap-4 pt-4">
-                <button type="submit" className="bg-white text-black px-10 py-3 rounded-2xl text-sm font-black flex items-center gap-2"><Save className="size-4" /> Enregistrer</button>
-              </div>
+              <input type="text" required placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
+              <input type="number" required placeholder="Coût (CFA)" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50 font-bold" />
+              <input type="url" placeholder="Lien photo" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
+              <button type="submit" className="w-full bg-white text-black hover:bg-orange-500 hover:text-white h-14 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3"><Save className="size-5" /> Enregistrer</button>
             </form>
           </section>
         </div>

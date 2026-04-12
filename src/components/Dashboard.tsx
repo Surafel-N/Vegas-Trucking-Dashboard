@@ -15,7 +15,12 @@ import {
   RotateCcw,
   Check,
   Zap,
-  CircleDollarSign
+  CircleDollarSign,
+  X,
+  FileText,
+  Calendar,
+  Truck,
+  FolderOpen
 } from "lucide-react";
 import { KpiCard } from "./KpiCard";
 import { FleetTrackerWidget } from "./FleetTrackerWidget";
@@ -54,6 +59,8 @@ type DashboardProps = {
   onMonthChange?: (month: string) => void;
   filterProps?: any;
   maintenanceRecords?: any[];
+  allTrips?: any[];
+  oilChanges?: any;
 };
 
 const DEFAULT_ORDER = ['top_gps', 'middle', 'controls', 'fleet', 'operational', 'archives'];
@@ -76,7 +83,9 @@ export function Dashboard({
   globalMonth,
   onMonthChange,
   filterProps,
-  maintenanceRecords = []
+  maintenanceRecords = [],
+  allTrips = [],
+  oilChanges = {}
 }: DashboardProps) {
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -94,6 +103,17 @@ export function Dashboard({
     const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
     return { tonnage, fuel, roadFees, revenue, netProfit, margin };
   }, [filteredData]);
+
+  const latestKmData = useMemo(() => {
+    const kmMap: Record<string, number> = { "AMARA TRUCK 76": 0, "BRAHIMA TRUCK 45": 0, "SORO TRUCK 52": 0 };
+    allTrips.forEach(t => {
+      const label = t.driverLabel;
+      if (kmMap[label] !== undefined && t.km && t.km > kmMap[label]) {
+        kmMap[label] = t.km;
+      }
+    });
+    return kmMap;
+  }, [allTrips]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     setDraggedId(id);
@@ -136,46 +156,74 @@ export function Dashboard({
               </div>
               <div className="hidden md:block w-px h-[200px] bg-white/5 mx-4"></div>
               <div className="md:hidden w-full h-px bg-white/5 my-2"></div>
-              <div className="w-full md:w-fit flex flex-col justify-between py-2 min-h-[200px] md:min-h-[250px]">
-                <div>
+              
+              <div className="w-full md:w-fit flex flex-col gap-6 py-2 min-h-[200px] md:min-h-[250px]">
+                {/* BLOC 1 : FINANCE & FUEL */}
+                <div className="space-y-4">
                   <h4 className="text-[10px] text-white/40 uppercase font-bold tracking-widest text-center md:text-left">FINANCE & FUEL</h4>
-                  <div className="flex flex-col sm:flex-row items-center gap-6 mt-4 md:mt-6">
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="relative shrink-0 size-24 md:size-28 rounded-full border-[6px] border-[#cf5d56]/20 border-l-[#cf5d56] flex flex-col items-center justify-center">
                       <span className="text-xl md:text-2xl font-black text-white">{formatCompactNumber(financeStats.tonnage)}</span>
                       <span className="text-[9px] text-white/40 uppercase mt-1 text-center leading-none">TONNES</span>
                     </div>
-                    <div className="flex flex-col gap-3 md:gap-4 w-full">
+                    <div className="flex flex-col gap-3 w-full">
                       <div className="flex items-center gap-3">
-                        <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                          <Banknote className="size-3.5" />
-                        </div>
+                        <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0"><Banknote className="size-3.5" /></div>
                         <div className="flex flex-col">
                           <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">REVENU (TX 8K)</p>
                           <p className="text-xs font-bold text-white">{formatCurrency(financeStats.revenue)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="size-6 rounded-md bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                          <Fuel className="size-3.5" />
-                        </div>
+                        <div className="size-6 rounded-md bg-red-500/10 text-red-500 flex items-center justify-center shrink-0"><Fuel className="size-3.5" /></div>
                         <div className="flex flex-col">
-                          <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">CONSOMMATION FUEL</p>
+                          <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">FUEL</p>
                           <p className="text-xs font-bold text-white">{formatCurrency(financeStats.fuel)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="size-6 rounded-md bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
-                          <ReceiptText className="size-3.5" />
-                        </div>
-                        <div className="flex flex-col">
-                          <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">FRAIS & DIVERS</p>
-                          <p className="text-xs font-bold text-white">{formatCurrency(financeStats.roadFees)}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="mt-6 md:mt-8 pt-4 border-t border-white/5 flex justify-between items-end gap-6 md:gap-12">
+
+                {/* BLOC 2 : KILOMÉTRAGE & VIDANGE */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <h4 className="text-[10px] text-white/40 uppercase font-bold tracking-widest text-center md:text-left">KILOMÉTRAGE & VIDANGE</h4>
+                  <div className="flex flex-col gap-3">
+                    {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].filter(label => dashboardData.chauffeur === "Tous les chauffeurs" || dashboardData.chauffeur.includes(label.split(' ')[0])).map(label => {
+                      const currentKm = latestKmData[label] || 0;
+                      const lastService = oilChanges[label]?.mileage || 0;
+                      const diff = currentKm - lastService;
+                      const remaining = Math.max(0, 10000 - diff);
+                      const isCritical = remaining < 1000;
+                      const isWarning = remaining < 2500;
+
+                      return (
+                        <div key={label} className="bg-black/20 rounded-xl p-3 border border-white/5">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-[9px] font-black text-white/40 uppercase">{label}</span>
+                            <span className="text-xs font-black text-white">{currentKm.toLocaleString()} Km</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[9px] font-bold">
+                              <span className="text-white/20 uppercase">Prochaine Vidange</span>
+                              <span className={isCritical ? "text-red-500" : isWarning ? "text-orange-500" : "text-emerald-500"}>
+                                {remaining.toLocaleString()} Km restants
+                              </span>
+                            </div>
+                            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all ${isCritical ? "bg-red-500" : isWarning ? "bg-orange-500" : "bg-emerald-500"}`}
+                                style={{ width: `${Math.min(100, (remaining / 10000) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-2 pt-4 border-t border-white/5 flex justify-between items-end gap-6 md:gap-12">
                   <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">BÉNÉFICE NET</span>
                   <span className="text-base md:text-lg font-black text-white">{formatCurrency(financeStats.netProfit)}</span>
                 </div>
@@ -196,7 +244,7 @@ export function Dashboard({
 
       case 'fleet':
         return (
-          <div key="fleet" className="grid grid-cols-1 xl:grid-cols-[1fr_350px] gap-6 items-stretch mb-6">
+          <div key="fleet" className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6 items-stretch mb-6">
             <section className="panel-enter rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white shadow-xl xl:p-6">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>

@@ -305,6 +305,7 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
   const [auditLogs, setAuditLogs] = useState(() => loadJson(APP_STORAGE_KEYS.audit, []));
   const [maintenanceRecords, setMaintenanceRecords] = useState(() => loadJson(APP_STORAGE_KEYS.maintenance, []));
+  const [oilChanges, setOilChanges] = useState(() => loadJson('sdv_oil_changes_v1', {}));
 
   const [categories, setCategories] = useState(() =>
     loadJson(APP_STORAGE_KEYS.categories, { expense: ["Carburant", "Péage"], income: ["Recette trajet"] }),
@@ -338,7 +339,7 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
   const [startDate, setStartDate] = useState(globalBounds.min);
   const [endDate, setEndDate] = useState(globalBounds.max);
 
-  const chauffeurOptions = useMemo(() => [ALL_CHAUFFEURS, ...drivers.map(d => `${d.sdv} (${d.name})`)], [drivers]);
+  const chauffeurOptions = useMemo(() => [ALL_CHAUFFEURS, ...drivers.map(d => `${d.name} ${d.sdv}`)], [drivers]);
   const monthOptions = useMemo(() => getMonthOptions(trips), [trips]);
   const destinationOptions = useMemo(() => [ALL_DESTINATIONS, ...destinationsList], [destinationsList]);
 
@@ -393,10 +394,52 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
     { label: "Tonnage", value: formatTonnage(dashboardMetrics.totalTonnage), tone: "slate" },
   ], [dashboardMetrics]);
 
-  useEffect(() => { saveJson(APP_STORAGE_KEYS.drivers, drivers); }, [drivers]);
-  useEffect(() => { saveJson(APP_STORAGE_KEYS.trips, manualTrips); }, [manualTrips]);
+  useEffect(() => { 
+    // Migration plus robuste des noms de camions
+    let globalMigrated = false;
+    const migratedDrivers = drivers.map(d => {
+      let sdv = String(d.sdv || "").toUpperCase();
+      let name = String(d.name || "").toUpperCase();
+      let newSdv = d.sdv;
+
+      if (name === "AMARA" && (sdv.includes("SDV 1") || sdv.includes("SDV1") || sdv.includes("TRUCK 76") === false)) { newSdv = "TRUCK 76"; }
+      if (name === "BRAHIMA" && (sdv.includes("SDV 2") || sdv.includes("SDV2") || sdv.includes("TRUCK 45") === false)) { newSdv = "TRUCK 45"; }
+      if (name === "SORO" && (sdv.includes("SDV 3") || sdv.includes("SV3") || sdv.includes("SDV3") || sdv.includes("TRUCK 52") === false)) { newSdv = "TRUCK 52"; }
+      
+      if (newSdv !== d.sdv) {
+        globalMigrated = true;
+        return { ...d, sdv: newSdv };
+      }
+      return d;
+    });
+
+    if (globalMigrated) setDrivers(migratedDrivers);
+    saveJson(APP_STORAGE_KEYS.drivers, drivers); 
+  }, [drivers]);
+  
+  useEffect(() => { 
+    // Migration plus robuste des trajets manuels
+    const needsMigration = manualTrips.some(t => {
+      const label = String(t.driverLabel || "").toUpperCase();
+      return label.includes("(") || label.includes("SDV") || label.includes("SV");
+    });
+    
+    if (needsMigration) {
+      const migrated = manualTrips.map(t => {
+        let label = String(t.driverLabel || "").toUpperCase();
+        if (label.includes("AMARA")) label = "AMARA TRUCK 76";
+        else if (label.includes("BRAHIMA")) label = "BRAHIMA TRUCK 45";
+        else if (label.includes("SORO")) label = "SORO TRUCK 52";
+        return { ...t, driverLabel: label };
+      });
+      setManualTrips(migrated);
+    }
+    saveJson(APP_STORAGE_KEYS.trips, manualTrips); 
+  }, [manualTrips]);
+
   useEffect(() => { saveJson(APP_STORAGE_KEYS.pending_ai_tickets, pendingTickets); }, [pendingTickets]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.maintenance, maintenanceRecords); }, [maintenanceRecords]);
+  useEffect(() => { saveJson('sdv_oil_changes_v1', oilChanges); }, [oilChanges]);
 
   const handleClearAllStorage = () => {
     if (confirm("🚨 Attention : Cela va supprimer absolument TOUTES les données (2026, imports, réglages). Confirmer ?")) {
@@ -763,7 +806,7 @@ const handleLogout = () => {
                     dashboardData={dashboardData} 
                     formatCurrency={formatCurrency} 
                     formatCompactNumber={formatCompactNumber} 
-                    onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} 
+                    onSelectDriver={(l) => { setChauffeur(l); }} 
                     uiConfig={uiConfig} 
                     selectedYear={year} 
                     onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} 
@@ -774,6 +817,8 @@ const handleLogout = () => {
                     globalMonth={month} 
                     onMonthChange={setMonth}
                     maintenanceRecords={maintenanceRecords}
+                    oilChanges={oilChanges}
+                    allTrips={trips}
                     // Filter Props
                     filterProps={{
                       chauffeurs: chauffeurOptions,
@@ -817,7 +862,7 @@ const handleLogout = () => {
             )}
 
             {activeSection === "closing" && <DailyClosingModule closings={dailyClosings} setClosings={rolePermissions.canEdit ? setDailyClosings : null} />}
-            {activeSection === "maintenance" && <MaintenanceAdminModule records={maintenanceRecords} setRecords={rolePermissions.canEdit ? setMaintenanceRecords : null} drivers={drivers} googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID} />}
+            {activeSection === "maintenance" && <MaintenanceAdminModule records={maintenanceRecords} setRecords={rolePermissions.canEdit ? setMaintenanceRecords : null} drivers={drivers} googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID} oilChanges={oilChanges} setOilChanges={rolePermissions.canEdit ? setOilChanges : null} />}
             {activeSection === "reports" && <ReportsModule records={manualTrips} setRecords={rolePermissions.canDelete ? setManualTrips : null} chauffeurs={chauffeurOptions} auditLogs={auditLogs} onDeleteBatch={rolePermissions.canDelete ? deleteImportBatch : null} canDelete={rolePermissions.canDelete} />}
             {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
             {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}

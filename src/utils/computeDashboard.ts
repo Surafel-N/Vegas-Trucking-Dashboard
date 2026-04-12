@@ -3,12 +3,17 @@ import type { DashboardRecord, DashboardSummary, DriverDashboardSummary } from "
 const DRIVER_ORDER = ["AMARA", "BRAHIMA", "SORO"];
 
 function emptyDriverSummary(chauffeur: string): DriverDashboardSummary {
-  const sdvNumber = DRIVER_ORDER.indexOf(chauffeur) + 1;
+  const truckMapping: Record<string, string> = {
+    "AMARA": "TRUCK 76",
+    "BRAHIMA": "TRUCK 45",
+    "SORO": "TRUCK 52"
+  };
+  const truckName = truckMapping[chauffeur] || "TRUCK ??";
 
   return {
     chauffeur,
-    driverLabel: `SDV ${sdvNumber} (${chauffeur})`,
-    sdv: `SDV ${sdvNumber}`,
+    driverLabel: `${chauffeur} ${truckName}`,
+    sdv: truckName,
     totalExpense: 0,
     totalFuel: 0,
     totalRoadFees: 0,
