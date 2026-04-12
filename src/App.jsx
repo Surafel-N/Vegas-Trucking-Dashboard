@@ -37,6 +37,7 @@ import {
 } from "./lib/dashboard";
 import { computeDashboard } from "./utils/computeDashboard";
 import SmartBulkImporter from './components/SmartBulkImporter';
+import { MaintenanceAdminModule } from "./components/MaintenanceAdminModule.jsx";
 import {
   loadFinanceRecords,
   saveFinanceRecords,
@@ -80,7 +81,8 @@ const APP_STORAGE_KEYS = {
   destinations: "sdv_cms_destinations_v1",
   rules: "sdv_cms_rules_v1",
   ui: "sdv_cms_ui_v1",
-  pending_ai_tickets: "sdv_pending_ai_tickets_v1" // Nouvelle clé
+  pending_ai_tickets: "sdv_pending_ai_tickets_v1",
+  maintenance: "sdv_maintenance_v1"
 };
 
 const DEFAULT_BUSINESS_RULES_UI = {
@@ -111,6 +113,7 @@ const DEFAULT_UI_CONFIG = {
     { id: "closing", label: "Clôture jour", enabled: true },
     { id: "reports", label: "Rapports", enabled: true },
     { id: "audit", label: "Audit", enabled: true },
+    { id: "maintenance", label: "Maintenance", enabled: true },
     { id: "quick-entry", label: "Saisie Rapide", enabled: true },
     { id: "admin", label: "Importation", enabled: true },
     { id: "settings", label: "Réglages", enabled: true },
@@ -301,6 +304,7 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
   const [documentRecords, setDocumentRecords] = useState(() => loadFinanceRecords("documents"));
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
   const [auditLogs, setAuditLogs] = useState(() => loadJson(APP_STORAGE_KEYS.audit, []));
+  const [maintenanceRecords, setMaintenanceRecords] = useState(() => loadJson(APP_STORAGE_KEYS.maintenance, []));
 
   const [categories, setCategories] = useState(() =>
     loadJson(APP_STORAGE_KEYS.categories, { expense: ["Carburant", "Péage"], income: ["Recette trajet"] }),
@@ -392,6 +396,7 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
   useEffect(() => { saveJson(APP_STORAGE_KEYS.drivers, drivers); }, [drivers]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.trips, manualTrips); }, [manualTrips]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.pending_ai_tickets, pendingTickets); }, [pendingTickets]);
+  useEffect(() => { saveJson(APP_STORAGE_KEYS.maintenance, maintenanceRecords); }, [maintenanceRecords]);
 
   const handleClearAllStorage = () => {
     if (confirm("🚨 Attention : Cela va supprimer absolument TOUTES les données (2026, imports, réglages). Confirmer ?")) {
@@ -598,7 +603,7 @@ const handleLogout = () => {
       console.log("Initialisation du client Google avec ID:", clientId);
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
-        scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+        scope: "https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly",
         prompt: 'consent',
         callback: async (tokenResponse) => {
           if (tokenResponse && tokenResponse.access_token) {
@@ -768,6 +773,7 @@ const handleLogout = () => {
                     calendarData={calendarData} 
                     globalMonth={month} 
                     onMonthChange={setMonth}
+                    maintenanceRecords={maintenanceRecords}
                     // Filter Props
                     filterProps={{
                       chauffeurs: chauffeurOptions,
@@ -811,6 +817,7 @@ const handleLogout = () => {
             )}
 
             {activeSection === "closing" && <DailyClosingModule closings={dailyClosings} setClosings={rolePermissions.canEdit ? setDailyClosings : null} />}
+            {activeSection === "maintenance" && <MaintenanceAdminModule records={maintenanceRecords} setRecords={rolePermissions.canEdit ? setMaintenanceRecords : null} drivers={drivers} googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID} />}
             {activeSection === "reports" && <ReportsModule records={manualTrips} setRecords={rolePermissions.canDelete ? setManualTrips : null} chauffeurs={chauffeurOptions} auditLogs={auditLogs} onDeleteBatch={rolePermissions.canDelete ? deleteImportBatch : null} canDelete={rolePermissions.canDelete} />}
             {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
             {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}

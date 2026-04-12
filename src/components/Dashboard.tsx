@@ -25,6 +25,7 @@ import { FleetStatus } from "./FleetStatus";
 import { MaintenanceLog } from "./MaintenanceLog";
 import { FuelEfficiency } from "./FuelEfficiency";
 import { OperationalAlerts } from "./OperationalAlerts";
+import { MiniCharts } from "./MiniCharts";
 import { 
   getDashboardMetrics, 
   formatDate, 
@@ -52,9 +53,10 @@ type DashboardProps = {
   globalMonth?: string;
   onMonthChange?: (month: string) => void;
   filterProps?: any;
+  maintenanceRecords?: any[];
 };
 
-const DEFAULT_ORDER = ['middle', 'controls', 'fleet', 'operational', 'archives'];
+const DEFAULT_ORDER = ['top_gps', 'middle', 'controls', 'fleet', 'operational', 'archives'];
 
 export function Dashboard({
   dashboardData,
@@ -73,7 +75,8 @@ export function Dashboard({
   calendarData = [],
   globalMonth,
   onMonthChange,
-  filterProps
+  filterProps,
+  maintenanceRecords = []
 }: DashboardProps) {
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -110,6 +113,13 @@ export function Dashboard({
 
   const renderBlock = (id: string) => {
     switch (id) {
+      case 'top_gps':
+        return (
+          <div key="top_gps" className="w-full h-full min-h-[300px] md:min-h-[400px] mb-6">
+            <FleetTrackerWidget records={filteredData} />
+          </div>
+        );
+
       case 'middle':
         return (
           <div key="middle" className="grid grid-cols-1 xl:grid-cols-[max-content_1fr] gap-6 items-stretch mb-6">
@@ -171,8 +181,8 @@ export function Dashboard({
                 </div>
               </div>
             </div>
-            <div className="h-full w-full min-h-[350px] md:min-h-[500px]"> 
-              <FleetTrackerWidget records={filteredData} /> 
+            <div className="h-full w-full"> 
+              <MiniCharts records={filteredData} />
             </div>
           </div>
         );
@@ -239,7 +249,7 @@ export function Dashboard({
       case 'operational':
         return (
           <div key="operational" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-6 min-h-[400px]">
-            <MaintenanceLog />
+            <MaintenanceLog records={maintenanceRecords} />
             <FuelEfficiency records={filteredData} />
             <OperationalAlerts records={filteredData} />
           </div>
