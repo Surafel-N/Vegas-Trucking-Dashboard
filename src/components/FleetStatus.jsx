@@ -17,37 +17,36 @@ export function FleetStatus({ totalTrips, activeDays, profitableTrips, driverLab
   ];
 
   return (
-    <section className="panel-enter rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-6 text-white shadow-[0_30px_90px_-52px_rgba(0,0,0,0.92)]">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="panel-enter rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white shadow-lg">
+      <div className="flex flex-col gap-2">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-[#cf5d56]">Statut flotte</p>
-          <h3 className="mt-2 text-2xl font-semibold tracking-tight">{driverLabel}</h3>
-          <p className="mt-1 text-sm text-white/44">Vue dynamique basee sur le fichier SDV associe au chauffeur selectionne.</p>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#cf5d56]">Statut flotte</p>
+          <h3 className="mt-1 text-xl font-bold tracking-tight">{driverLabel}</h3>
         </div>
-        <div className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/56">
+        <div className="inline-block w-fit rounded-full border border-white/10 bg-white/4 px-3 py-1 text-xs text-white/50">
           Marge {profitMargin}
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {items.map((item) => {
           const Icon = item.icon;
 
           return (
-            <div key={item.label} className="rounded-[24px] border border-white/8 bg-black/18 p-4">
-              <div className={`inline-flex rounded-2xl p-3 ${item.accent}`}>
-                <Icon className="size-5" />
+            <div key={item.label} className="rounded-2xl border border-white/8 bg-black/18 p-3">
+              <div className={`inline-flex rounded-xl p-2 ${item.accent}`}>
+                <Icon className="size-4" />
               </div>
-              <p className="mt-4 text-sm text-white/42">{item.label}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight">{item.value}</p>
+              <p className="mt-2 text-[11px] text-white/40">{item.label}</p>
+              <p className="mt-1 text-xl font-bold tracking-tight">{item.value}</p>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-6 flex items-center gap-3 rounded-[24px] border border-[#cf5d56]/16 bg-[#cf5d56]/8 p-4 text-sm text-white/78">
-        <Activity className="size-4 text-[#ff8f84]" />
-        Affectation active: <span className="font-semibold">{driverLabel}</span>.
+      <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[#cf5d56]/10 bg-[#cf5d56]/5 p-3 text-[11px] text-white/60">
+        <Activity className="size-3.5 text-[#ff8f84]" />
+        Affectation: <span className="font-bold text-white">{driverLabel}</span>
       </div>
     </section>
   );

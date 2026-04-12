@@ -19,9 +19,9 @@ import {
 } from 'lucide-react';
 
 const OFFICIAL_DRIVERS = [
-  { id: "SDV 1 (AMARA)", label: "SDV 1 - AMARA" },
-  { id: "SDV 2 (BRAHIMA)", label: "SDV 2 - BRAHIMA" },
-  { id: "SDV 3 (SORO)", label: "SDV 3 - SORO" }
+  { id: "AMARA TRUCK 76", label: "AMARA TRUCK 76" },
+  { id: "BRAHIMA TRUCK 45", label: "BRAHIMA TRUCK 45" },
+  { id: "SORO TRUCK 52", label: "SORO TRUCK 52" }
 ];
 
 const MAPPING_OPTIONS = [
@@ -117,9 +117,9 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
 
   const mapChauffeurValue = (val) => {
     const f = String(val || "").toUpperCase();
-    if (f.includes('AMARA') || f.includes('SDV 1')) return 'SDV 1 (AMARA)';
-    if (f.includes('BRAHIMA') || f.includes('SDV 2')) return 'SDV 2 (BRAHIMA)';
-    if (f.includes('SORO') || f.includes('SDV 3')) return 'SDV 3 (SORO)';
+    if (f.includes('AMARA') || f.includes('SDV 1')) return 'AMARA TRUCK 76';
+    if (f.includes('BRAHIMA') || f.includes('SDV 2')) return 'BRAHIMA TRUCK 45';
+    if (f.includes('SORO') || f.includes('SDV 3')) return 'SORO TRUCK 52';
     return null;
   };
 

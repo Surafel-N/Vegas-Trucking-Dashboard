@@ -26,9 +26,9 @@ The **SDV Chauffeur Dashboard** is a logistics performance analysis platform des
 
 ### Business Logic & Data Mapping
 - **Driver Mapping:**
-  - `SDV_1.csv` -> **AMARA** (SDV 1)
-  - `SDV_2.csv` -> **BRAHIMA** (SDV 2)
-  - `SDV_3.csv` -> **SORO** (SDV 3)
+  - `SDV_1.csv` -> **AMARA TRUCK 76**
+  - `SDV_2.csv` -> **BRAHIMA TRUCK 45**
+  - `SDV_3.csv` -> **SORO TRUCK 52**
 - **Multi-Year Support:** The system supports both **2025** (CSV data) and **2026** (imported data).
 - **Persistence:** All manually imported data and AI-validated tickets are stored in the browser's local storage and persist across sessions.
 - **Date Normalization:** French date formats are parsed and normalized to `YYYY-MM-DD`.

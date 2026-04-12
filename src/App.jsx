@@ -117,9 +117,9 @@ const DEFAULT_UI_CONFIG = {
   ],
 };
 const DEFAULT_DRIVERS = [
-  { id: "drv-amara", sdv: "SDV 1", name: "AMARA", phone: "+225 07 07 00 00 01", license: "SDV-AMARA-01", status: "active", vehicle: "AA-672-PS-09" },
-  { id: "drv-brahima", sdv: "SDV 2", name: "BRAHIMA", phone: "+225 07 07 00 00 02", license: "SDV-BRAHIMA-02", status: "active", vehicle: "BB-221-TR-07" },
-  { id: "drv-soro", sdv: "SDV 3", name: "SORO", phone: "+225 07 07 00 00 03", license: "SDV-SORO-03", status: "active", vehicle: "CC-478-KL-01" },
+  { id: "drv-amara", sdv: "TRUCK 76", name: "AMARA", phone: "+225 07 07 00 00 01", license: "SDV-AMARA-01", status: "active", vehicle: "AA-672-PS-09" },
+  { id: "drv-brahima", sdv: "TRUCK 45", name: "BRAHIMA", phone: "+225 07 07 00 00 02", license: "SDV-BRAHIMA-02", status: "active", vehicle: "BB-221-TR-07" },
+  { id: "drv-soro", sdv: "TRUCK 52", name: "SORO", phone: "+225 07 07 00 00 03", license: "SDV-SORO-03", status: "active", vehicle: "CC-478-KL-01" },
 ];
 const DEFAULT_DESTINATIONS_LIST = ["Abidjan", "San Pedro", "Lauzoua", "Yamoussoukro", "Bouake"];
 const DEFAULT_VEHICLES = [
@@ -531,9 +531,9 @@ const handleLogout = () => {
 
                 let finalDriverLabel = "";
                 const cName = String(extractedData.chauffeur || "").toUpperCase();
-                if (cName.includes("AMARA")) finalDriverLabel = "SDV 1 (AMARA)";
-                else if (cName.includes("BRAHIMA")) finalDriverLabel = "SDV 2 (BRAHIMA)";
-                else if (cName.includes("SORO")) finalDriverLabel = "SDV 3 (SORO)";
+                if (cName.includes("AMARA")) finalDriverLabel = "AMARA TRUCK 76";
+                else if (cName.includes("BRAHIMA")) finalDriverLabel = "BRAHIMA TRUCK 45";
+                else if (cName.includes("SORO")) finalDriverLabel = "SORO TRUCK 52";
 
                 newPendingTickets.push({
                   id: file.id,
@@ -621,7 +621,7 @@ const handleLogout = () => {
                 return;
               }
 
-              const driverKeys = [{ chauffeur: "AMARA", sdv: "SDV 1" }, { chauffeur: "BRAHIMA", sdv: "SDV 2" }, { chauffeur: "SORO", sdv: "SDV 3" }];
+              const driverKeys = [{ chauffeur: "AMARA", sdv: "TRUCK 76" }, { chauffeur: "BRAHIMA", sdv: "TRUCK 45" }, { chauffeur: "SORO", sdv: "TRUCK 52" }];
               let importedTrips = [];
 
               data.valueRanges.forEach((vr, idx) => {
@@ -743,30 +743,10 @@ const handleLogout = () => {
         pendingCount={rolePermissions.canSync ? pendingTickets.length : 0} 
         />
 
-      <FilterBar 
-        chauffeurs={chauffeurOptions} 
-        months={monthOptions} 
-        years={yearOptions} 
-        destinations={destinationOptions} 
-        chauffeur={chauffeur} 
-        month={month} 
-        year={year} 
-        destination={destination} 
-        startDate={startDate} 
-        endDate={endDate} 
-        onChauffeurChange={setChauffeur} 
-        onMonthChange={setMonth} 
-        onYearChange={setYear} 
-        onDestinationChange={setDestination} 
-        onStartDateChange={setStartDate} 
-        onEndDateChange={setEndDate} 
-        onReset={() => {}} 
-        uiConfig={uiConfig} 
-        onClearAllStorage={rolePermissions.canDelete ? handleClearAllStorage : null} 
-      />
 
 <main className="h-[calc(100svh-4rem)] md:h-[calc(100svh-10rem)] overflow-auto p-4 md:p-6 md:pt-0 pb-24 md:pb-6">
-        <ErrorBoundary>
+        <div className="mx-auto max-w-[1600px]">
+          <ErrorBoundary>
           <div className="panel-enter">
             
             {activeSection === "dashboard" && (
@@ -774,7 +754,42 @@ const handleLogout = () => {
                 {!filteredData.length ? ( 
                   <EmptyState selectedYear={year} invalidRange={invalidRange} /> 
                 ) : (
-                  <Dashboard dashboardData={dashboardData} formatCurrency={formatCurrency} formatCompactNumber={formatCompactNumber} onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} uiConfig={uiConfig} selectedYear={year} onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} onReset={() => { setStartDate(globalBounds.min); setEndDate(globalBounds.max); }} isDateFiltered={startDate !== globalBounds.min || endDate !== globalBounds.max} filteredData={filteredData} calendarData={calendarData} globalMonth={month} onMonthChange={setMonth} />
+                  <Dashboard 
+                    dashboardData={dashboardData} 
+                    formatCurrency={formatCurrency} 
+                    formatCompactNumber={formatCompactNumber} 
+                    onSelectDriver={(l) => { setChauffeur(l); setActiveSection("chauffeur"); }} 
+                    uiConfig={uiConfig} 
+                    selectedYear={year} 
+                    onDateSelect={(d) => { setStartDate(d); setEndDate(d); }} 
+                    onReset={() => { setStartDate(globalBounds.min); setEndDate(globalBounds.max); }} 
+                    isDateFiltered={startDate !== globalBounds.min || endDate !== globalBounds.max} 
+                    filteredData={filteredData} 
+                    calendarData={calendarData} 
+                    globalMonth={month} 
+                    onMonthChange={setMonth}
+                    // Filter Props
+                    filterProps={{
+                      chauffeurs: chauffeurOptions,
+                      chauffeur,
+                      months: monthOptions,
+                      month,
+                      years: yearOptions,
+                      year,
+                      destinations: destinationOptions,
+                      destination,
+                      startDate,
+                      endDate,
+                      onChauffeurChange: setChauffeur,
+                      onMonthChange: setMonth,
+                      onYearChange: setYear,
+                      onDestinationChange: setDestination,
+                      onStartDateChange: setStartDate,
+                      onEndDateChange: setEndDate,
+                      onReset: () => { setChauffeur(ALL_CHAUFFEURS); setMonth(ALL_MONTHS); setStartDate(globalBounds.min); setEndDate(globalBounds.max); },
+                      onClearAllStorage: rolePermissions.canDelete ? handleClearAllStorage : null
+                    }}
+                  />
                 )}
               </div>
             )}
@@ -804,6 +819,7 @@ const handleLogout = () => {
             
           </div>
         </ErrorBoundary>
+        </div>
         </main>
 
         <BottomNav 

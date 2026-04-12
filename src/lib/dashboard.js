@@ -7,9 +7,9 @@ export const ALL_DESTINATIONS = "Toutes les destinations";
 export const ALL_MONTHS = "Tous les mois";
 
 const SDV_SOURCES = [
-  { chauffeur: "AMARA", sdv: "SDV 1", sourceFile: "SDV_1.csv", raw: sdv1Raw },
-  { chauffeur: "BRAHIMA", sdv: "SDV 2", sourceFile: "SDV_2.csv", raw: sdv2Raw },
-  { chauffeur: "SORO", sdv: "SDV 3", sourceFile: "SDV_3.csv", raw: sdv3Raw },
+  { chauffeur: "AMARA", sdv: "TRUCK 76", sourceFile: "SDV_1.csv", raw: sdv1Raw },
+  { chauffeur: "BRAHIMA", sdv: "TRUCK 45", sourceFile: "SDV_2.csv", raw: sdv2Raw },
+  { chauffeur: "SORO", sdv: "TRUCK 52", sourceFile: "SDV_3.csv", raw: sdv3Raw },
 ];
 
 const FRENCH_MONTHS = {

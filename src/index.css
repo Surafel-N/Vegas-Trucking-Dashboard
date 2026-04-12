@@ -4,8 +4,9 @@
 :root {
   color-scheme: dark;
   --page-bg: #060606;
-  --page-ink: #f6f2ef;
+  --page-ink: #ffffff;
   --page-muted: #9b938d;
+  font-size: 14px; /* Dézoom global */
 }
 
 html {

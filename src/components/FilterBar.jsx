@@ -24,139 +24,101 @@ export function FilterBar({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <section className="panel-enter rounded-2xl md:rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 md:p-6 text-white shadow-[0_28px_80px_-50px_rgba(0,0,0,0.9)] shrink-0">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex items-center justify-between w-full xl:w-auto">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-white/46">
-              <Filter className="size-4" />
-              Filtres
-            </div>
-            <h2 className="mt-1 md:mt-2 text-xl md:text-2xl font-semibold tracking-tight text-white">Control deck</h2>
-            <p className="mt-1 text-xs md:text-sm text-white/44 hidden sm:block">Pilotez tout le dashboard depuis ici.</p>
+    <section className="panel-enter rounded-2xl md:rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-3 md:p-4 text-white shadow-lg shrink-0">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#cf5d56]/10 text-[#cf5d56]">
+            <Filter className="size-4" />
           </div>
-          
+          <span className="text-sm font-bold uppercase tracking-wider text-white/70">Control Deck</span>
+        </div>
+        
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setIsOpen(!isOpen)}
-            className="flex md:hidden items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-white/10"
+            className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-white/10"
           >
-            {isOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            {isOpen ? "Réduire" : "Filtres"}
+            {isOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            {isOpen ? "Fermer" : "Filtres"}
           </button>
-        </div>
 
-        <div className={`flex gap-2 md:gap-3 ${isOpen ? 'flex' : 'hidden md:flex'}`}>
-          {onClearAllStorage && (
-            <button
-              type="button"
-              onClick={onClearAllStorage}
-              className="inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/5 px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-red-400/70 transition hover:bg-red-500/10 hover:text-red-400"
-            >
-              <AlertTriangle className="size-3 md:size-4" />
-              <span className="hidden sm:inline">Purger tout</span>
-              <span className="sm:hidden">Purger</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium text-white/74 transition hover:-translate-y-0.5 hover:border-white/18 hover:bg-white/8"
+            title="Réinitialiser"
+            className="rounded-lg border border-white/10 bg-white/4 p-1.5 text-white/74 transition hover:bg-white/8"
           >
-            <RotateCcw className="size-3 md:size-4" />
-            <span className="hidden sm:inline">Reinitialiser</span>
-            <span className="sm:hidden">Reset</span>
+            <RotateCcw className="size-3.5" />
           </button>
         </div>
       </div>
 
-      <div className={`mt-4 md:mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4 ${isOpen ? 'grid' : 'hidden md:grid'}`}>
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Chauffeur</span>
+      <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 ${isOpen ? 'grid' : 'hidden'}`}>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Chauffeur</span>
           <div className="relative">
-            <UserRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/35" />
+            <UserRound className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
             <select
               value={chauffeur}
-              onChange={(event) => onChauffeurChange(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] pl-11 pr-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
+              onChange={(e) => onChauffeurChange(e.target.value)}
+              className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] pl-9 pr-4 text-xs text-white outline-none transition focus:border-[#cf5d56]"
             >
-              {chauffeurs.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
+              {chauffeurs.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Mois</span>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Mois</span>
           <select
             value={month}
-            onChange={(event) => onMonthChange(event.target.value)}
-            className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] px-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
+            onChange={(e) => onMonthChange(e.target.value)}
+            className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
           >
-            {months.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Annee</span>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Année</span>
           <select
             value={year}
-            onChange={(event) => onYearChange(event.target.value)}
-            className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] px-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
+            onChange={(e) => onYearChange(e.target.value)}
+            className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
           >
-            {years.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Destination</span>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Destination</span>
           <select
             value={destination}
-            onChange={(event) => onDestinationChange(event.target.value)}
-            className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] px-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
+            onChange={(e) => onDestinationChange(e.target.value)}
+            className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
           >
-            {destinations.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
+            {destinations.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Date debut</span>
-          <div className="relative">
-            <CalendarRange className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/35" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(event) => onStartDateChange(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] pl-11 pr-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
-            />
-          </div>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Début</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onStartDateChange(e.target.value)}
+            className="h-9 w-full rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
+          />
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-white/58">Date fin</span>
-          <div className="relative">
-            <CalendarRange className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/35" />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(event) => onEndDateChange(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-white/8 bg-[#0d0d0d] pl-11 pr-4 text-white outline-none transition focus:border-[#cf5d56] focus:ring-4 focus:ring-[#cf5d56]/12"
-            />
-          </div>
+        <label className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Fin</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => onEndDateChange(e.target.value)}
+            className="h-9 w-full rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
+          />
         </label>
       </div>
     </section>
