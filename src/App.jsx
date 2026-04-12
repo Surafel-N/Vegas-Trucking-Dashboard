@@ -321,7 +321,13 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
   const yearOptions = useMemo(() => getYearOptions(trips), [trips]);
   const [chauffeur, setChauffeur] = useState(ALL_CHAUFFEURS);
   const [month, setMonth] = useState(ALL_MONTHS);
-  const [year, setYear] = useState(() => yearOptions[yearOptions.length - 1] || String(new Date().getFullYear()));
+  
+  // Default year logic: use 2026 if it has data, otherwise fallback to 2025
+  const [year, setYear] = useState(() => {
+    const has2026 = trips.some(t => String(t.year) === "2026");
+    if (has2026) return "2026";
+    return yearOptions.includes("2025") ? "2025" : (yearOptions[yearOptions.length - 1] || "2026");
+  });
   const [destination, setDestination] = useState(ALL_DESTINATIONS);
   
   const globalBounds = useMemo(() => getDateBounds(trips), [trips]);
@@ -375,9 +381,6 @@ const [authUser, setAuthUser] = useState(() => loadJson(APP_STORAGE_KEYS.auth, n
     });
   }, [uiConfig.menu, authUser?.role]);
 
-  useEffect(() => {
-    // Suppression du filtre forcé sur 2026 pour permettre de conserver les données de 2025 et autres.
-  }, []);
 
   const chauffeurKpis = useMemo(() => [
     { label: "Revenue", value: formatCurrency(dashboardMetrics.totalRevenue), tone: "teal" },
@@ -647,7 +650,10 @@ const handleLogout = () => {
                       isoDate = `${y}-${m}-${d}`;
                     }
                   }
-                  if (!isoDate) return;
+
+                  // STRICT 2026 FEB RESTRICTION
+                  if (!isoDate || isoDate < "2026-02-01") return;
+
                   const dateObj = new Date(isoDate);
                   const parseNum = (v) => {
                     if (!v) return 0;
@@ -657,21 +663,33 @@ const handleLogout = () => {
                   let tonnage = parseNum(row[10]); 
                   let totalGross = parseNum(row[11]); 
                   let totalExpense = parseNum(row[9]); 
-                  importedTrips.push({
+
+                  const newTrip = {
                     id: `gsheet-${chauffeur}-${isoDate}-${totalGross}-${Math.random().toString(36).substr(2, 5)}`,
                     batchId, importDate: new Date().toISOString(), chauffeur, driverLabel, sdv, date: isoDate, day: dateObj.getDate(), month: dateObj.getMonth() + 1, year: dateObj.getFullYear(),
                     start: row[1] || "Non renseigné", destination: row[2] || "Non renseigné", fuel_cost_cfa: parseNum(row[3]), road_fees_cfa: parseNum(row[5]),
                     tonnage, total_gross_cfa: totalGross, total_expense_cfa: totalExpense, total_net_cfa: totalGross - totalExpense,
                     voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0), tripType: "Google Sheets", comments: row[13] || "", km: parseNum(row[14])
-                  });
+                  };
+
+                  // DUPLICATE CHECK (Check both manual and regular records)
+                  const isDuplicate = trips.some(existing => 
+                    existing.date === newTrip.date && 
+                    existing.chauffeur === newTrip.chauffeur && 
+                    Math.abs((existing.total_gross_cfa || 0) - newTrip.total_gross_cfa) < 10
+                  );
+
+                  if (!isDuplicate) {
+                    importedTrips.push(newTrip);
+                  }
                 });
               });
 
               if (importedTrips.length > 0) {
                 setManualTrips(prev => [...prev, ...importedTrips]);
-                alert(`${importedTrips.length} trajets synchronisés !`);
+                alert(`${importedTrips.length} nouveaux trajets synchronisés ! (Les doublons ont été ignorés)`);
               } else {
-                alert("Aucun nouveau trajet trouvé.");
+                alert("Aucun nouveau trajet trouvé ou tous les trajets sont déjà présents.");
               }
             } catch (err) {
               console.error("Fetch Error:", err);
