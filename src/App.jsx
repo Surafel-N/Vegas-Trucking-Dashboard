@@ -571,7 +571,7 @@ const handleLogout = () => {
   };
 
   // ----------------------------------------------------
-  // ANCIENNE SYNCHRONISATION GOOGLE SHEETS (Intacte !)
+  // SYNCHRONISATION GOOGLE SHEETS
   // ----------------------------------------------------
 
   const syncWithGoogleSheets = async () => {
@@ -584,7 +584,7 @@ const handleLogout = () => {
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      alert("❌ Erreur : VITE_GOOGLE_CLIENT_ID est manquant dans les réglages Netlify.");
+      alert("❌ Erreur : VITE_GOOGLE_CLIENT_ID est manquant dans les réglages.");
       return;
     }
 
@@ -601,7 +601,7 @@ const handleLogout = () => {
           if (tokenResponse && tokenResponse.access_token) {
             try {
               console.log("✅ Accès autorisé par Google.");
-              const spreadsheetId = "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
+              const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
               const ranges = ["'AMARA TRUCK 76'!A2:O", "'BRAHIMA TRUCK 45'!A2:O", "'SORO TRUCK 52'!A2:O"];
               const queryRanges = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryRanges}`;
@@ -618,7 +618,6 @@ const handleLogout = () => {
                 return;
               }
 
-              // Traitement des données (logique inchangée)
               const driverKeys = [{ chauffeur: "AMARA", sdv: "SDV 1" }, { chauffeur: "BRAHIMA", sdv: "SDV 2" }, { chauffeur: "SORO", sdv: "SDV 3" }];
               let importedTrips = [];
 
@@ -684,173 +683,14 @@ const handleLogout = () => {
         },
         error_callback: (err) => {
           console.error("Google Auth Error Detail:", err);
-          alert(`Erreur Google (${err.error}) : ${err.error_description || "Vérifiez que l'URL du site est autorisée dans Google Cloud Console."}`);
+          alert(`Erreur Google (${err.error}) : ${err.error_description || "Vérifiez l'URL du site."}`);
           setIsSyncing(false);
         }
       });
       client.requestAccessToken();
     } catch (err) {
       console.error("Sync Initialization Exception:", err);
-      alert("Erreur fatale d'initialisation. Détails: " + JSON.stringify(err));
-      setIsSyncing(false);
-    }
-  };
-              const valueRanges = data.valueRanges || [];
-              
-              const driverKeys = [
-                { chauffeur: "AMARA", sdv: "SDV 1" },
-                { chauffeur: "BRAHIMA", sdv: "SDV 2" },
-                { chauffeur: "SORO", sdv: "SDV 3" }
-              ];
-              let importedTrips = [];
-
-              valueRanges.forEach((vr, idx) => {
-                const rows = vr.values || [];
-                const { chauffeur, sdv } = driverKeys[idx];
-                const driverLabel = `${sdv} (${chauffeur})`;
-
-                console.log(`Processing ${rows.length} rows for ${chauffeur}...`);
-
-                rows.forEach(row => {
-                  const rawDate = String(row[0] || "").trim();
-                  let isoDate = null;
-
-                  const moisMap = {
-                    "janvier": "01", "fevrier": "02", "février": "02",
-                    "mars": "03", "avril": "04", "mai": "05", "juin": "06",
-                    "juillet": "07", "aout": "08", "août": "08", "septembre": "09",
-                    "octobre": "10", "novembre": "11", "decembre": "12", "décembre": "12"
-                  };
-
-                  const dateTextMatch = rawDate.toLowerCase().match(/(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zéû]+)\s+(\d{2,4})/);
-
-                  if (dateTextMatch) {
-                    const d = dateTextMatch[1].padStart(2, '0');
-                    const mText = dateTextMatch[2];
-                    const m = moisMap[mText];
-                    let y = dateTextMatch[3];
-                    if (y.length === 2) y = "20" + y;
-                    if (m) isoDate = `${y}-${m}-${d}`;
-                  } else {
-                    const dateNumMatch = rawDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-                    if (dateNumMatch) {
-                      let d = dateNumMatch[1].padStart(2, '0');
-                      let m = dateNumMatch[2].padStart(2, '0');
-                      let y = dateNumMatch[3];
-                      if (y.length === 2) y = "20" + y;
-                      isoDate = `${y}-${m}-${d}`;
-                    }
-                  }
-
-                  if (!isoDate || isoDate < "2026-02-01") return;
-
-                  const dateObj = new Date(isoDate);
-
-                  const parseNum = (v) => {
-                    if (!v) return 0;
-                    let clean = String(v).replace(/\s/g, "").replace(/,/g, ".").replace(/[^0-9.-]/g, "");
-                    return parseFloat(clean) || 0;
-                  };
-
-                  let tonnage = parseNum(row[10]); 
-                  let totalGross = parseNum(row[11]); 
-                  let totalExpense = parseNum(row[9]); 
-
-                  if (tonnage > 1000) {
-                    totalGross = tonnage; 
-                    tonnage = 0; 
-                  }
-
-                  const tripObj = {
-                    id: `gsheet-${chauffeur}-${isoDate}-${totalGross}-${Math.random().toString(36).substr(2, 5)}`,
-                    batchId,
-                    importDate: new Date().toISOString(),
-                    chauffeur,
-                    driverLabel,
-                    sdv,
-                    date: isoDate,
-                    day: dateObj.getDate(),
-                    month: dateObj.getMonth() + 1,
-                    year: dateObj.getFullYear(),
-                    start: row[1] || "Non renseigné",
-                    destination: row[2] || "Non renseigné",
-                    fuel_cost_cfa: parseNum(row[3]),
-                    road_fees_cfa: parseNum(row[5]),
-                    tonnage: tonnage,
-                    total_gross_cfa: totalGross,
-                    total_expense_cfa: totalExpense,
-                    total_net_cfa: totalGross - totalExpense,
-                    voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0),
-                    tripType: "Google Sheets",
-                    comments: row[13] || "",
-                    km: parseNum(row[14])
-                  };
-
-                  importedTrips.push(tripObj);
-                });
-              });
-
-              if (importedTrips.length > 0) {
-                const importedKeys = new Set(importedTrips.map(t => t.date + '_' + t.driverLabel));
-                const hasOverlap = manualTrips.some(t => importedKeys.has(t.date + '_' + t.driverLabel));
-                
-                let proceed = true;
-                let cleanupRequired = false;
-
-                if (hasOverlap) {
-                  const overwrite = window.confirm(
-                    "⚠️ CONFLIT DÉTECTÉ : Des trajets existent déjà dans l'application pour ces dates et ces chauffeurs.\n\n" +
-                    "Voulez-vous ÉCRASER et remplacer les anciennes données par ces nouvelles ?\n" +
-                    "(OK = Écraser, Annuler = Ignorer les doublons)"
-                  );
-                  
-                  if (overwrite) {
-                    cleanupRequired = true;
-                  } else {
-                    proceed = false;
-                  }
-                }
-
-                if (proceed) {
-                  setManualTrips(prev => {
-                    let finalTrips = [...prev];
-                    if (cleanupRequired) {
-                      finalTrips = prev.filter(t => !importedKeys.has(t.date + '_' + t.driverLabel));
-                    }
-                    return [...finalTrips, ...importedTrips];
-                  });
-
-                  setAuditLogs(prev => [{
-                    id: `log-${Date.now()}`,
-                    timestamp: new Date().toISOString(),
-                    type: "Sync Sheets",
-                    count: importedTrips.length,
-                    batchId: batchId
-                  }, ...prev]);
-
-                  alert(`${importedTrips.length} trajets synchronisés avec succès !`);
-                }
-              } else {
-                alert("Déjà à jour. Aucun nouveau trajet trouvé.");
-              }
-            } catch (err) {
-              console.error("Fetch/Parsing Error:", err);
-              alert(`Erreur technique: ${err.message}`);
-            } finally {
-              setIsSyncing(false);
-            }
-          }
-        },
-        error_callback: (err) => {
-          console.error("Auth Error:", err);
-          alert("Erreur d'authentification Google.");
-          setIsSyncing(false);
-        }
-      });
-      client.requestAccessToken();
-    } catch (err) {
-      console.error("Sync Initialization Error:", err);
-      alert("Impossible de démarrer la synchronisation.");
+      alert("Erreur fatale. Détails: " + err.message);
       setIsSyncing(false);
     }
   };
@@ -865,20 +705,7 @@ const handleLogout = () => {
         setAuthUser(user);
         saveJson(APP_STORAGE_KEYS.auth, user);
       }} />
-    );<Header 
-        activeSection={activeSection}
-        onSectionChange={handleSectionChange}
-        isAuthenticated={!!authUser}
-        authUser={authUser}
-        onLogout={() => setAuthUser(null)}
-        menuConfig={uiConfig.menu}
-        // 👇 ICI : On envoie la fonction de synchro SEULEMENT si c'est l'admin
-        syncWithGoogleSheets={isAdmin ? syncWithGoogleSheets : null}
-        isSyncing={isSyncing}
-        syncTicketsIA={isAdmin ? syncTicketsIA : null}
-        isSyncingTickets={isSyncingTickets}
-        pendingCount={isAdmin ? (pendingTickets?.length || 0) : 0}
-      />
+    );
   }
 
   // -----------------------
