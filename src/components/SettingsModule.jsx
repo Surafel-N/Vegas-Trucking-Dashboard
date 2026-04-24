@@ -32,10 +32,13 @@ export function SettingsModule({
   setCategories,
   trips,
   onBulkImport,
-  onClearAllStorage
+  onClearAllStorage,
+  onPurgeTrips,
+  onPurgeRange
 }) {
   const [activeTab, setActiveSection] = useState("drivers");
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [purgeRange, setPurgeRange] = useState({ start: 1, end: 1, year: "2026" });
 
   const onDragStart = (e, index) => {
     setDraggedIndex(index);
@@ -328,7 +331,48 @@ export function SettingsModule({
               <p className="text-sm text-white/40 mb-6">
                 Ces actions sont irréversibles. Elles supprimeront toutes les données locales stockées dans votre navigateur.
               </p>
+
+              <div className="p-5 rounded-3xl bg-orange-500/5 border border-orange-500/10 mb-6">
+                <h4 className="text-[10px] font-black uppercase text-orange-500 mb-4 tracking-[0.2em] flex items-center gap-2">
+                  <Database className="size-3.5" /> Purge par plage
+                </h4>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-white/20 uppercase">Année</label>
+                    <select value={purgeRange.year} onChange={e => setPurgeRange({...purgeRange, year: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                       <option value="2026">2026</option>
+                       <option value="2025">2025</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-white/20 uppercase">Mois Début</label>
+                    <select value={purgeRange.start} onChange={e => setPurgeRange({...purgeRange, start: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>Mois {m}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-white/20 uppercase">Mois Fin</label>
+                    <select value={purgeRange.end} onChange={e => setPurgeRange({...purgeRange, end: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>Mois {m}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => onPurgeRange(purgeRange.start, purgeRange.end, purgeRange.year)}
+                  className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
+                >
+                  Purger cette période
+                </button>
+              </div>
               
+              <button 
+                onClick={onPurgeTrips}
+                className="w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
+              >
+                <Database className="size-5" />
+                PURGER UNIQUEMENT LES TRAJETS (2026)
+              </button>
+
               <button 
                 onClick={onClearAllStorage}
                 className="w-full py-4 rounded-2xl bg-red-500 text-white font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center justify-center gap-3"

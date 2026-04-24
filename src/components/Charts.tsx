@@ -78,16 +78,25 @@ export function Charts({ dashboardData, monthlyComparison, formatCurrency }: Cha
       </ChartCard>
 
       <ChartCard title="Repartition des depenses" description="PieChart fuel vs road fees sur la selection active.">
-        <div className="h-[320px]">
+        <div className="h-[420px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={expenseSplit} dataKey="value" nameKey="name" innerRadius={72} outerRadius={110} paddingAngle={4}>
+              <Pie 
+                data={expenseSplit} 
+                dataKey="value" 
+                nameKey="name" 
+                innerRadius={90} 
+                outerRadius={140} 
+                paddingAngle={6}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
+              >
                 {expenseSplit.map((entry) => (
-                  <Cell key={entry.name} fill={entry.fill} />
+                  <Cell key={entry.name} fill={entry.fill} stroke="none" />
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} formatter={(value: number, name: string) => [formatCurrency(value), name]} />
-              <Legend />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </div>

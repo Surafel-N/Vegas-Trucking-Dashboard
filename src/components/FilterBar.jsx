@@ -68,27 +68,78 @@ export function FilterBar({
           </div>
         </label>
 
-        <label className="space-y-1">
+        <div className="space-y-1">
           <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Mois</span>
-          <select
-            value={month}
-            onChange={(e) => onMonthChange(e.target.value)}
-            className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
-          >
-            {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </label>
+          <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
+            {months.map((m) => {
+              const isSelected = Array.isArray(month) ? month.includes(String(m.value)) : month === String(m.value);
+              return (
+                <button
+                  key={m.value}
+                  onClick={() => {
+                    let newMonths;
+                    const val = String(m.value);
+                    if (val === "Tous les mois") {
+                      newMonths = ["Tous les mois"];
+                    } else {
+                      const current = Array.isArray(month) ? month.filter(v => v !== "Tous les mois") : [];
+                      if (current.includes(val)) {
+                        newMonths = current.filter(v => v !== val);
+                      } else {
+                        newMonths = [...current, val];
+                      }
+                      if (newMonths.length === 0) newMonths = ["Tous les mois"];
+                    }
+                    onMonthChange(newMonths);
+                  }}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all border ${
+                    isSelected 
+                      ? "bg-[#cf5d56] border-[#cf5d56] text-white shadow-[0_0_10px_rgba(207,93,86,0.3)]" 
+                      : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {m.label.length > 3 ? m.label.substring(0, 3) : m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-        <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Année</span>
-          <select
-            value={year}
-            onChange={(e) => onYearChange(e.target.value)}
-            className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
-          >
-            {years.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </label>
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Années</span>
+          <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
+            {years.map((y) => {
+              const isSelected = Array.isArray(year) ? year.includes(y) : year === y;
+              return (
+                <button
+                  key={y}
+                  onClick={() => {
+                    let newYears;
+                    if (y === "Toutes les années") {
+                      newYears = ["Toutes les années"];
+                    } else {
+                      const current = Array.isArray(year) ? year.filter(v => v !== "Toutes les années") : [];
+                      if (current.includes(y)) {
+                        newYears = current.filter(v => v !== y);
+                      } else {
+                        newYears = [...current, y];
+                      }
+                      if (newYears.length === 0) newYears = ["Toutes les années"];
+                    }
+                    onYearChange(newYears);
+                  }}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all border ${
+                    isSelected 
+                      ? "bg-[#00F2FF] border-[#00F2FF] text-black shadow-[0_0_10px_rgba(0,242,255,0.3)]" 
+                      : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {y === "Toutes les années" ? "ALL" : y}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <label className="space-y-1">
           <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Destination</span>

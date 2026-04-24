@@ -22,48 +22,51 @@ export function MaintenanceLog({ records = [] }: MaintenanceLogProps) {
   const sortedRecords = [...records].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <section className="panel-enter rounded-[30px] border border-white/7 bg-[#111] p-5 text-white shadow-xl h-full flex flex-col relative">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-            <Wrench className="size-4" />
+    <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-full flex flex-col relative">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
+            <Wrench className="size-5" />
           </div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-white/70">Maintenance & Réparations</h3>
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-tighter">Maintenance Flotte</h3>
+            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">Historique Interventions</p>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
         {sortedRecords.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-white/10 italic">
-            <Wrench className="size-8 mb-2" />
-            <p className="text-xs">Aucune maintenance enregistrée</p>
+            <Wrench className="size-10 mb-2 opacity-50" />
+            <p className="text-xs font-bold uppercase tracking-widest">Aucun relevé</p>
           </div>
         ) : (
           sortedRecords.map((repair) => (
             <div 
               key={repair.id} 
               onClick={() => setSelectedRepair(repair)}
-              className="group relative flex gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-3 transition hover:bg-white/[0.08] cursor-pointer"
+              className="group relative flex gap-4 rounded-3xl border border-white/5 bg-white/2 p-3.5 transition-all duration-300 hover:bg-white/5 hover:border-orange-500/30 cursor-pointer"
             >
-              <div className="size-12 shrink-0 overflow-hidden rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+              <div className="size-14 shrink-0 overflow-hidden rounded-2xl bg-white/5 flex items-center justify-center border border-white/5">
                 {repair.imageUrl ? (
                   repair.isPdf ? (
-                    <FileText className="size-5 text-white/40" />
+                    <FileText className="size-6 text-white/20" />
                   ) : (
-                    <img src={repair.imageUrl} alt="Repair" className="h-full w-full object-cover transition group-hover:scale-110" />
+                    <img src={repair.imageUrl} alt="Repair" className="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
                   )
                 ) : (
-                  <ImageIcon className="size-5 text-white/20" />
+                  <ImageIcon className="size-6 text-white/10" />
                 )}
               </div>
               
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start">
-                  <p className="text-[10px] font-bold text-orange-500/80 uppercase">{repair.vehicle}</p>
-                  <p className="text-[10px] text-white/30">{new Date(repair.date).toLocaleDateString('fr-FR')}</p>
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{repair.vehicle}</p>
+                  <p className="text-[9px] font-bold text-white/20 uppercase">{new Date(repair.date).toLocaleDateString('fr-FR')}</p>
                 </div>
-                <h4 className="text-xs font-semibold text-white truncate mt-0.5">{repair.description}</h4>
-                <p className="text-xs font-bold text-white/60 mt-1">{repair.cost.toLocaleString()} CFA</p>
+                <h4 className="text-xs font-black text-white truncate">{repair.description}</h4>
+                <p className="text-xs font-black text-[#9fe3b9] mt-1">{repair.cost.toLocaleString()} CFA</p>
               </div>
             </div>
           ))

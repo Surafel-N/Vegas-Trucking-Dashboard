@@ -5,6 +5,7 @@ import sdv3Raw from "../../data/SDV_3.csv?raw";
 export const ALL_CHAUFFEURS = "Tous les chauffeurs";
 export const ALL_DESTINATIONS = "Toutes les destinations";
 export const ALL_MONTHS = "Tous les mois";
+export const ALL_YEARS = "Toutes les années";
 
 const SDV_SOURCES = [
   { chauffeur: "AMARA", sdv: "TRUCK 76", sourceFile: "SDV_1.csv", raw: sdv1Raw },
@@ -226,6 +227,8 @@ function parseFileRecords(source, rules) {
   const netIdx = getColumnIndex(headers, [/net/i, /profit/i, /benefice/i], 8);
   const destIdx = getColumnIndex(headers, [/dest/i, /arrivee/i, /ville/i], 2);
   const startIdx = getColumnIndex(headers, [/start/i, /depart/i, /origine/i], 1);
+  const commentIdx = getColumnIndex(headers, [/comment/i, /note/i, /info/i], 9);
+  const kmIdx = getColumnIndex(headers, [/km/i, /distance/i, /kilometr/i], 10);
 
   return lines
     .slice(1)
@@ -237,6 +240,30 @@ function parseFileRecords(source, rules) {
       const tonnage = parseNumber(cells[tonnageIdx]);
       if (tonnage === 0 && parseNumber(cells[grossIdx]) === 0 && parseNumber(cells[fuelIdx]) === 0) {
         return null;
+      }
+
+      // Extraction du kilométrage (KM)
+      let km = 0;
+      
+      // 1. Try dedicated KM column first
+      if (kmIdx >= 0 && cells[kmIdx]) {
+        const rawKm = String(cells[kmIdx]).trim();
+        if (rawKm) {
+          // Handle cases like "36736KM" or "36736 / 37121"
+          const lastValue = rawKm.split(/[\/\-]/).pop().trim();
+          km = parseNumber(lastValue);
+        }
+      }
+      
+      // 2. Fallback or cross-check with comments if KM is suspiciously low or zero
+      if (km === 0 && commentIdx >= 0 && cells[commentIdx]) {
+        const comment = String(cells[commentIdx]);
+        // Regex to find numbers followed by KM, ignoring spaces
+        const kmMatch = comment.match(/(\d{3,})\s?KM/i);
+        if (kmMatch) {
+          const extracted = parseNumber(kmMatch[1]);
+          if (extracted > km) km = extracted;
+        }
       }
 
       return {
@@ -254,10 +281,13 @@ function parseFileRecords(source, rules) {
         fuel_cost_cfa: parseNumber(cells[fuelIdx]),
         road_fees_cfa: parseNumber(cells[roadIdx]),
         tonnage,
-        total_gross_cfa: parseNumber(cells[grossIdx]),
+        total_gross_cfa: dateData.year === 2025 ? tonnage * 8000 : parseNumber(cells[grossIdx]),
         total_expense_cfa: parseNumber(cells[fuelIdx]) + parseNumber(cells[roadIdx]),
-        total_net_cfa: parseNumber(cells[netIdx]),
+        total_net_cfa: dateData.year === 2025 
+          ? (tonnage * 8000) - (parseNumber(cells[fuelIdx]) + parseNumber(cells[roadIdx])) 
+          : parseNumber(cells[netIdx]),
         voyages: calculateVoyages(tonnage),
+        km,
       };
     })
     .filter(Boolean);
@@ -364,7 +394,8 @@ export function getYearOptions(records = []) {
       if (r.year) years.add(String(r.year));
     });
   }
-  return [...years].sort();
+  const sortedYears = [...years].sort();
+  return [ALL_YEARS, ...sortedYears];
 }
 
 export function getDestinations(records) {

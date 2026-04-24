@@ -14,7 +14,7 @@ const EMPTY_TRIP = {
   comment: "",
 };
 
-export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onCreateTrip }) {
+export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onAddTrip: onCreateTrip }) {
   const [form, setForm] = useState(EMPTY_TRIP);
 
   const enrichedTrips = useMemo(
@@ -53,7 +53,7 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
       start: form.start,
       destination: form.destination,
       tripType: form.tripType,
-      distanceKm: Number(form.distanceKm || 0),
+      km: Number(form.distanceKm || 0),
       volume: tonnage,
       total_gross_cfa: Number(form.amount || 0),
       total_expense_cfa: Number(form.directExpense || 0),
@@ -78,10 +78,11 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
             </select>
             <input placeholder="Départ" value={form.start} onChange={e => updateField("start", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
             <input placeholder="Destination" value={form.destination} onChange={e => updateField("destination", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder="Distance (KM)" type="number" value={form.distanceKm} onChange={e => updateField("distanceKm", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
             <input placeholder="Volume (T)" type="number" value={form.volume} onChange={e => updateField("volume", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
             <input placeholder="Revenu" type="number" value={form.amount} onChange={e => updateField("amount", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
             <input placeholder="Dépenses directes" type="number" value={form.directExpense} onChange={e => updateField("directExpense", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <button type="submit" className="md:col-span-3 xl:col-span-1 rounded-xl bg-[#cf5d56] font-bold text-white transition hover:brightness-110">Ajouter</button>
+            <button type="submit" className="md:col-span-3 xl:col-span-2 rounded-xl bg-[#cf5d56] font-bold text-white transition hover:brightness-110">Ajouter</button>
           </form>
         </section>
       )}

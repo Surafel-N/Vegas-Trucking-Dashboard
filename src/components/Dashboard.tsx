@@ -1,39 +1,44 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { 
   ArrowUpRight, 
   Banknote, 
   Fuel, 
-  ReceiptText, 
-  Wallet, 
   Weight, 
-  AlertTriangle, 
-  Cloud, 
-  ExternalLink,
-  Sparkles,
-  Activity,
-  Layout,
-  RotateCcw,
-  Check,
-  Zap,
-  CircleDollarSign,
-  X,
-  FileText,
   Calendar,
   Truck,
-  FolderOpen
+  Activity,
+  ShieldAlert,
+  ChevronRight,
+  Target,
+  PieChart as PieIcon,
+  CircleDollarSign,
+  Zap,
+  Layout,
+  Maximize,
+  Minimize,
+  X,
+  Wrench
 } from "lucide-react";
-import { KpiCard } from "./KpiCard";
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip as RechartsTooltip 
+} from "recharts";
 import { FleetTrackerWidget } from "./FleetTrackerWidget";
 import { LogisticsCalendar } from "./LogisticsCalendar";
-import { MostProfitableDay } from "./MostProfitableDay";
 import { FleetStatus } from "./FleetStatus";
 import { MaintenanceLog } from "./MaintenanceLog";
 import { FuelEfficiency } from "./FuelEfficiency";
 import { OperationalAlerts } from "./OperationalAlerts";
 import { MiniCharts } from "./MiniCharts";
-import { 
-  getDashboardMetrics, 
-  formatDate, 
+import { QuantumExpenseAnalysis } from "./QuantumExpenseAnalysis";
+import { ActiveTrends } from "./ActiveTrends";
+import { FinancialTrends } from "./FinancialTrends";
+import {
+  getDashboardMetrics,  formatCurrency, 
+  formatCompactNumber, 
   formatTonnage, 
   formatPercent 
 } from "../lib/dashboard";
@@ -41,343 +46,246 @@ import type { DashboardSummary } from "../utils/types";
 import { FilterBar } from "./FilterBar";
 
 type DashboardProps = {
-  dashboardData: DashboardSummary;
   formatCurrency: (value: number) => string;
   formatCompactNumber: (value: number) => string;
   onSelectDriver: (driverLabel: string) => void;
-  uiConfig: any;
-  expenseRecords?: any[];
-  incomeRecords?: any[];
-  documentRecords?: any[];
-  selectedYear: string;
-  onDateSelect?: (date: string) => void;
+  selectedChauffeur: string;
+  onDateSelect?: (date: string | null) => void;
   onReset?: () => void;
-  isDateFiltered?: boolean;
-  filteredData?: any[];
-  calendarData?: any[];
-  globalMonth?: string;
-  onMonthChange?: (month: string) => void;
+  filteredData: any[];
+  calendarData: any[];
   filterProps?: any;
-  maintenanceRecords?: any[];
-  allTrips?: any[];
-  oilChanges?: any;
+  maintenanceRecords: any[];
+  allTrips: any[];
+  oilChanges: any;
+  selectedDates: string[];
 };
 
-const DEFAULT_ORDER = ['top_gps', 'middle', 'controls', 'fleet', 'operational', 'archives'];
-
 export function Dashboard({
-  dashboardData,
-  formatCurrency,
-  formatCompactNumber,
   onSelectDriver,
-  uiConfig,
-  expenseRecords = [],
-  incomeRecords = [],
-  documentRecords = [],
-  selectedYear,
+  selectedChauffeur,
   onDateSelect,
   onReset,
-  isDateFiltered,
-  filteredData = [],
+  filteredData: initialFilteredData = [],
   calendarData = [],
-  globalMonth,
-  onMonthChange,
   filterProps,
   maintenanceRecords = [],
   allTrips = [],
-  oilChanges = {}
+  oilChanges = {},
+  formatCurrency,
+  formatCompactNumber,
+  selectedDates = []
 }: DashboardProps) {
 
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [blocksOrder, setBlocksOrder] = useState(DEFAULT_ORDER);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
+  // --- ÉTATS PILOTES DU CALENDRIER ---
+  const [viewDate, setViewDate] = useState(new Date());
+  const [isGpsExpanded, setIsGpsExpanded] = useState(false);
 
-  const metrics = getDashboardMetrics(filteredData);
+  // --- MOTEUR DE SYNCHRONISATION GLOBAL ---
+  const syncFilteredData = useMemo(() => {
+    // initialFilteredData est déjà filtré par App.jsx (Chauffeur, Multi-Années, Multi-Mois)
+    // Mais s'il y a des jours spécifiques sélectionnés (selectedDates), on affine ici.
+    let data = [...initialFilteredData];
+    if (selectedDates && selectedDates.length > 0) {
+        return data.filter(t => selectedDates.includes(t.date));
+    }
+    return data;
+  }, [initialFilteredData, selectedDates]);
+
+  // --- CALCUL MAINTENANCE FILTRÉE ---
+  const maintenanceTotal = useMemo(() => {
+    if (!maintenanceRecords || maintenanceRecords.length === 0) return 0;
+
+    return maintenanceRecords.filter(r => {
+      const rDate = new Date(r.date);
+      
+      let dateMatch = false;
+      if (selectedDates && selectedDates.length > 0) {
+          dateMatch = selectedDates.includes(r.date);
+      } else {
+          // On suit les filtres globaux passés par App.jsx
+          const yFilter = filterProps?.year || [];
+          const mFilter = filterProps?.month || [];
+          
+          const yMatch = yFilter.includes("Toutes les années") || yFilter.includes(String(rDate.getFullYear()));
+          const mMatch = mFilter.includes("Tous les mois") || mFilter.includes(String(rDate.getMonth() + 1));
+          dateMatch = yMatch && mMatch;
+      }
+
+      // Filtre Chauffeur/Véhicule
+      let chauffeurMatch = true;
+      if (selectedChauffeur !== "Tous les chauffeurs") {
+        chauffeurMatch = r.vehicle.includes(selectedChauffeur.split(' ')[2]) || r.vehicle.includes(selectedChauffeur.split(' ')[0]);
+      }
+      
+      return dateMatch && chauffeurMatch;
+    }).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+  }, [maintenanceRecords, selectedDates, filterProps, selectedChauffeur]);
+
+  const metrics = useMemo(() => getDashboardMetrics(syncFilteredData), [syncFilteredData]);
 
   const financeStats = useMemo(() => {
-    const tonnage = filteredData.reduce((s, r) => s + (r.tonnage || 0), 0);
-    const fuel = filteredData.reduce((s, r) => s + (r.fuel_cost_cfa || 0), 0);
-    const roadFees = filteredData.reduce((s, r) => s + (r.road_fees_cfa || 0), 0);
-    const revenue = tonnage * 8000;
-    const netProfit = revenue - (fuel + roadFees);
+    const tonnage = syncFilteredData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
+    const revenue = syncFilteredData.reduce((s, r) => s + (Number(r.total_gross_cfa) || 0), 0);
+    const expense = syncFilteredData.reduce((s, r) => s + (Number(r.total_expense_cfa) || 0), 0);
+    const netProfit = revenue - (expense + maintenanceTotal);
     const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-    return { tonnage, fuel, roadFees, revenue, netProfit, margin };
-  }, [filteredData]);
+    return { tonnage, revenue, netProfit, margin };
+  }, [syncFilteredData, maintenanceTotal]);
 
-  const latestKmData = useMemo(() => {
-    const kmMap: Record<string, number> = { "AMARA TRUCK 76": 0, "BRAHIMA TRUCK 45": 0, "SORO TRUCK 52": 0 };
-    allTrips.forEach(t => {
-      const label = t.driverLabel;
-      if (kmMap[label] !== undefined && t.km && t.km > kmMap[label]) {
-        kmMap[label] = t.km;
-      }
-    });
-    return kmMap;
-  }, [allTrips]);
+  // --- HANDLERS ---
+  const handleDayClick = (date: string | null) => {
+    if (!date) return;
+    
+    const newDates = selectedDates.includes(date)
+        ? selectedDates.filter(d => d !== date)
+        : [...selectedDates, date];
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    if (draggedId === null || draggedId === id) return;
-    const items = [...blocksOrder];
-    const fromIndex = items.indexOf(draggedId);
-    const toIndex = items.indexOf(id);
-    items.splice(fromIndex, 1);
-    items.splice(toIndex, 0, draggedId);
-    setBlocksOrder(items);
-  };
-
-  const renderBlock = (id: string) => {
-    switch (id) {
-      case 'top_gps':
-        return (
-          <div key="top_gps" className="w-full h-full min-h-[300px] md:min-h-[400px] mb-6">
-            <FleetTrackerWidget records={filteredData} />
-          </div>
-        );
-
-      case 'middle':
-        return (
-          <div key="middle" className="grid grid-cols-1 xl:grid-cols-[max-content_1fr] gap-6 items-stretch mb-6">
-            <div className="flex flex-col md:flex-row gap-4 bg-[#181818] rounded-2xl md:rounded-[30px] border border-white/5 shadow-2xl p-4 w-full xl:w-max h-full items-center">
-              <div className="w-full md:w-auto overflow-x-auto">
-                <LogisticsCalendar 
-                  records={calendarData} 
-                  onDateSelect={onDateSelect}
-                  onReset={onReset}
-                  isDateFiltered={isDateFiltered}
-                  globalMonth={globalMonth}
-                  onMonthChange={onMonthChange}
-                />
-              </div>
-              <div className="hidden md:block w-px h-[200px] bg-white/5 mx-4"></div>
-              <div className="md:hidden w-full h-px bg-white/5 my-2"></div>
-              
-              <div className="w-full md:w-fit flex flex-col gap-6 py-2 min-h-[200px] md:min-h-[250px]">
-                {/* BLOC 1 : FINANCE & FUEL */}
-                <div className="space-y-4">
-                  <h4 className="text-[10px] text-white/40 uppercase font-bold tracking-widest text-center md:text-left">FINANCE & FUEL</h4>
-                  <div className="flex flex-col sm:flex-row items-center gap-6">
-                    <div className="relative shrink-0 size-24 md:size-28 rounded-full border-[6px] border-[#cf5d56]/20 border-l-[#cf5d56] flex flex-col items-center justify-center">
-                      <span className="text-xl md:text-2xl font-black text-white">{formatCompactNumber(financeStats.tonnage)}</span>
-                      <span className="text-[9px] text-white/40 uppercase mt-1 text-center leading-none">TONNES</span>
-                    </div>
-                    <div className="flex flex-col gap-3 w-full">
-                      <div className="flex items-center gap-3">
-                        <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0"><Banknote className="size-3.5" /></div>
-                        <div className="flex flex-col">
-                          <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">REVENU (TX 8K)</p>
-                          <p className="text-xs font-bold text-white">{formatCurrency(financeStats.revenue)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="size-6 rounded-md bg-red-500/10 text-red-500 flex items-center justify-center shrink-0"><Fuel className="size-3.5" /></div>
-                        <div className="flex flex-col">
-                          <p className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">FUEL</p>
-                          <p className="text-xs font-bold text-white">{formatCurrency(financeStats.fuel)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* BLOC 2 : KILOMÉTRAGE & VIDANGE */}
-                <div className="space-y-4 pt-4 border-t border-white/5">
-                  <h4 className="text-[10px] text-white/40 uppercase font-bold tracking-widest text-center md:text-left">KILOMÉTRAGE & VIDANGE</h4>
-                  <div className="flex flex-col gap-3">
-                    {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].filter(label => dashboardData.chauffeur === "Tous les chauffeurs" || dashboardData.chauffeur.includes(label.split(' ')[0])).map(label => {
-                      const currentKm = latestKmData[label] || 0;
-                      const lastService = oilChanges[label]?.mileage || 0;
-                      const diff = currentKm - lastService;
-                      const remaining = Math.max(0, 10000 - diff);
-                      const isCritical = remaining < 1000;
-                      const isWarning = remaining < 2500;
-
-                      return (
-                        <div key={label} className="bg-black/20 rounded-xl p-3 border border-white/5">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-[9px] font-black text-white/40 uppercase">{label}</span>
-                            <span className="text-xs font-black text-white">{currentKm.toLocaleString()} Km</span>
-                          </div>
-                          <div className="space-y-1.5">
-                            <div className="flex justify-between text-[9px] font-bold">
-                              <span className="text-white/20 uppercase">Prochaine Vidange</span>
-                              <span className={isCritical ? "text-red-500" : isWarning ? "text-orange-500" : "text-emerald-500"}>
-                                {remaining.toLocaleString()} Km restants
-                              </span>
-                            </div>
-                            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all ${isCritical ? "bg-red-500" : isWarning ? "bg-orange-500" : "bg-emerald-500"}`}
-                                style={{ width: `${Math.min(100, (remaining / 10000) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="mt-2 pt-4 border-t border-white/5 flex justify-between items-end gap-6 md:gap-12">
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">BÉNÉFICE NET</span>
-                  <span className="text-base md:text-lg font-black text-white">{formatCurrency(financeStats.netProfit)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="h-full w-full"> 
-              <MiniCharts records={filteredData} />
-            </div>
-          </div>
-        );
-
-      case 'controls':
-        return (
-          <div key="controls" className="w-full mb-6">
-            {filterProps && <FilterBar {...filterProps} />}
-          </div>
-        );
-
-      case 'fleet':
-        return (
-          <div key="fleet" className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6 items-stretch mb-6">
-            <section className="panel-enter rounded-[30px] border border-white/7 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white shadow-xl xl:p-6">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight text-white">Fleet by driver</h3>
-                  <p className="mt-1 text-sm text-white/46">Clique sur une carte pour basculer vers la vue chauffeur.</p>
-                </div>
-                <div className="rounded-full border border-white/8 bg-white/4 px-3 py-2 text-sm text-white/48">Vue dynamique</div>
-              </div>
-              <div className="mt-5 grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                {dashboardData.byDriver.map((driver) => (
-                  <button
-                    key={driver.driverLabel}
-                    type="button"
-                    onClick={() => onSelectDriver(driver.driverLabel)}
-                    className="panel-enter rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(207,93,86,0.18),transparent_38%),linear-gradient(180deg,#1a1818_0%,#111111_100%)] p-5 text-left shadow-lg transition hover:-translate-y-1.5 hover:border-[#cf5d56]/30"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.28em] text-[#cf5d56]">{driver.sdv}</p>
-                        <h4 className="mt-2 text-xl font-semibold tracking-tight text-white">{driver.chauffeur}</h4>
-                      </div>
-                      <ArrowUpRight className="size-5 text-[#cf5d56]" />
-                    </div>
-                    <div className="mt-5 grid gap-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-[22px] border border-white/8 bg-black/24 p-4">
-                          <p className="text-[10px] text-white/40 uppercase font-bold">Bénéfice</p>
-                          <p className="mt-1 text-base font-semibold text-[#9fe3b9]">{formatCurrency(driver.totalProfit)}</p>
-                        </div>
-                        <div className="rounded-[22px] border border-white/8 bg-black/24 p-4">
-                          <p className="text-[10px] text-white/40 uppercase font-bold">Tonnage</p>
-                          <p className="mt-1 text-base font-semibold text-white">{formatCompactNumber(driver.totalTonnage)} T</p>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-            <FleetStatus 
-              totalTrips={metrics.totalTrips} 
-              activeDays={metrics.activeDays} 
-              profitableTrips={metrics.profitableTrips} 
-              driverLabel={dashboardData.chauffeur} 
-              profitMargin={formatPercent(financeStats.margin)}
-            />
-          </div>
-        );
-
-      case 'operational':
-        return (
-          <div key="operational" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-6 min-h-[400px]">
-            <MaintenanceLog records={maintenanceRecords} />
-            <FuelEfficiency records={filteredData} />
-            <OperationalAlerts records={filteredData} />
-          </div>
-        );
-
-      case 'archives':
-        return (
-          <div key="archives" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold tracking-tight text-white">Archives des trajets</h3>
-            </div>
-            <TransportTable
-              rows={filteredData}
-              formatCurrency={formatCurrency}
-              formatTonnage={formatTonnage}
-            />
-          </div>
-        );
-
-      default:
-        return null;
+    if (onDateSelect) {
+        onDateSelect({ 
+            dates: newDates, 
+            months: [ALL_MONTHS], // Sélection de jours précis désactive le filtre mois
+        });
     }
   };
 
-  return (
-    <div className="flex flex-col gap-6 relative">
-      <div className="absolute -top-12 right-0 flex items-center gap-3">
-        <button 
-          onClick={() => setIsEditMode(!isEditMode)}
-          className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all shadow-lg ${
-            isEditMode ? "bg-[#61d2c0] text-black" : "bg-[#cf5d56] text-white"
-          }`}
-        >
-          {isEditMode ? <Check className="size-3" /> : <Layout className="size-3" />}
-          {isEditMode ? "Terminer" : "Modifier l'écran"}
-        </button>
-      </div>
+  const handleMonthChange = (offset: number) => {
+    const next = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+    setViewDate(next);
+  };
 
-      {blocksOrder.map((blockId) => (
-        <div
-          key={blockId}
-          draggable={isEditMode}
-          onDragStart={(e) => handleDragStart(e, blockId)}
-          onDragOver={(e) => handleDragOver(e, blockId)}
-          className={`relative transition-all duration-300 ${isEditMode ? 'opacity-50 cursor-grab' : ''}`}
-        >
-          {renderBlock(blockId)}
+  const handleResetDay = () => {
+    if (onDateSelect) onDateSelect(null);
+  };
+
+  const handleSelectionFromCalendar = (type: 'month' | 'year', values: string[]) => {
+      if (onDateSelect) {
+          onDateSelect({
+              [type === 'month' ? 'months' : 'years']: values,
+              dates: [] // On réinitialise les jours si on change mois/année
+          });
+      }
+  };
+
+  const isAllYears = Array.isArray(filterProps?.year) && filterProps.year.includes("Toutes les années");
+
+  return (
+    <div className="flex flex-col gap-4 w-full h-full pb-6 font-sans antialiased text-white relative">
+
+      {filterProps && (
+         <div className="panel-enter rounded-2xl border border-white/5 bg-[#1c1c1e] p-1.5 shadow-xl">
+            <FilterBar {...filterProps} />
+         </div>
+      )}
+
+      {/* GPS / Fleet Widget Header */}
+      <section className={`panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-4 shadow-2xl transition-all duration-700 relative overflow-hidden ${isGpsExpanded ? 'h-[70vh]' : 'h-[110px]'}`}>
+         <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
+                 <div className="size-2 rounded-full bg-[#cf5d56] animate-pulse shadow-[0_0_8px_#cf5d56]" />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-white/90 italic">Fleet Live</span>
+             </div>
+             <button onClick={() => setIsGpsExpanded(!isGpsExpanded)} className="px-3 py-1 rounded-xl bg-white/5 hover:bg-[#cf5d56] hover:text-white text-[9px] font-black uppercase tracking-tighter transition-all flex items-center gap-2 border border-white/10">
+               {isGpsExpanded ? <><Minimize className="size-3" /> Réduire</> : <><Maximize className="size-3" /> Focus Mode</>}
+             </button>
+         </div>
+         <FleetTrackerWidget records={allTrips} />
+      </section>
+
+      {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
+
+      <section className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+        <div className="col-span-12 lg:col-span-5 xl:col-span-4 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col items-stretch min-h-[500px]">
+            <div className="flex-1 w-full h-full">
+                <LogisticsCalendar 
+  records={calendarData} 
+  selectedDay={selectedDates.length === 1 ? selectedDates[0] : (isAllYears ? "ALL_YEARS_GLOBAL" : null)} 
+  viewDate={viewDate} 
+  onDayClick={handleDayClick} 
+  onMonthChange={handleMonthChange} 
+  onResetDay={handleResetDay} 
+  isDateFiltered={selectedDates.length > 0} 
+  selectedChauffeur={selectedChauffeur} 
+  onChauffeurChange={onSelectDriver} 
+  chauffeurOptions={filterProps?.chauffeurs}
+  year={filterProps?.year}
+  month={filterProps?.month}
+  selectedDates={selectedDates}
+  onSelection={handleSelectionFromCalendar}
+/>
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
+                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">Volume</p>
+                    <p className="text-base font-black text-white">{formatCompactNumber(financeStats.tonnage)} T</p>
+                </div>
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
+                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">Net Profit</p>
+                    <p className="text-base font-black text-[#9fe3b9]">{formatCurrency(financeStats.netProfit)}</p>
+                </div>
+            </div>
         </div>
-      ))}
-    </div>
-  );
-}
 
-function TransportTable({ rows, formatCurrency, formatTonnage }: any) {
-  return (
-    <section className="panel-enter rounded-[30px] border border-white/7 bg-[#111] overflow-hidden shadow-xl">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-white/5 bg-white/[0.02]">
-              <th className="px-6 py-4 text-[10px] font-black text-white/30 uppercase tracking-widest">Date</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/30 uppercase tracking-widest">Chauffeur</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/30 uppercase tracking-widest">Destination</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/30 uppercase tracking-widest">Tonnage</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/30 uppercase tracking-widest text-right">Bénéfice</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {rows.slice(0, 10).map((row: any) => (
-              <tr key={row.id} className="hover:bg-white/[0.02] transition-colors">
-                <td className="px-6 py-4 text-xs font-bold text-white/70">{new Date(row.date).toLocaleDateString('fr-FR')}</td>
-                <td className="px-6 py-4 text-xs font-black text-[#cf5d56]">{row.chauffeur}</td>
-                <td className="px-6 py-4 text-xs text-white/50">{row.destination}</td>
-                <td className="px-6 py-4 text-xs font-mono text-white/40">{formatTonnage(row.tonnage)}</td>
-                <td className="px-6 py-4 text-xs font-black text-[#9fe3b9] text-right">{formatCurrency(row.total_net_cfa)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="col-span-12 lg:col-span-7 xl:col-span-8 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-7 shadow-2xl flex flex-col overflow-hidden">
+            <header className="flex items-center justify-between mb-2 text-white">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-2xl bg-[#00F2FF]/10 text-[#00F2FF]"><Zap className="size-5" /></div>
+                    <div>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">Quantum Finance Analyzer</h3>
+                        <p className="text-[10px] font-bold text-white/20 uppercase mt-1 italic underline decoration-[#00F2FF]/30 underline-offset-4">Exploration des Coûts Multidimensionnelle</p>
+                    </div>
+                </div>
+            </header>
+            <div className="flex-1 flex items-center justify-center">
+                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={formatCurrency} />
+            </div>
+        </div>
+        </section>
+
+        {/* ACTIVE TRENDS MODULE */}
+        <section className="mb-4">
+          <ActiveTrends records={syncFilteredData} formatCurrency={formatCurrency} />
+        </section>
+
+        {/* FINANCIAL TRENDS MODULE */}
+        <section className="mb-4">
+          <FinancialTrends records={syncFilteredData} formatCurrency={formatCurrency} />
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">          <div className="md:col-span-3 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col">
+              <div className="flex items-center gap-3 mb-6 px-1">
+                  <div className="p-2.5 rounded-2xl bg-[#cf5d56]/10 text-[#cf5d56]"><Target className="size-4" /></div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">Active Drivers Matrix</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+                {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].map((label) => {
+                  const isActive = selectedChauffeur === label;
+                  const driverData = syncFilteredData.filter(t => t.driverLabel === label);
+                  const dProfit = driverData.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
+                  const dTonnage = driverData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
+                  return (
+                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? "Tous les chauffeurs" : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
+                      <div className="flex justify-between items-start mb-4"><div className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${isActive ? 'bg-black text-white' : 'bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20'}`}>{label.split(' ')[2]}</div><ArrowUpRight className={`size-4 transition-colors ${isActive ? 'text-white' : 'text-white/20'}`} /></div>
+                      <div><p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${isActive ? 'text-black/60' : 'text-[#cf5d56]'}`}>UNIT {label.split(' ')[2]}</p><h4 className={`text-base font-black truncate mb-4 tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>{label.split(' ')[0]}</h4></div>
+                      <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>
+                    </button>
+                  );
+                })}
+              </div>
+          </div>
+          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} /></div>
+      </section>
+
+      {/* REVENUE TREND & TONNAGE (FULL WIDTH APPLE DESIGN) */}
+      <section className="col-span-12">
+          <MiniCharts records={syncFilteredData} />
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <MaintenanceLog records={maintenanceRecords} />
+          <OperationalAlerts records={syncFilteredData} />
       </div>
-    </section>
+
+    </div>
   );
 }

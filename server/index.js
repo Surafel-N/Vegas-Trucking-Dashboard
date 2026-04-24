@@ -2,7 +2,11 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import OpenAI from "openai";
-import { toFile } from "openai/uploads";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -97,17 +101,13 @@ function extractJsonPayload(rawOutput) {
 
   try {
     return JSON.parse(rawText);
-  } catch {
-    // Continue on fallback parsing.
-  }
+  } catch { }
 
   const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced?.[1]) {
     try {
       return JSON.parse(fenced[1].trim());
-    } catch {
-      // Continue on fallback parsing.
-    }
+    } catch { }
   }
 
   const firstBrace = rawText.indexOf("{");
@@ -162,9 +162,7 @@ app.get("/api/health", (_, res) => {
 app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
-      res.status(500).json({
-        error: "OPENAI_API_KEY manquant sur le serveur.",
-      });
+      res.status(500).json({ error: "OPENAI_API_KEY manquant." });
       return;
     }
 
@@ -174,19 +172,8 @@ app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
       return;
     }
 
-    if (!acceptedMimeTypes.has(file.mimetype)) {
-      res.status(415).json({
-        error: "Format non supporte. Utilise JPG, PNG ou PDF.",
-      });
-      return;
-    }
-
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    
-    // GPT-4o-mini supports images via data URL in chat completions.
-    // For PDF, it's more complex, but we'll try to send it if it's an image-PDF or 
-    // we'll let the user know if it fails.
     const dataUrl = toDataUrl(file);
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const response = await client.chat.completions.create({
       model,
@@ -196,12 +183,7 @@ app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
           role: "user",
           content: [
             { type: "text", text: userPrompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: dataUrl,
-              },
-            },
+            { type: "image_url", image_url: { url: dataUrl } },
           ],
         },
       ],
@@ -212,24 +194,24 @@ app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
     const outputText = response.choices[0]?.message?.content;
     const parsed = extractJsonPayload(outputText);
     if (!parsed) {
-      res.status(502).json({
-        error: "Reponse IA non exploitable (JSON invalide).",
-        raw: outputText || "",
-      });
+      res.status(502).json({ error: "Reponse IA non exploitable.", raw: outputText || "" });
       return;
     }
 
     res.json(normalizeResponseFields(parsed));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue.";
-    res.status(500).json({
-      error: "Echec analyse IA.",
-      details: message,
-    });
+    res.status(500).json({ error: "Echec analyse IA.", details: error.message });
   }
 });
 
+// SERVIR LE FRONTEND (PRODUCTION)
+const distPath = path.join(__dirname, "../dist");
+app.use(express.static(distPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
+});
 
 app.listen(port, () => {
-  console.log(`API OCR/Vision active sur http://localhost:${port}`);
+  console.log(`Serveur actif sur http://localhost:${port}`);
 });

@@ -8,6 +8,7 @@
     "dev:api": "node server/index.js",
     "dev:all": "concurrently -k \"npm run dev\" \"npm run dev:api\"",
     "build": "vite build",
+    "start": "node server/index.js",
     "preview": "vite preview"
   },
   "dependencies": {

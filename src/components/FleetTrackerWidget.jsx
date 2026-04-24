@@ -32,8 +32,9 @@ export function FleetTrackerWidget({ records }) {
       // 💡 LE SECRET EST ICI : Au lieu de +=, on utilise =
       // Si la ligne contient un kilométrage valide, il ÉCRASE le précédent.
       // À la fin de la boucle, il ne restera que le chiffre de la date la plus récente.
-      if (t.km && Number(t.km) > 0) {
-        data[driverKey].km = Number(t.km);
+      const kmValue = Number(t.km || t.distanceKm || 0);
+      if (kmValue > 0) {
+        data[driverKey].km = kmValue;
         data[driverKey].lastDate = t.date; // On garde la date du relevé
       }
     });

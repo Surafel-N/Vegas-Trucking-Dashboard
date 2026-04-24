@@ -4,6 +4,7 @@ import {
   Calendar, 
   MapPin, 
   Weight, 
+  Route,
   Fuel, 
   ReceiptText, 
   ShieldCheck, 
@@ -42,6 +43,7 @@ const MAPPING_OPTIONS = [
   { value: 'total_expense', label: 'Total Expense (CFA)' },
   { value: 'tonnage', label: 'Tonnage (T)' },
   { value: 'revenue', label: 'Total Gross (CFA)' },
+  { value: 'km', label: 'Kilométrage (Km)' },
   { value: 'comments', label: 'Comments' },
 ];
 
@@ -58,6 +60,7 @@ const KEYWORDS = {
   expense: ["bonus", "extra", "prime"],
   total_expense: ["total expense", "dépenses totales", "total frais"],
   tonnage: ["ton", "poids", "tonnage"],
+  km: ["km", "kilométrage", "distance"],
   revenue: ["gross", "brut", "ca", "chiffre", "revenu"],
   comments: ["comments", "commentaires", "note"]
 };
@@ -72,6 +75,7 @@ export default function ManualEntryModule({ setTrips }) {
     date: new Date().toISOString().split('T')[0],
     destination: '',
     tonnage: '',
+    km: '',
     fuel: '',
     toll: '',
     port: '',
@@ -137,6 +141,7 @@ export default function ManualEntryModule({ setTrips }) {
     const extraBonus = cleanNumber(data.extra);
     const revenue = cleanNumber(data.revenue);
     const tonnage = cleanNumber(data.tonnage);
+    const km = cleanNumber(data.km);
 
     // SECURED CALCULATION FORMULAS
     const roadFees = (tollCost || 0) + (portAccess || 0) + (foodCost || 0) + (extraBonus || 0) + (policeCost || 0);
@@ -167,8 +172,9 @@ export default function ManualEntryModule({ setTrips }) {
       road_fees_cfa: roadFees, // standardized grouping
       tollCost, portAccess, food_fees_cfa: foodCost, police_fees_cfa: policeCost,
       other_expenses_cfa: extraBonus, 
-      tonnage, total_gross_cfa: revenue,
+      total_gross_cfa: revenue,
       total_expense_cfa: totalExpense, total_net_cfa: netRevenue,
+      km,
       voyages: tonnage > 100 ? 2 : (tonnage > 0 ? 1 : 0), tripType: "Saisie Manuelle"
       };
       };
@@ -241,7 +247,7 @@ export default function ManualEntryModule({ setTrips }) {
         let parsedDate = null;
         let driverNameRaw = null;
         
-        let fuel = 0, toll = 0, port = 0, police = 0, food = 0, extra = 0, revenue = 0, tonnage = 0, mappedTotalExpense = null;
+        let fuel = 0, toll = 0, port = 0, police = 0, food = 0, extra = 0, revenue = 0, tonnage = 0, km = 0, mappedTotalExpense = null;
 
         mapping.forEach((field, idx) => {
           const val = row[idx];
@@ -259,6 +265,7 @@ export default function ManualEntryModule({ setTrips }) {
             case 'expense': extra = cleanNumber(val); break;
             case 'total_expense': mappedTotalExpense = cleanNumber(val); break;
             case 'tonnage': tonnage = cleanNumber(val); break;
+            case 'km': km = cleanNumber(val); break;
             case 'revenue': revenue = cleanNumber(val); break;
             case 'comments': trip.comments = val || ""; break;
           }
@@ -287,6 +294,7 @@ export default function ManualEntryModule({ setTrips }) {
         trip.police_fees_cfa = police;
         trip.other_expenses_cfa = extra;
         trip.tonnage = tonnage;
+        trip.km = km;
         trip.total_gross_cfa = revenue;
         trip.total_expense_cfa = totalExpense;
         trip.total_net_cfa = netRevenue;
@@ -325,7 +333,10 @@ export default function ManualEntryModule({ setTrips }) {
             <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Chauffeur</span><div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><select value={formData.driverLabel} onChange={e => setFormData({...formData, driverLabel: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition">{CHAUFFEURS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div></label>
             <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Date du trajet</span><div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
             <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Destination</span><div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="text" placeholder="Ex: San Pedro" value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
-            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Tonnage</span><div className="relative"><Weight className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="0.00" value={formData.tonnage} onChange={e => setFormData({...formData, tonnage: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Tonnage</span><div className="relative"><Weight className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="0.00" value={formData.tonnage} onChange={e => setFormData({...formData, tonnage: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+              <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Kilométrage</span><div className="relative"><Route className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="Km" value={formData.km} onChange={e => setFormData({...formData, km: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+            </div>
           </div>
           <div className="space-y-4 bg-white/[0.02] p-6 rounded-[24px] border border-white/5">
             <h4 className="text-xs font-bold uppercase tracking-widest text-[#cf5d56] mb-4">Finances (CFA)</h4>

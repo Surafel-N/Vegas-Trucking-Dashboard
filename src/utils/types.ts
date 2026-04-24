@@ -15,6 +15,7 @@ export type DashboardRecord = {
   voyages: number;
   total_gross_cfa: number;
   total_net_cfa: number;
+  km?: number;
 };
 
 export type DriverDashboardSummary = {

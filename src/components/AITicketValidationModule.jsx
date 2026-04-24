@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, Edit3, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Check, X, Edit3, Image as ImageIcon, AlertCircle, Route } from 'lucide-react';
 
 export default function AITicketValidationModule({ pendingTickets, setPendingTickets, onApprove, drivers }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -137,14 +137,25 @@ export default function AITicketValidationModule({ pendingTickets, setPendingTic
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-white/50 mb-1">Frais / Dépenses (CFA)</label>
-                  <input 
-                    type="number" 
-                    value={formData.total_expense_cfa || ''} 
-                    onChange={e => setFormData({...formData, total_expense_cfa: e.target.value})}
-                    className="w-full rounded-lg bg-black/50 border border-white/10 p-2.5 text-sm text-white focus:border-[#4285F4] outline-none"
-                  />
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-white/50 mb-1">Frais / Dépenses (CFA)</label>
+                    <input 
+                      type="number" 
+                      value={formData.total_expense_cfa || ''} 
+                      onChange={e => setFormData({...formData, total_expense_cfa: e.target.value})}
+                      className="w-full rounded-lg bg-black/50 border border-white/10 p-2.5 text-sm text-white focus:border-[#4285F4] outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-white/50 mb-1">Kilométrage (KM)</label>
+                    <input 
+                      type="number" 
+                      value={formData.km || ''} 
+                      onChange={e => setFormData({...formData, km: e.target.value})}
+                      className="w-full rounded-lg bg-black/50 border border-white/10 p-2.5 text-sm text-white focus:border-[#4285F4] outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
