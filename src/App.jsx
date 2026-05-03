@@ -638,8 +638,17 @@ export default function App() {
                 });
               });
             });
-            setManualTrips(prev => [...prev.filter(t => t.tripType !== "Google Sheets"), ...imported]);
-            alert(`${imported.length} trajets synchronisés !`);
+            setManualTrips(prev => {
+              // 1. On crée une liste des clés "Date-Chauffeur" qui arrivent de Google Sheets
+              const newImportKeys = new Set(imported.map(t => `${t.date}-${t.chauffeur}`));
+              
+              // 2. On filtre l'ancien état : on garde tout ce qui n'est PAS dans l'import actuel
+              // (Cela écrase les doublons sur la même date pour le même chauffeur)
+              const filteredPrev = prev.filter(t => !newImportKeys.has(`${t.date}-${t.chauffeur}`));
+              
+              return [...filteredPrev, ...imported];
+            });
+            alert(`${imported.length} trajets synchronisés ! Les doublons éventuels ont été écrasés.`);
             setIsSyncing(false);
             } catch (err) {
               console.error("Erreur d'analyse des données Google Sheets:", err);
