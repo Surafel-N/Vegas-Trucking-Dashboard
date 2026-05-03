@@ -561,7 +561,6 @@ export default function App() {
                     }
                   }
                 }
-                if (!isoDate || isoDate < "2026-02-01") return;
 
                 const parseNum = (v) => {
                    if (!v) return 0;
@@ -571,23 +570,68 @@ export default function App() {
                 };
 
                 const chauffeur = driverKeys[i].c;
-                const fuel = parseNum(row[3]);
-                const tolls = parseNum(row[4]);
-                const police = parseNum(row[5]);
-                const food = parseNum(row[6]);
-                const bonus = parseNum(row[7]);
-                const roadSubTotal = parseNum(row[8]) || (tolls + police + food + bonus);
-                const totalExpense = parseNum(row[9]) || (fuel + roadSubTotal);
+                let fuel, roadSubTotal, totalExpense, km = 0;
+                let start = row[1] || "";
+                let destination = row[2] || "";
+
+                // MAPPING LOGIC BASED ON DATE AND DRIVER
+                if (isoDate >= "2026-02-01") {
+                  // Format standard 2026 (Février+) - Uniforme pour tous
+                  fuel = parseNum(row[3]);
+                  const tolls = parseNum(row[4]);
+                  const police = parseNum(row[5]);
+                  const food = parseNum(row[6]);
+                  const bonus = parseNum(row[7]);
+                  roadSubTotal = parseNum(row[8]) || (tolls + police + food + bonus);
+                  totalExpense = parseNum(row[9]) || (fuel + roadSubTotal);
+                  tonnage = parseNum(row[10]);
+                  totalGross = parseNum(row[11]);
+                  km = parseNum(row[12]);
+                } else if (isoDate >= "2026-01-01") {
+                  // Janvier 2026 - Spécifique par chauffeur
+                  if (chauffeur === "AMARA") {
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[9]);
+                  } else if (chauffeur === "BRAHIMA") {
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
+                    tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = parseNum(row[11]);
+                  } else { // SORO
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[8]);
+                    tonnage = parseNum(row[9]); totalGross = parseNum(row[10]); km = 0;
+                  }
+                } else {
+                  // Année 2025 - Spécifique par chauffeur
+                  if (chauffeur === "AMARA") {
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = 0;
+                  } else if (chauffeur === "BRAHIMA") {
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
+                    tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = 0;
+                  } else { // SORO
+                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[10]);
+                  }
+                }
 
                 imported.push({
                   id: `gs-${chauffeur}-${isoDate}-${Math.random()}`,
-                  date: isoDate, chauffeur, driverLabel: `${chauffeur} ${driverKeys[i].s}`, sdv: driverKeys[i].s,
-                  fuel_cost_cfa: fuel, road_fees_cfa: tolls, police_fees_cfa: police, food_fees_cfa: food, other_expenses_cfa: bonus,
-                  tonnage: parseNum(row[10]), total_gross_cfa: parseNum(row[11]), total_expense_cfa: totalExpense,
-                  total_net_cfa: parseNum(row[11]) - totalExpense,
-                  km: parseNum(row[chauffeur === "AMARA" ? 14 : 13]),
+                  date: isoDate, 
+                  chauffeur, 
+                  driverLabel: `${chauffeur} ${driverKeys[i].s}`, 
+                  sdv: driverKeys[i].s,
+                  start,
+                  destination,
+                  fuel_cost_cfa: fuel, 
+                  road_fees_cfa: roadSubTotal, 
+                  total_expense_cfa: totalExpense,
+                  tonnage, 
+                  total_gross_cfa: totalGross,
+                  total_net_cfa: totalGross - totalExpense,
+                  km,
                   tripType: "Google Sheets",
-                  month: new Date(isoDate).getMonth() + 1, year: new Date(isoDate).getFullYear()
+                  comments: `Synchronisé (${isoDate < "2026-01-01" ? '2025' : (isoDate < "2026-02-01" ? 'Jan 2026' : 'Standard')})`,
+                  month: new Date(isoDate).getMonth() + 1, 
+                  year: new Date(isoDate).getFullYear()
                 });
               });
             });
