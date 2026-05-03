@@ -383,12 +383,9 @@ export default function App() {
   };
 
   // LOGIQUE TRANSPORT
-  const transportBundle = useMemo(() => loadSDVFiles(businessRules), [businessRules]);
   const trips = useMemo(() => [
-    ...transportBundle.records.map(r => ({ ...r, tripType: "Régulier" })),
     ...manualTrips
-  ], [transportBundle.records, manualTrips]);
-
+  ], [manualTrips]);
   const [chauffeur, setChauffeur] = useState(ALL_CHAUFFEURS);
   const [month, setMonth] = useState([ALL_MONTHS]);
   const [year, setYear] = useState(["2026"]);
