@@ -25,6 +25,7 @@ type MaintenanceLogProps = {
 
 export function MaintenanceLog({ records = [], expenseRecords = [], googleClientId }: MaintenanceLogProps) {
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'maintenance' | 'expenses'>('maintenance');
   const [folderImages, setFolderImages] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
@@ -218,11 +219,11 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                   {isFolder(selectedRecord.driveLink) ? (
                     folderImages.length > 0 ? (
                       folderImages.map((img, i) => (
-                        <div key={i} className="aspect-square rounded-[24px] overflow-hidden border border-white/10 bg-black group relative shadow-xl">
+                        <div key={i} className="aspect-square rounded-[24px] overflow-hidden border border-white/10 bg-black group relative shadow-xl cursor-zoom-in" onClick={() => setZoomedImage(img.replace('sz=w1000', 'sz=w2000'))}>
                           <img src={img} className="size-full object-cover transition duration-500 group-hover:scale-110" alt="Preuve" />
-                          <a href={img.replace('sz=w1000', 'sz=w2000')} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                            <ExternalLink className="size-6 text-white" />
-                          </a>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                            <LayoutGrid className="size-6 text-white" />
+                          </div>
                         </div>
                       ))
                     ) : !isLoadingImages && (
@@ -232,18 +233,42 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                       </div>
                     )
                   ) : (
-                    <div className="col-span-2 aspect-video rounded-[32px] overflow-hidden border border-white/10 bg-black relative group">
+                    <div className="col-span-2 aspect-video rounded-[32px] overflow-hidden border border-white/10 bg-black relative group cursor-zoom-in" onClick={() => {
+                        const url = getDrivePreviewUrl(selectedRecord.driveLink || selectedRecord.imageUrl);
+                        if (url) setZoomedImage(url.replace('sz=w800', 'sz=w2000'));
+                    }}>
                        {getDrivePreviewUrl(selectedRecord.driveLink || selectedRecord.imageUrl) ? (
-                         <img src={getDrivePreviewUrl(selectedRecord.driveLink || selectedRecord.imageUrl)!} className="size-full object-cover" alt="Preuve unique" />
+                         <img src={getDrivePreviewUrl(selectedRecord.driveLink || selectedRecord.imageUrl)!} className="size-full object-cover transition duration-500 group-hover:scale-105" alt="Preuve unique" />
                        ) : (
                          <div className="size-full flex items-center justify-center text-white/5 italic">Aperçu indisponible</div>
                        )}
+                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                          <LayoutGrid className="size-8 text-white" />
+                       </div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
           </section>
+        </div>
+      )}
+
+      {/* Lightbox / Zoom Plein Écran */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-200 cursor-zoom-out"
+          onClick={() => setZoomedImage(null)}
+        >
+          <button className="absolute top-8 right-8 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-[410]">
+            <X className="size-8" />
+          </button>
+          <img 
+            src={zoomedImage} 
+            alt="Zoomed" 
+            className="max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </section>
