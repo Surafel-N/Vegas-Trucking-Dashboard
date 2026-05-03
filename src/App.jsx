@@ -529,50 +529,53 @@ export default function App() {
             return;
           }
           if (tr.access_token) {
-            const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
-            const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O`, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
-            const data = await res.json();
-            const driverKeys = [{ c: "AMARA", s: "TRUCK 76" }, { c: "BRAHIMA", s: "TRUCK 45" }, { c: "SORO", s: "TRUCK 52" }];
-            let imported = [];
+            try {
+              const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
+              const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O`, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
+              const data = await res.json();
+              const driverKeys = [{ c: "AMARA", s: "TRUCK 76" }, { c: "BRAHIMA", s: "TRUCK 45" }, { c: "SORO", s: "TRUCK 52" }];
+              let imported = [];
 
-            data.valueRanges.forEach((vr, i) => {
-              (vr.values || []).forEach(row => {
-                let isoDate = "";
-                if (row[0]) {
-                  const cleanDate = String(row[0]).replace(/^[a-z]+\s+/i, "").toLowerCase();
-                  if (cleanDate.includes("/") || cleanDate.includes("-")) {
-                    const parts = cleanDate.split(/[\/\-]/);
-                    if (parts.length === 3) {
-                      let [d, m, y] = parts[0].length === 4 ? [parts[2], parts[1], parts[0]] : [parts[0], parts[1], parts[2]];
-                      if (y.length === 2) y = "20" + y;
-                      isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    }
-                  } else {
-                    const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
-                    const parts = cleanDate.split(/\s+/);
-                    if (parts.length >= 2) {
-                      const d = parts[0].padStart(2, '0');
-                      let m = "01";
-                      const monthStr = parts[1];
-                      monthsFr.forEach((name, idx) => { if (monthStr.startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
-                      let y = parts[2] || "2026";
-                      if (y.length === 2) y = "20" + y;
-                      isoDate = `${y}-${m}-${d}`;
+              data.valueRanges.forEach((vr, i) => {
+                (vr.values || []).forEach(row => {
+                  let isoDate = "";
+                  if (row[0]) {
+                    const cleanDate = String(row[0]).replace(/^[a-z]+\s+/i, "").toLowerCase();
+                    if (cleanDate.includes("/") || cleanDate.includes("-")) {
+                      const parts = cleanDate.split(/[\/\-]/);
+                      if (parts.length === 3) {
+                        let [d, m, y] = parts[0].length === 4 ? [parts[2], parts[1], parts[0]] : [parts[0], parts[1], parts[2]];
+                        if (y.length === 2) y = "20" + y;
+                        isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                      }
+                    } else {
+                      const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+                      const parts = cleanDate.split(/\s+/);
+                      if (parts.length >= 2) {
+                        const d = parts[0].padStart(2, '0');
+                        let m = "01";
+                        const monthStr = parts[1];
+                        monthsFr.forEach((name, idx) => { if (monthStr.startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
+                        let y = parts[2] || "2026";
+                        if (y.length === 2) y = "20" + y;
+                        isoDate = `${y}-${m}-${d}`;
+                      }
                     }
                   }
-                }
 
-                const parseNum = (v) => {
-                   if (!v) return 0;
-                   let s = String(v).replace(/\s/g, "");
-                   if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
-                   return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
-                };
+                  if (!isoDate) return;
 
-                const chauffeur = driverKeys[i].c;
-                let fuel, roadSubTotal, totalExpense, km = 0;
-                let start = row[1] || "";
-                let destination = row[2] || "";
+                  const parseNum = (v) => {
+                     if (!v) return 0;
+                     let s = String(v).replace(/\s/g, "");
+                     if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
+                     return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
+                  };
+
+                  const chauffeur = driverKeys[i].c;
+                  let fuel = 0, roadSubTotal = 0, totalExpense = 0, km = 0, tonnage = 0, totalGross = 0;
+                  let start = row[1] || "";
+                  let destination = row[2] || "";
 
                 // MAPPING LOGIC BASED ON DATE AND DRIVER
                 if (isoDate >= "2026-02-01") {
@@ -638,6 +641,11 @@ export default function App() {
             setManualTrips(prev => [...prev.filter(t => t.tripType !== "Google Sheets"), ...imported]);
             alert(`${imported.length} trajets synchronisés !`);
             setIsSyncing(false);
+            } catch (err) {
+              console.error("Erreur d'analyse des données Google Sheets:", err);
+              alert("Une erreur est survenue pendant la lecture des données Google Sheets.");
+              setIsSyncing(false);
+            }
           }
         }
       });
