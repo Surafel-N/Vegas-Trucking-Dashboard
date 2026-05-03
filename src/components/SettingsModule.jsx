@@ -34,11 +34,13 @@ export function SettingsModule({
   onBulkImport,
   onClearAllStorage,
   onPurgeTrips,
-  onPurgeRange
+  onPurgeRange,
+  onPurgeMaintenance
 }) {
   const [activeTab, setActiveSection] = useState("drivers");
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [purgeRange, setPurgeRange] = useState({ start: 1, end: 1, year: "2026" });
+  const [maintPurge, setMaintPurge] = useState({ year: "2026", month: "Tous", day: "Tous" });
 
   const onDragStart = (e, index) => {
     setDraggedIndex(index);
@@ -357,21 +359,56 @@ export function SettingsModule({
                     </select>
                   </div>
                 </div>
+                  <button 
+                    onClick={() => onPurgeRange(purgeRange.start, purgeRange.end, purgeRange.year)}
+                    className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
+                  >
+                    Purger cette période
+                  </button>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-blue-500/5 border border-blue-500/10 mb-6">
+                  <h4 className="text-[10px] font-black uppercase text-blue-400 mb-4 tracking-[0.2em] flex items-center gap-2">
+                    <Truck className="size-3.5" /> Purge Maintenances
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-white/20 uppercase">Année</label>
+                      <select value={maintPurge.year} onChange={e => setMaintPurge({...maintPurge, year: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-white/20 uppercase">Mois</label>
+                      <select value={maintPurge.month} onChange={e => setMaintPurge({...maintPurge, month: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                        <option value="Tous">Tous</option>
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={String(m).padStart(2, '0')}>Mois {m}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-white/20 uppercase">Jour (Facultatif)</label>
+                      <select value={maintPurge.day} onChange={e => setMaintPurge({...maintPurge, day: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
+                        <option value="Tous">Tous</option>
+                        {Array.from({length: 31}, (_, i) => i + 1).map(d => <option key={d} value={String(d).padStart(2, '0')}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onPurgeMaintenance(maintPurge.year, maintPurge.month, maintPurge.day)}
+                    className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                  >
+                    Purger Maintenances
+                  </button>
+                </div>
+                
                 <button 
-                  onClick={() => onPurgeRange(purgeRange.start, purgeRange.end, purgeRange.year)}
-                  className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
+                  onClick={onPurgeTrips}
+                  className="w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
                 >
-                  Purger cette période
+                  <Database className="size-5" />
+                  PURGER UNIQUEMENT LES TRAJETS (2026)
                 </button>
-              </div>
-              
-              <button 
-                onClick={onPurgeTrips}
-                className="w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
-              >
-                <Database className="size-5" />
-                PURGER UNIQUEMENT LES TRAJETS (2026)
-              </button>
 
               <button 
                 onClick={onClearAllStorage}

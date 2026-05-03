@@ -59,6 +59,8 @@ type DashboardProps = {
   allTrips: any[];
   oilChanges: any;
   selectedDates: string[];
+  googleClientId?: string;
+  currency?: string;
 };
 
 export function Dashboard({
@@ -74,7 +76,9 @@ export function Dashboard({
   oilChanges = {},
   formatCurrency,
   formatCompactNumber,
-  selectedDates = []
+  selectedDates = [],
+  googleClientId,
+  currency = "CFA"
 }: DashboardProps) {
 
   // --- ÉTATS PILOTES DU CALENDRIER ---
@@ -221,7 +225,7 @@ export function Dashboard({
                 </div>
                 <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
                     <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">Net Profit</p>
-                    <p className="text-base font-black text-[#9fe3b9]">{formatCurrency(financeStats.netProfit)}</p>
+                    <p className="text-base font-black text-[#9fe3b9]">{formatCurrency(financeStats.netProfit, currency)}</p>
                 </div>
             </div>
         </div>
@@ -237,19 +241,19 @@ export function Dashboard({
                 </div>
             </header>
             <div className="flex-1 flex items-center justify-center">
-                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={formatCurrency} />
+                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} />
             </div>
         </div>
         </section>
 
         {/* ACTIVE TRENDS MODULE */}
         <section className="mb-4">
-          <ActiveTrends records={syncFilteredData} formatCurrency={formatCurrency} />
+          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} />
         </section>
 
         {/* FINANCIAL TRENDS MODULE */}
         <section className="mb-4">
-          <FinancialTrends records={syncFilteredData} formatCurrency={formatCurrency} />
+          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} />
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">          <div className="md:col-span-3 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col">
@@ -267,7 +271,7 @@ export function Dashboard({
                     <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? "Tous les chauffeurs" : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
                       <div className="flex justify-between items-start mb-4"><div className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${isActive ? 'bg-black text-white' : 'bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20'}`}>{label.split(' ')[2]}</div><ArrowUpRight className={`size-4 transition-colors ${isActive ? 'text-white' : 'text-white/20'}`} /></div>
                       <div><p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${isActive ? 'text-black/60' : 'text-[#cf5d56]'}`}>UNIT {label.split(' ')[2]}</p><h4 className={`text-base font-black truncate mb-4 tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>{label.split(' ')[0]}</h4></div>
-                      <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>
+                      <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit, currency)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>
                     </button>
                   );
                 })}
@@ -282,7 +286,11 @@ export function Dashboard({
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <MaintenanceLog records={maintenanceRecords} />
+          <MaintenanceLog 
+            records={maintenanceRecords} 
+            expenseRecords={syncFilteredData.filter(t => t.tripType === "Google Sheets" || t.category === "Dépense Opérationnelle")} 
+            googleClientId={googleClientId}
+          />
           <OperationalAlerts records={syncFilteredData} />
       </div>
 

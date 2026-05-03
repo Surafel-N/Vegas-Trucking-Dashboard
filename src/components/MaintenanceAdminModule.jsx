@@ -5,13 +5,24 @@ import {
   FolderOpen, Eye, FileText, RotateCcw
 } from 'lucide-react';
 
-export function MaintenanceAdminModule({ records = [], setRecords, drivers = [], googleClientId, oilChanges = {}, setOilChanges }) {
+export function MaintenanceAdminModule({ 
+  records = [], 
+  setRecords, 
+  expenseRecords = [],
+  drivers = [], 
+  googleClientId, 
+  oilChanges = {}, 
+  setOilChanges, 
+  onSync, 
+  isSyncing 
+}) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [driveUrl, setDriveUrl] = useState('');
   const [debugKey, setDebugKey] = useState('');
   const [pendingAI, setPendingAI] = useState([]);
+  const [activeTab, setActiveTab] = useState('maintenance');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -24,7 +35,8 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
 
   const extractFolderId = (url) => {
     const match = url.match(/folders\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : null;
+    const fileMatch = url.match(/[-\w]{25,}/);
+    return match ? match[1] : (fileMatch ? fileMatch[0] : null);
   };
 
   const getBase64FromDrive = async (fileId, token) => {
@@ -162,55 +174,89 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
 
   const vehicleOptions = drivers.map(d => `${d.name} ${d.sdv}`);
 
+  const displayRecords = activeTab === 'maintenance' ? records : expenseRecords;
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-3">
             <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500"><Wrench className="size-6" /></div>
-            Maintenance Avancée
+            Atelier & Finances
           </h2>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-white/40 text-sm">Gestion IA & Drive Explorer</p>
             <input type="password" placeholder="Debug Key..." value={debugKey} onChange={e => setDebugKey(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[9px] w-32 outline-none focus:border-orange-500/50" />
           </div>
         </div>
-        <button onClick={() => setIsAdding(true)} className="bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10"><Plus className="size-4" /> Saisie manuelle</button>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex bg-black/40 border border-white/5 p-1 rounded-2xl mr-4">
+            <button 
+              onClick={() => setActiveTab('maintenance')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'maintenance' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/20 hover:text-white/40'}`}
+            >
+              Maintenances
+            </button>
+            <button 
+              onClick={() => setActiveTab('expenses')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'expenses' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/20 hover:text-white/40'}`}
+            >
+              Dépenses
+            </button>
+          </div>
+
+          <button
+            onClick={onSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2.5 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
+          >
+            {isSyncing ? <RotateCcw className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+            {isSyncing ? "Synchronisation..." : "Sync Spreadsheet"}
+          </button>
+          
+          <button onClick={() => setIsAdding(true)} className="bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10">
+            <Plus className="size-4" /> 
+            Saisie manuelle
+          </button>
+        </div>
       </header>
 
       {/* CONFIGURATION VIDANGE */}
-      <section className="panel-enter rounded-[30px] border border-orange-500/20 bg-[#111] p-6 shadow-xl">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><RotateCcw className="size-5" /></div>
-          <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Suivi des Vidanges (Intervalle 10,000 KM)</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {drivers.map(d => {
-            const truckLabel = `${d.name} ${d.sdv}`;
-            const current = oilChanges[truckLabel] || { mileage: 0 };
-            return (
-              <div key={d.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl space-y-3">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs font-black text-white/70">{truckLabel}</p>
-                  <span className="text-[9px] font-bold text-white/20">KM Dernier Service</span>
-                </div>
-                <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    placeholder="Kilométrage..." 
-                    defaultValue={current.mileage || ''}
-                    onBlur={(e) => handleOilChangeUpdate(truckLabel, e.target.value)}
-                    className="flex-1 h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-orange-500/50 transition-all"
-                  />
-                  <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 shadow-lg shadow-orange-500/5">
-                    <CheckCircle2 className="size-4" />
+      {activeTab === 'maintenance' && (
+        <section className="panel-enter rounded-[30px] border border-orange-500/20 bg-[#111] p-6 shadow-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><RotateCcw className="size-5" /></div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Suivi des Vidanges (Intervalle 10,000 KM)</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {drivers.map(d => {
+              const truckLabel = `${d.name} ${d.sdv}`;
+              const current = oilChanges[truckLabel] || { mileage: 0 };
+              return (
+                <div key={d.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-black text-white/70">{truckLabel}</p>
+                    <span className="text-[9px] font-bold text-white/20">KM Dernier Service</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" 
+                      placeholder="Kilométrage..." 
+                      defaultValue={current.mileage || ''}
+                      onBlur={(e) => handleOilChangeUpdate(truckLabel, e.target.value)}
+                      className="flex-1 h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-orange-500/50 transition-all"
+                    />
+                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 shadow-lg shadow-orange-500/5">
+                      <CheckCircle2 className="size-4" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="panel-enter rounded-[30px] border border-blue-500/20 bg-[#111] p-6 shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-3 mb-4">
@@ -270,24 +316,72 @@ export function MaintenanceAdminModule({ records = [], setRecords, drivers = [],
           <thead>
             <tr className="bg-white/[0.01]">
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Date</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Véhicule</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? 'Véhicule' : 'Chauffeur'}</th>
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Description</th>
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Coût</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Photos</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Preuves / Photos</th>
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {records.sort((a,b) => b.date.localeCompare(a.date)).map(row => (
+            {displayRecords.sort((a,b) => b.date.localeCompare(a.date)).map(row => (
               <tr key={row.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="px-6 py-4 text-xs font-bold text-white/70">{new Date(row.date).toLocaleDateString('fr-FR')}</td>
-                <td className="px-6 py-4 text-xs font-black text-orange-500">{row.vehicle}</td>
+                <td className="px-6 py-4 text-xs font-black text-orange-500">{row.vehicle || row.driverLabel}</td>
                 <td className="px-6 py-4 text-xs text-white/50">{row.description}</td>
-                <td className="px-6 py-4 text-xs font-black text-white">{row.cost.toLocaleString()} CFA</td>
+                <td className="px-6 py-4 text-xs font-black text-white">{(row.cost || row.amount || 0).toLocaleString()} CFA</td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-1.5">
-                    {row.imageUrl && <a href={row.imageUrl} target="_blank" rel="noreferrer" className="size-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center hover:bg-blue-500/20"><ImageIcon className="size-3.5" /></a>}
-                    {row.workPhotos?.length > 0 && <div className="px-2 h-7 rounded-lg bg-white/5 text-white/40 text-[9px] font-black flex items-center gap-1"><Eye className="size-3" /> {row.workPhotos.length}</div>}
+                  <div className="flex items-center gap-2">
+                    {(row.imageUrl || row.driveLink) && (
+                      <div className="flex items-center gap-2">
+                        {(row.driveLink?.includes('google.com') && (row.driveLink?.includes('view') || row.driveLink?.includes('id='))) ? (
+                          <div className="relative group/img size-10 rounded-lg overflow-hidden border border-white/10 bg-black/40">
+                             <img 
+                               src={`https://drive.google.com/thumbnail?id=${row.driveLink.match(/[-\w]{25,}/)}&sz=w400`}
+                               className="size-full object-cover"
+                               onError={(e) => { e.target.style.display = 'none'; }}
+                             />
+                             <a 
+                               href={row.driveLink} 
+                               target="_blank" 
+                               rel="noreferrer"
+                               className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all"
+                             >
+                               <ExternalLink className="size-3 text-white" />
+                             </a>
+                          </div>
+                        ) : (
+                          <a 
+                            href={row.imageUrl || row.driveLink} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="size-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center hover:bg-blue-500/20 border border-blue-500/20"
+                            title="Voir la preuve"
+                          >
+                            <ExternalLink className="size-4" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {row.workPhotos?.length > 0 && (
+                      <div className="flex -space-x-2">
+                        {row.workPhotos.slice(0, 3).map((p, i) => (
+                          <div key={i} className="size-8 rounded-lg border-2 border-[#111] overflow-hidden bg-white/5">
+                            <img src={p} className="size-full object-cover" />
+                          </div>
+                        ))}
+                        {row.workPhotos.length > 3 && (
+                          <div className="size-8 rounded-lg border-2 border-[#111] bg-white/10 flex items-center justify-center text-[8px] font-black text-white/40">
+                            +{row.workPhotos.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {row.source === "Google Sheets" && (
+                      <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5" title="Synchronisé de GSheets">
+                        <Sparkles className="size-4" />
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right space-x-2">

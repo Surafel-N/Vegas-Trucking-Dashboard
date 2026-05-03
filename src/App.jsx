@@ -139,7 +139,53 @@ export default function App() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingMaintenance, setIsSyncingMaintenance] = useState(false);
   const [isSyncingTickets, setIsSyncingTickets] = useState(false);
+  const [currency, setCurrency] = useState("CFA");
+  const [language, setLanguage] = useState("FR");
+
+  const translations = {
+    FR: {
+      dashboard: "Tableau de Bord",
+      drivers: "Chauffeurs",
+      trips: "Trajets",
+      expenses: "Dépenses",
+      income: "Encaissements",
+      validation: "Validation IA",
+      closing: "Clôture jour",
+      reports: "Rapports",
+      audit: "Audit Log",
+      maintenance: "Maintenance",
+      quickEntry: "Saisie Rapide",
+      import: "Importation",
+      settings: "Réglages",
+      search: "Rechercher...",
+      syncSheets: "Sync Sheets",
+      iaSync: "IA Sync",
+      fleet: "FLOTTE 2026",
+    },
+    EN: {
+      dashboard: "Dashboard",
+      drivers: "Drivers",
+      trips: "Trips",
+      expenses: "Expenses",
+      income: "Revenue",
+      validation: "AI Validation",
+      closing: "Daily Closing",
+      reports: "Reports",
+      audit: "Audit Log",
+      maintenance: "Maintenance",
+      quickEntry: "Quick Entry",
+      import: "Import",
+      settings: "Settings",
+      search: "Search...",
+      syncSheets: "Sync Sheets",
+      iaSync: "AI Sync",
+      fleet: "FLEET 2026",
+    }
+  };
+
+  const t = translations[language];
 
   const [drivers, setDrivers] = useState(() => loadJson(APP_STORAGE_KEYS.drivers, DEFAULT_DRIVERS));
   const [vehicles, setVehicles] = useState(() => loadJson(APP_STORAGE_KEYS.vehicles, []));
@@ -155,6 +201,186 @@ export default function App() {
   const [expenseRecords, setExpenseRecords] = useState(() => loadFinanceRecords("expenses"));
   const [incomeRecords, setIncomeRecords] = useState(() => loadFinanceRecords("incomes"));
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
+
+  useEffect(() => {
+    saveFinanceRecords("expenses", expenseRecords);
+  }, [expenseRecords]);
+
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.maintenance, maintenanceRecords);
+  }, [maintenanceRecords]);
+
+  const syncMaintenanceAndExpenses = async () => {
+    setIsSyncingMaintenance(true);
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+        callback: async (tr) => {
+          if (tr.access_token) {
+            const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
+            
+            // Utilisation exclusive de la feuille 'Spreedsheet' comme source de maintenance/dépenses
+            const ranges = ["'Spreedsheet'!A2:Z"];
+            const fields = "sheets(data(rowData(values(formattedValue,hyperlink))))";
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?ranges=${encodeURIComponent(ranges[0])}&fields=${fields}`;
+            
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
+            const data = await res.json();
+            
+            const driverKeys = [{ c: "AMARA", s: "76" }, { c: "BRAHIMA", s: "45" }, { c: "SORO", s: "52" }];
+            
+            // On prépare des accumulateurs pour ne pas écraser les données
+            let maintenanceList = [];
+            let expensesList = [];
+
+            data.sheets.forEach((sheet) => {
+              const rows = sheet.data[0].rowData || [];
+              
+              rows.forEach((row, index) => {
+                const values = row.values || [];
+                if (values.length === 0) return;
+
+                // --- EXTRACTION ET SCAN GLOBAL ---
+                const rowTexts = values.map(v => v?.formattedValue ? String(v.formattedValue) : "");
+                const fullRowContent = rowTexts.join(" ").toLowerCase();
+                
+                const dateRaw = rowTexts[0] || "";
+                if (!dateRaw.includes("26")) return; // Uniquement 2026
+
+                // Montant en Colonne I (Index 8)
+                const amountRaw = rowTexts[8] || "";
+                const driveLink = values[8]?.hyperlink || null;
+                
+                const parseNum = (v) => {
+                  let s = String(v).replace(/\s/g, "");
+                  const match = s.match(/[\d,.]+/);
+                  if (!match) return 0;
+                  s = match[0];
+                  if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
+                  return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
+                };
+                
+                const amount = parseNum(amountRaw);
+                if (amount === 0) return; // Ignore les lignes sans montant
+
+                // --- RÉCUPÉRATION DU COMMENTAIRE (Priorité M et N) ---
+                const commentM = rowTexts[12] || "";
+                const commentN = rowTexts[13] || "";
+                let bestComment = `${commentM} ${commentN}`.trim();
+                
+                // Fallback : si M et N sont vides, on cherche la cellule la plus longue après la colonne B
+                if (!bestComment) {
+                  const possible = rowTexts.slice(2).filter(t => t.length > 3 && t !== amountRaw && t !== dateRaw);
+                  bestComment = possible.sort((a, b) => b.length - a.length)[0] || "";
+                }
+
+                // --- FILTRE DE VALIDATION STRICTE ---
+                if (!bestComment) return;
+                
+                const cleanComment = bestComment.replace(/\s/g, '').toLowerCase();
+                const kmOnlyRegex = /^[\d.,]+(km|kms|k|klm)$/i;
+                const amountOnlyRegex = /^[\d.,]+(cfa|f|fcfa)?$/i;
+                const numberOnlyRegex = /^[\d.,]+$/;
+
+                if (kmOnlyRegex.test(cleanComment) || amountOnlyRegex.test(cleanComment) || numberOnlyRegex.test(cleanComment)) {
+                  console.log(`[IGNORE] Ligne ignorée (Bruit numérique) : ${bestComment}`);
+                  return;
+                }
+
+                // --- DICTIONNAIRE TECHNIQUE ---
+                const maintenanceKeywords = [
+                  'tire', 'oil', 'repair', 'rod', 'maint', 'spare', 'change', 'garage', 
+                  'mechanic', 'mecanic', 'frein', 'brake', 'tube', 'labor', 'filter', 
+                  'battery', 'bearing', 'suspension', 'clutch', 'joint', 'gasket', 
+                  'alternator', 'starter', 'belt', 'pump', 'radiator', 'shock', 'rim',
+                  'pneu', 'vidange', 'moteur', 'batterie', 'roulement', 'amortisseur', 
+                  'embrayage', 'boite', 'pont', 'transmission', 'alternateur',
+                  'demarreur', 'courroie', 'pompe', 'radiateur', 'huil', 'entretien', 
+                  'révision', 'revision', 'facture', 'pièce', 'mecanicien',
+                  'main d', 'lavage', 'graissage', 'parallélisme', 'équilibrage', 'valve',
+                  'durite', 'soufflet', 'disque', 'plaquette', 'étrier', 'injecteur'
+                ];
+                
+                const hasMaintenanceKeyword = maintenanceKeywords.some(keyword => fullRowContent.includes(keyword));
+                const hasKm = fullRowContent.includes('km');
+                const hasDriveLink = !!driveLink || fullRowContent.includes('http') || fullRowContent.includes('drive.google');
+
+                const isMaintenance = hasMaintenanceKeyword || hasKm || hasDriveLink;
+
+                let isoDate = "2026-01-01";
+                const p = dateRaw.toLowerCase().split(" ");
+                if (p.length >= 3) {
+                  const day = p[1].padStart(2, '0');
+                  const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+                  let m = "01";
+                  monthsFr.forEach((name, idx) => { if (p[2].startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
+                  isoDate = `2026-${m}-${day}`;
+                }
+
+                // --- DÉTECTION DU CHAUFFEUR DANS LE COMMENTAIRE ---
+                const driverNames = ["AMARA", "BRAHIMA", "SORO"];
+                let detectedDriver = { c: "AMARA", s: "76" }; // Default
+                driverNames.forEach(name => {
+                  if (fullRowContent.includes(name.toLowerCase())) {
+                    if (name === "AMARA") detectedDriver = { c: "AMARA", s: "76" };
+                    if (name === "BRAHIMA") detectedDriver = { c: "BRAHIMA", s: "45" };
+                    if (name === "SORO") detectedDriver = { c: "SORO", s: "52" };
+                  }
+                });
+
+                // --- EXTRACTION DU TYPE DE RÉPARATION ---
+                const detectedRepairType = maintenanceKeywords.find(kw => fullRowContent.includes(kw)) || "Réparation";
+
+                // --- CAPTURE DU LIEN DRIVE ---
+                const driveLinkRegex = /(https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+)/;
+                const foundLink = fullRowContent.match(driveLinkRegex);
+                const finalDriveLink = driveLink || (foundLink ? foundLink[0] : null);
+
+                const payload = {
+                  id: `gs-${detectedDriver.c}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+                  date: isoDate,
+                  amount: amount,
+                  description: bestComment || `Maintenance ${detectedRepairType}`,
+                  driveLink: finalDriveLink,
+                  source: "Google Sheets"
+                };
+
+                if (isMaintenance) {
+                  maintenanceList.push({
+                    ...payload,
+                    vehicle: `${detectedDriver.c} TRUCK ${detectedDriver.s}`,
+                    cost: amount,
+                    status: "Completed",
+                    repairType: detectedRepairType
+                  });
+                } else {
+                  expensesList.push({
+                    ...payload,
+                    driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`,
+                    category: "Dépense Opérationnelle",
+                    subCategory: "Sync Spreadsheet"
+                  });
+                }
+              });
+            });
+
+            // Mise à jour finale et unique des états pour garantir l'accumulation
+            setMaintenanceRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...maintenanceList]);
+            setExpenseRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...expensesList]);
+
+            alert(`SYNC TERMINÉE : ${maintenanceList.length} Maintenances et ${expensesList.length} Dépenses récupérées.\nCommentaires (M+N) fusionnés.`);
+            setIsSyncingMaintenance(false);
+          }
+        },
+        error_callback: () => setIsSyncingMaintenance(false)
+      });
+      client.requestAccessToken();
+    } catch (e) {
+      console.error(e);
+      setIsSyncingMaintenance(false);
+    }
+  };
 
   // LOGIQUE TRANSPORT
   const transportBundle = useMemo(() => loadSDVFiles(businessRules), [businessRules]);
@@ -207,14 +433,35 @@ export default function App() {
     audit: ShieldCheck, "quick-entry": PlusCircle, admin: RefreshCcw
   };
 
+  const menuLabels = {
+    dashboard: t.dashboard,
+    drivers: t.drivers,
+    trips: t.trips,
+    depenses: t.expenses,
+    encaissements: t.income,
+    documents: t.validation,
+    closing: t.closing,
+    reports: t.reports,
+    audit: t.audit,
+    maintenance: t.maintenance,
+    "quick-entry": t.quickEntry,
+    admin: t.import,
+    settings: t.settings
+  };
+
   const filteredMenu = useMemo(() => {
     const base = uiConfig?.menu?.length > 0 ? uiConfig.menu : DEFAULT_UI_CONFIG.menu;
-    return base.filter(item => {
-      if (item.enabled === false) return false;
-      if (authUser?.role === "viewer") return ["dashboard", "reports"].includes(item.id);
-      return true;
-    });
-  }, [uiConfig, authUser]);
+    return base
+      .filter(item => {
+        if (item.enabled === false) return false;
+        if (authUser?.role === "viewer") return ["dashboard", "reports"].includes(item.id);
+        return true;
+      })
+      .map(item => ({
+        ...item,
+        label: menuLabels[item.id] || item.label
+      }));
+  }, [uiConfig, authUser, menuLabels]);
 
   useEffect(() => { saveJson(APP_STORAGE_KEYS.trips, manualTrips); }, [manualTrips]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.pending_ai_tickets, pendingTickets); }, [pendingTickets]);
@@ -260,12 +507,27 @@ export default function App() {
   };
 
   const syncWithGoogleSheets = async () => {
+    if (!window.google?.accounts?.oauth2) {
+      alert("Le module de synchronisation Google n'est pas encore chargé ou est bloqué par votre navigateur (vérifiez les bloqueurs de pub).");
+      return;
+    }
+    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+      alert("ID Client Google non configuré dans l'environnement.");
+      return;
+    }
+
     setIsSyncing(true);
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
         scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
         callback: async (tr) => {
+          if (tr.error) {
+            console.error("Erreur Auth Google:", tr.error);
+            alert("Erreur lors de l'authentification Google.");
+            setIsSyncing(false);
+            return;
+          }
           if (tr.access_token) {
             const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
             const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O`, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
@@ -336,12 +598,38 @@ export default function App() {
         }
       });
       client.requestAccessToken();
-    } catch (e) { setIsSyncing(false); }
+    } catch (e) { 
+      console.error("Sync Error:", e);
+      alert("Une erreur est survenue lors de l'initialisation de la synchro.");
+      setIsSyncing(false); 
+    }
   };
 
   const handlePurgeRange = (s, e, y) => {
     setManualTrips(prev => prev.filter(t => !(String(t.year) === String(y) && Number(t.month) >= s && Number(t.month) <= e)));
     alert("Période purgée.");
+  };
+
+  const onPurgeMaintenance = (targetYear, targetMonth, targetDay) => {
+    if (!confirm(`Confirmer la suppression pour ${targetYear}-${targetMonth}-${targetDay} ?`)) return;
+    
+    setMaintenanceRecords(prev => prev.filter(m => {
+      const [y, mStr, d] = m.date.split("-");
+      const matchYear = String(y) === String(targetYear);
+      const matchMonth = targetMonth === "Tous" || String(mStr) === String(targetMonth);
+      const matchDay = targetDay === "Tous" || String(d) === String(targetDay);
+      return !(matchYear && matchMonth && matchDay);
+    }));
+    
+    setExpenseRecords(prev => prev.filter(e => {
+      if (e.source !== "Google Sheets") return true;
+      const [y, mStr, d] = e.date.split("-");
+      const matchYear = String(y) === String(targetYear);
+      const matchMonth = targetMonth === "Tous" || String(mStr) === String(targetMonth);
+      const matchDay = targetDay === "Tous" || String(d) === String(targetDay);
+      return !(matchYear && matchMonth && matchDay);
+    }));
+    alert("Maintenance purgée.");
   };
 
   if (!authUser) return <LoginScreen onLogin={(u) => { setAuthUser(u); saveJson(APP_STORAGE_KEYS.auth, u); }} />;
@@ -353,7 +641,7 @@ export default function App() {
         <div className="flex flex-col h-full">
           <div className="p-6 flex items-center gap-2.5">
             <div className="size-9 rounded-xl bg-[#cf5d56] flex items-center justify-center shadow-lg"><Truck className="size-5 text-white" /></div>
-            <div><h1 className="text-lg font-black italic">SDV <span className="text-[#cf5d56] not-italic">LOGS</span></h1><p className="text-[9px] uppercase tracking-widest text-white/20 font-bold">FLEET 2026</p></div>
+            <div><h1 className="text-lg font-black italic">SDV <span className="text-[#cf5d56] not-italic">LOGS</span></h1><p className="text-[9px] uppercase tracking-widest text-white/20 font-bold">{t.fleet}</p></div>
           </div>
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto text-white">
             {filteredMenu.map((item) => {
@@ -379,13 +667,47 @@ export default function App() {
         <header className="sticky top-0 z-30 h-16 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/5 px-6 flex items-center justify-between">
           <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 rounded-xl bg-white/5 text-white"><Menu className="size-5" /></button>
           <div className="hidden md:flex items-center gap-2.5 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-white">
-            <Search className="size-3.5 text-white/20" /><input type="text" placeholder="Rechercher..." className="bg-transparent border-none outline-none text-[11px] text-white/60 w-48 font-medium" />
+            <Search className="size-3.5 text-white/20" /><input type="text" placeholder={t.search} className="bg-transparent border-none outline-none text-[11px] text-white/60 w-48 font-medium" />
           </div>
           <div className="flex items-center gap-2.5 text-white">
-             <button onClick={syncWithGoogleSheets} disabled={isSyncing} className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-[#cf5d56]/10 hover:bg-[#cf5d56]/20 text-[#cf5d56] rounded-xl border border-[#cf5d56]/20 font-black text-[10px] uppercase tracking-widest transition-all">{isSyncing ? <Activity className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}Sync Sheets</button>
-             <button onClick={() => alert("IA Sync non configurée")} className="flex items-center gap-2.5 px-4 py-2 bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20"><ShieldCheck className="size-3.5" />IA Sync</button>
+           <div className="flex items-center gap-3">
+            {/* SÉLECTEUR DE LANGUE */}
+            <div className="flex bg-white/5 border border-white/10 p-1 rounded-xl">
+              <button 
+                onClick={() => setLanguage("FR")}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${language === "FR" ? "bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20" : "text-white/40 hover:text-white/60"}`}
+              >
+                FR
+              </button>
+              <button 
+                onClick={() => setLanguage("EN")}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${language === "EN" ? "bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20" : "text-white/40 hover:text-white/60"}`}
+              >
+                EN
+              </button>
+            </div>
+
+            {/* SÉLECTEUR DE DEVISE */}
+            <div className="flex bg-white/5 border border-white/10 p-1 rounded-xl mr-2">
+              <button 
+                onClick={() => setCurrency("CFA")}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${currency === "CFA" ? "bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20" : "text-white/40 hover:text-white/60"}`}
+              >
+                CFA
+              </button>
+              <button 
+                onClick={() => setCurrency("USD")}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${currency === "USD" ? "bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20" : "text-white/40 hover:text-white/60"}`}
+              >
+                USD
+              </button>
+            </div>
+
+            <button onClick={syncWithGoogleSheets} disabled={isSyncing} className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-[#cf5d56]/10 hover:bg-[#cf5d56]/20 text-[#cf5d56] rounded-xl border border-[#cf5d56]/20 font-black text-[10px] uppercase tracking-widest transition-all">{isSyncing ? <Activity className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}{t.syncSheets}</button>
+             <button onClick={() => alert("IA Sync non configurée")} className="flex items-center gap-2.5 px-4 py-2 bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20"><ShieldCheck className="size-3.5" />{t.iaSync}</button>
           </div>
-        </header>
+        </div>
+      </header>
 
         <div className="p-4 md:p-6 flex-1 overflow-x-hidden">
           <ErrorBoundary>
@@ -415,19 +737,54 @@ export default function App() {
                  }}
                  maintenanceRecords={maintenanceRecords} oilChanges={oilChanges}
                  selectedDates={selectedDates}
-               />
-              )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} />}
+                 googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
+                 currency={currency}
+                 />
+                 )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} />}
               {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={(t) => setManualTrips([...manualTrips, t])} />}
-              {activeSection === "depenses" && <ExpenseModule expenses={expenseRecords} setExpenses={rolePermissions.canEdit ? setExpenseRecords : null} drivers={drivers} formatCurrency={formatCurrency} />}
+              {activeSection === "depenses" && (
+                <ExpenseModule 
+                  expenses={expenseRecords} 
+                  setExpenses={rolePermissions.canEdit ? setExpenseRecords : null} 
+                  drivers={drivers} 
+                  formatCurrency={formatCurrency}
+                  onSync={syncMaintenanceAndExpenses}
+                  isSyncing={isSyncingMaintenance}
+                />
+              )}
               {activeSection === "encaissements" && <FinanceWorkspace type="income" records={incomeRecords} setRecords={rolePermissions.canEdit ? setIncomeRecords : null} categories={categories} setCategories={rolePermissions.canEdit ? setCategories : null} />}
               {activeSection === "documents" && <AITicketValidationModule pendingTickets={pendingTickets} setPendingTickets={rolePermissions.canEdit ? setPendingTickets : null} onApprove={rolePermissions.canEdit ? handleApproveAITicket : null} drivers={drivers} />}
               {activeSection === "closing" && <DailyClosingModule closings={dailyClosings} setClosings={rolePermissions.canEdit ? setDailyClosings : null} />}
-              {activeSection === "maintenance" && <MaintenanceAdminModule records={maintenanceRecords} setRecords={rolePermissions.canEdit ? setMaintenanceRecords : null} drivers={drivers} googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID} oilChanges={oilChanges} setOilChanges={rolePermissions.canEdit ? setOilChanges : null} />}
-              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} />}
+              {activeSection === "maintenance" && (
+                <MaintenanceAdminModule
+                  records={maintenanceRecords}
+                  setRecords={rolePermissions.canEdit ? setMaintenanceRecords : null}
+                  expenseRecords={expenseRecords}
+                  drivers={drivers}
+                  googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
+                  oilChanges={oilChanges}
+                  setOilChanges={rolePermissions.canEdit ? setOilChanges : null}
+                  onSync={syncMaintenanceAndExpenses}
+                  isSyncing={isSyncingMaintenance}
+                />
+              )}              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} />}
               {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
               {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}
               {activeSection === "admin" && <SmartBulkImporter setTrips={rolePermissions.canEdit ? setManualTrips : null} setAuditLogs={rolePermissions.canEdit ? setAuditLogs : null} />}
-              {activeSection === "settings" && <SettingsModule drivers={drivers} setDrivers={setDrivers} vehicles={vehicles} setVehicles={setVehicles} destinationsList={destinationsList} setDestinationsList={setDestinationsList} businessRules={businessRules} setBusinessRules={setBusinessRules} uiConfig={uiConfig} setUiConfig={setUiConfig} trips={trips} onClearAllStorage={() => { localStorage.clear(); window.location.reload(); }} onPurgeTrips={() => setManualTrips([])} onPurgeRange={handlePurgeRange} />}
+              {activeSection === "settings" && (
+                <SettingsModule 
+                  drivers={drivers} setDrivers={setDrivers} 
+                  vehicles={vehicles} setVehicles={setVehicles} 
+                  destinationsList={destinationsList} setDestinationsList={setDestinationsList} 
+                  businessRules={businessRules} setBusinessRules={setBusinessRules} 
+                  uiConfig={uiConfig} setUiConfig={setUiConfig} 
+                  trips={trips} 
+                  onClearAllStorage={() => { localStorage.clear(); window.location.reload(); }} 
+                  onPurgeTrips={() => setManualTrips([])} 
+                  onPurgeRange={handlePurgeRange}
+                  onPurgeMaintenance={onPurgeMaintenance}
+                />
+              )}
             </div>
           </ErrorBoundary>
         </div>

@@ -13,13 +13,21 @@ import {
   AlertCircle,
   Link as LinkIcon,
   FileText,
-  MousePointer2
+  MousePointer2,
+  RefreshCcw,
+  Sparkles,
+  CheckSquare,
+  Square,
+  XCircle,
+  Settings2
 } from 'lucide-react';
 
 const CATEGORIES = {
   "Entretien": ["Pneus", "Vidange", "Freins", "Moteur", "Carrosserie"],
   "Administratif": ["Assurance", "Visite Technique", "Patente", "Taxes"],
-  "Sinistres": ["Accrochage", "Dépannage", "Vol"]
+  "Sinistres": ["Accrochage", "Dépannage", "Vol"],
+  "Dépenses Bureau": ["Loyer", "Électricité", "Internet"],
+  "Dépenses Administratives": ["Impôt", "Assurance", "Document administratif", "Comptabilité"]
 };
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -36,7 +44,7 @@ const initialFormState = {
   manualDriveLink: ""
 };
 
-export default function ExpenseModule({ expenses, setExpenses, drivers, formatCurrency }) {
+export default function ExpenseModule({ expenses, setExpenses, drivers, formatCurrency, onSync, isSyncing }) {
   // Global States
   const [formData, setFormData] = useState(initialFormState);
   const [file, setFile] = useState(null);
@@ -45,6 +53,9 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
   const [accessToken, setAccessToken] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // MISSION 2: Multi-select State
+  const [selectedExpenses, setSelectedExpenses] = useState([]);
 
   // 1. GAPI & GIS Initialization
   useEffect(() => {
@@ -60,7 +71,6 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
               apiKey: API_KEY,
               discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
             });
-            console.log("GAPI Client initialized");
           } catch (err) {
             console.error("GAPI init error:", err);
           }
@@ -74,38 +84,22 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
 
   const isApiConfigured = !!(CLIENT_ID && API_KEY);
 
-  // 2. Google Drive Engine (Auth + Upload)
+  // 2. Google Drive Engine
   const handleCloudUpload = async (e) => {
     if (e) e.preventDefault();
     setError(null);
-
-    if (!file) {
-      alert("Veuillez d'abord sélectionner un fichier.");
-      return;
-    }
-
-    if (!isApiConfigured) {
-      setError("API Google non configurée dans le fichier .env");
-      return;
-    }
-
+    if (!file) { alert("Veuillez d'abord sélectionner un fichier."); return; }
+    if (!isApiConfigured) { setError("API Google non configurée."); return; }
     setIsUploading(true);
 
     try {
-      // Step A: Get Access Token via GIS
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
         callback: async (response) => {
           if (response.access_token) {
             setAccessToken(response.access_token);
-            
-            // Step B: Multipart Upload to Drive
-            const metadata = {
-              name: `Facture_${formData.category || 'SansCat'}_${formData.date}_${Date.now()}`,
-              mimeType: file.type,
-            };
-
+            const metadata = { name: `Facture_${formData.category}_${formData.date}`, mimeType: file.type };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', file);
@@ -116,17 +110,11 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
               body: form
             });
 
-            if (!uploadResponse.ok) throw new Error("Échec de l'envoi vers Google Drive.");
-
             const driveData = await uploadResponse.json();
-            
-            // Step C: Update Form State with the new link
             setFormData(prev => ({ ...prev, manualDriveLink: driveData.webViewLink }));
-            setSuccess("Justificatif uploader avec succès sur le Cloud !");
+            setSuccess("Justificatif uploadé !");
             setTimeout(() => setSuccess(null), 3000);
             setIsUploading(false);
-          } else {
-            throw new Error("Authentification Google annulée ou échouée.");
           }
         },
       });
@@ -137,15 +125,8 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
     }
   };
 
-  // 3. Form Submission
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    if (!formData.manualDriveLink && justificationType === 'manual') {
-      setError("Veuillez fournir un lien vers le justificatif.");
-      return;
-    }
-
     const newExpense = {
       id: crypto.randomUUID(),
       ...formData,
@@ -153,17 +134,14 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
       justificationType,
       createdAt: new Date().toISOString()
     };
-
     setExpenses([newExpense, ...expenses]);
-    
-    // RESET STRICT
     setFormData(initialFormState);
     setFile(null);
-    setSuccess("Dépense enregistrée dans le système.");
+    setSuccess("Dépense enregistrée.");
     setTimeout(() => setSuccess(null), 3000);
   };
 
-  // 4. Filters & Logic
+  // 4. Filters
   const [filterMonth, setFilterMonth] = useState('ALL');
   const [filterDriver, setFilterDriver] = useState('ALL');
 
@@ -181,245 +159,156 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
     return Array.from(m).sort().reverse();
   }, [expenses]);
 
+  // MISSION 2: Bulk Actions Logic
+  const handleToggleSelectAll = () => {
+    if (selectedExpenses.length === filteredExpenses.length) {
+      setSelectedExpenses([]);
+    } else {
+      setSelectedExpenses(filteredExpenses.map(e => e.id));
+    }
+  };
+
+  const handleToggleSelect = (id) => {
+    setSelectedExpenses(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (window.confirm(`Supprimer les ${selectedExpenses.length} dépenses sélectionnées ?`)) {
+      setExpenses(expenses.filter(e => !selectedExpenses.includes(e.id)));
+      setSelectedExpenses([]);
+      setSuccess("Suppression de masse effectuée.");
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  };
+
+  const handleBulkEdit = () => {
+    console.log("Bulk Edit for:", selectedExpenses);
+    alert("Fonctionnalité d'édition groupée en cours de développement.");
+  };
+
   return (
-    <div className="space-y-6 text-white animate-in fade-in duration-700">
+    <div className="space-y-6 text-white animate-in fade-in duration-700 relative">
+      
+      {/* MISSION 2: CONTEXTUAL TOOLBAR */}
+      {selectedExpenses.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] bg-[#1a1a1a] border border-[#cf5d56]/30 px-8 py-4 rounded-[25px] shadow-2xl flex items-center gap-8 animate-in slide-in-from-bottom-10 backdrop-blur-2xl">
+          <div className="flex items-center gap-3 pr-8 border-r border-white/10">
+            <div className="size-8 bg-[#cf5d56] rounded-full flex items-center justify-center text-white font-black text-xs">
+              {selectedExpenses.length}
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Éléments sélectionnés</p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleBulkEdit}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-white/5 rounded-xl text-[10px] font-bold uppercase transition-all text-blue-400"
+            >
+              <Settings2 className="size-4" /> Modifier
+            </button>
+            <button 
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase transition-all border border-red-500/20"
+            >
+              <Trash2 className="size-4" /> Supprimer la sélection
+            </button>
+            <button 
+              onClick={() => setSelectedExpenses([])}
+              className="p-2 hover:bg-white/5 rounded-full text-white/20 hover:text-white transition-all"
+            >
+              <XCircle className="size-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#181818]/50 p-6 rounded-[30px] border border-white/5 backdrop-blur-xl">
-        <div>
-          <h2 className="text-3xl font-black tracking-tighter flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <div className="size-14 rounded-2xl bg-[#cf5d56]/10 flex items-center justify-center border border-[#cf5d56]/20">
             <Wallet className="size-8 text-[#cf5d56]" />
-            GESTION DES DÉPENSES <span className="text-[#cf5d56]">CLOUD</span>
-          </h2>
-          <p className="text-white/40 text-sm font-medium uppercase tracking-widest">G.E.D & Archivage Numérique v3.0</p>
+          </div>
+          <div>
+            <h2 className="text-3xl font-black tracking-tighter flex items-center gap-3 uppercase">
+              Dépenses <span className="text-[#cf5d56]">Cloud</span>
+            </h2>
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">G.E.D & Archivage Numérique v5.0</p>
+          </div>
         </div>
         
-        <div className="flex items-center gap-3 px-4 py-2 bg-black/40 rounded-full border border-white/5">
-          <div className={`size-2 rounded-full ${accessToken ? 'bg-green-500 animate-pulse' : 'bg-white/20'}`} />
-          <span className="text-[10px] font-bold uppercase tracking-tighter text-white/60">
-            {accessToken ? "Moteur Cloud Connecté" : "Moteur Cloud Prêt"}
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onSync}
+            disabled={isSyncing}
+            className="flex items-center gap-3 px-6 py-3 bg-[#cf5d56] hover:bg-[#cf5d56]/80 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#cf5d56]/20 transition-all active:scale-95"
+          >
+            {isSyncing ? <RefreshCcw className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+            {isSyncing ? "Sync en cours..." : "Sync Maintenance"}
+          </button>
+          <div className="flex items-center gap-3 px-4 py-3 bg-black/40 rounded-2xl border border-white/5">
+            <div className={`size-2 rounded-full ${accessToken ? 'bg-green-500 animate-pulse' : 'bg-white/20'}`} />
+            <span className="text-[10px] font-bold uppercase tracking-tighter text-white/60">Cloud {accessToken ? "OK" : "Ready"}</span>
+          </div>
         </div>
       </div>
 
-      {/* FEEDBACKS */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2">
-          <AlertCircle className="size-5" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
-      )}
-      {success && (
-        <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2">
-          <CheckCircle2 className="size-5" />
-          <p className="text-sm font-medium">{success}</p>
-        </div>
-      )}
+      {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3"><AlertCircle className="size-5" /><p className="text-sm font-medium">{error}</p></div>}
+      {success && <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-2xl flex items-center gap-3"><CheckCircle2 className="size-5" /><p className="text-sm font-medium">{success}</p></div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* LEFT COLUMN: FORM */}
+        {/* FORM */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <CloudUpload className="size-32" />
-            </div>
-
-            <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
-              <Plus className="text-[#cf5d56]" />
-              Saisie Dépense
-            </h3>
-
+            <h3 className="text-xl font-bold mb-8 flex items-center gap-2"><Plus className="text-[#cf5d56]" /> Saisie Dépense</h3>
             <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
-              {/* Basic Fields */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.date || ""}
-                    onChange={e => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Montant (CFA)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="0"
-                    value={formData.amount || ""}
-                    onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all"
-                  />
-                </div>
+                <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+                <input type="number" required placeholder="Montant" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
               </div>
+              <select required value={formData.driverLabel} onChange={e => setFormData({ ...formData, driverLabel: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]">
+                <option value="">Chauffeur...</option>
+                {drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.sdv} - {d.name}</option>)}
+              </select>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Chauffeur Responsable</label>
-                <select
-                  required
-                  value={formData.driverLabel || ""}
-                  onChange={e => setFormData({ ...formData, driverLabel: e.target.value })}
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all appearance-none"
+              <div className="grid grid-cols-2 gap-4">
+                <select 
+                  required 
+                  value={formData.category} 
+                  onChange={e => setFormData({ ...formData, category: e.target.value, subCategory: "" })} 
+                  className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]"
                 >
-                  <option value="">Choisir un chauffeur...</option>
-                  {drivers.map(d => (
-                    <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.sdv} - {d.name}</option>
-                  ))}
+                  <option value="">Catégorie...</option>
+                  {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+
+                <select 
+                  required 
+                  disabled={!formData.category}
+                  value={formData.subCategory} 
+                  onChange={e => setFormData({ ...formData, subCategory: e.target.value })} 
+                  className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56] disabled:opacity-30"
+                >
+                  <option value="">Sous-catégorie...</option>
+                  {formData.category && CATEGORIES[formData.category].map(sub => <option key={sub} value={sub}>{sub}</option>)}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Catégorie</label>
-                  <select
-                    required
-                    value={formData.category || ""}
-                    onChange={e => setFormData({ ...formData, category: e.target.value, subCategory: "" })}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all"
-                  >
-                    <option value="">Sélection...</option>
-                    {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Sous-Type</label>
-                  <select
-                    required
-                    disabled={!formData.category}
-                    value={formData.subCategory || ""}
-                    onChange={e => setFormData({ ...formData, subCategory: e.target.value })}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all disabled:opacity-20"
-                  >
-                    <option value="">Sélection...</option>
-                    {formData.category && CATEGORIES[formData.category].map(sc => (
-                      <option key={sc} value={sc}>{sc}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Notes / Description</label>
-                <textarea
-                  placeholder="Détails de l'intervention..."
-                  value={formData.description || ""}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-sm focus:border-[#cf5d56] outline-none transition-all min-h-[100px] resize-none"
-                />
-              </div>
-
-              {/* JUSTIFICATION SYSTEM */}
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <div className="flex bg-black/60 p-1.5 rounded-2xl border border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setJustificationType('upload')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${
-                      justificationType === 'upload' ? "bg-[#cf5d56] text-white shadow-lg" : "text-white/30 hover:text-white"
-                    }`}
-                  >
-                    <CloudUpload className="size-4" />
-                    Upload Cloud
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setJustificationType('manual')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${
-                      justificationType === 'manual' ? "bg-[#cf5d56] text-white shadow-lg" : "text-white/30 hover:text-white"
-                    }`}
-                  >
-                    <LinkIcon className="size-4" />
-                    Lien Manuel
-                  </button>
-                </div>
-
-                {justificationType === 'upload' ? (
-                  <div className="space-y-3 p-4 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={e => setFile(e.target.files[0])}
-                      className="block w-full text-xs text-white/40 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-[#cf5d56]/10 file:text-[#cf5d56] hover:file:bg-[#cf5d56]/20 cursor-pointer"
-                    />
-                    
-                    <button
-                      type="button"
-                      disabled={isUploading || !file}
-                      onClick={handleCloudUpload}
-                      className="w-full relative z-20 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-white/5 disabled:text-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-600/20"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Cloud className="size-4" />
-                      )}
-                      {isUploading ? "Transfert en cours..." : "Lancer l'Upload Google Drive"}
-                    </button>
-
-                    {formData.manualDriveLink && (
-                      <p className="text-[10px] text-green-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="size-3" /> Fichier lié avec succès
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <input
-                      type="url"
-                      placeholder="https://drive.google.com/..."
-                      value={formData.manualDriveLink || ""}
-                      onChange={e => setFormData({ ...formData, manualDriveLink: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:border-[#cf5d56] outline-none transition-all"
-                    />
-                    <p className="text-[9px] text-white/20 italic px-2 italic">Collez l'URL de partage Google Drive ici.</p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-5 rounded-[20px] shadow-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-3 text-sm uppercase tracking-tighter"
-              >
-                <Plus className="size-5" />
-                Valider la Dépense
-              </button>
+              <textarea placeholder="Description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-sm outline-none focus:border-[#cf5d56] min-h-[80px]" />
+              <button type="submit" className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-4 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest">Valider</button>
             </form>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: LIST */}
+        {/* LIST */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl min-h-[600px] flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
               <h3 className="text-xl font-bold">Historique Archivé</h3>
-              
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <Filter className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#cf5d56]" />
-                  <select
-                    value={filterMonth || ""}
-                    onChange={e => setFilterMonth(e.target.value)}
-                    className="bg-black/40 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xs font-bold outline-none focus:border-[#cf5d56] transition-all"
-                  >
-                    <option value="ALL">Tous les mois</option>
-                    {months.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#cf5d56]" />
-                  <select
-                    value={filterDriver || ""}
-                    onChange={e => setFilterDriver(e.target.value)}
-                    className="bg-black/40 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xs font-bold outline-none focus:border-[#cf5d56] transition-all"
-                  >
-                    <option value="ALL">Tous les chauffeurs</option>
-                    {drivers.map(d => (
-                      <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center gap-3">
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">Tous les mois</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">Tous les chauffeurs</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
               </div>
             </div>
 
@@ -427,8 +316,13 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
               <table className="w-full text-left border-separate border-spacing-y-3">
                 <thead>
                   <tr className="text-[10px] uppercase font-black tracking-[0.2em] text-white/20">
-                    <th className="pb-4 pl-6">Identification</th>
-                    <th className="pb-4">Classification</th>
+                    <th className="pb-4 pl-6 w-10">
+                      <button onClick={handleToggleSelectAll} className="p-1 hover:bg-white/5 rounded transition-all">
+                        {selectedExpenses.length === filteredExpenses.length && filteredExpenses.length > 0 ? <CheckSquare className="size-4 text-[#cf5d56]" /> : <Square className="size-4" />}
+                      </button>
+                    </th>
+                    <th className="pb-4">Identification</th>
+                    <th className="pb-4">Description</th>
                     <th className="pb-4 text-right">Montant</th>
                     <th className="pb-4 text-center">G.E.D</th>
                     <th className="pb-4 pr-6 text-right">Action</th>
@@ -436,86 +330,40 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                 </thead>
                 <tbody>
                   {filteredExpenses.map((expense) => (
-                    <tr key={expense.id} className="group bg-white/[0.02] hover:bg-white/[0.05] transition-all">
+                    <tr key={expense.id} className={`group ${selectedExpenses.includes(expense.id) ? "bg-[#cf5d56]/5 border-[#cf5d56]/20" : "bg-white/[0.02]"} hover:bg-white/[0.05] transition-all`}>
                       <td className="py-5 pl-6 rounded-l-[20px] border-y border-l border-white/5">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-sm font-black tracking-tight">{expense.date}</span>
-                          <span className="text-[10px] font-bold text-white/30 uppercase">{expense.driverLabel}</span>
-                        </div>
+                        <button onClick={() => handleToggleSelect(expense.id)} className="p-1 hover:bg-white/5 rounded transition-all">
+                          {selectedExpenses.includes(expense.id) ? <CheckSquare className="size-4 text-[#cf5d56]" /> : <Square className="size-4 opacity-30 group-hover:opacity-100" />}
+                        </button>
                       </td>
                       <td className="py-5 border-y border-white/5">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-black text-[#cf5d56] uppercase tracking-widest">{expense.category}</span>
-                          <span className="text-[10px] font-medium text-white/40 italic">{expense.subCategory}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black">{expense.date}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-bold text-[#cf5d56] uppercase bg-[#cf5d56]/10 px-1.5 py-0.5 rounded-md">{expense.category}</span>
+                            <span className="text-[10px] font-bold text-white/30 uppercase">{expense.subCategory}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-white/20 uppercase mt-0.5">{expense.driverLabel}</span>
                         </div>
+                      </td>
+                      <td className="py-5 border-y border-white/5 max-w-[200px]">
+                        <p className="text-[10px] text-white/60 line-clamp-2 italic">{expense.description}</p>
                       </td>
                       <td className="py-5 border-y border-white/5 text-right font-mono font-black text-white/90">
                         {formatCurrency(expense.amount)}
                       </td>
                       <td className="py-5 border-y border-white/5 text-center">
-                        {expense.manualDriveLink ? (
-                          <a
-                            href={expense.manualDriveLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center size-10 rounded-2xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all shadow-lg"
-                            title="Ouvrir le justificatif Drive"
-                          >
-                            <ExternalLink className="size-4" />
-                          </a>
-                        ) : (
-                          <div className="size-10 mx-auto rounded-2xl bg-white/5 flex items-center justify-center opacity-20">
-                            <FileText className="size-4" />
-                          </div>
-                        )}
+                        {expense.driveLink ? (
+                          <a href={expense.driveLink} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center size-9 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all"><ExternalLink className="size-4" /></a>
+                        ) : <FileText className="size-4 opacity-10 mx-auto" />}
                       </td>
                       <td className="py-5 pr-6 rounded-r-[20px] border-y border-r border-white/5 text-right">
-                        <button
-                          onClick={() => { if(confirm("Supprimer cette archive ?")) setExpenses(expenses.filter(e => e.id !== expense.id)); }}
-                          className="p-3 text-white/10 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                        <button onClick={() => { if(confirm("Supprimer ?")) setExpenses(expenses.filter(e => e.id !== expense.id)); }} className="p-2 text-white/10 hover:text-red-500 rounded-lg transition-all"><Trash2 className="size-4" /></button>
                       </td>
                     </tr>
                   ))}
-                  {filteredExpenses.length === 0 && (
-                    <tr>
-                      <td colSpan="5" className="py-32 text-center opacity-20">
-                        <Wallet className="size-16 mx-auto mb-6" />
-                        <p className="text-xs font-black uppercase tracking-[0.3em]">Aucun enregistrement</p>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
-            </div>
-
-            {/* MINI SUMMARY WIDGETS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-              <div className="bg-black/40 border border-white/5 rounded-[25px] p-6 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Total Consommé</p>
-                  <h4 className="text-2xl font-black text-[#cf5d56]">
-                    {formatCurrency(filteredExpenses.reduce((sum, e) => sum + e.amount, 0))}
-                  </h4>
-                </div>
-                <div className="size-12 bg-[#cf5d56]/10 rounded-2xl flex items-center justify-center text-[#cf5d56]">
-                  <Wallet className="size-6" />
-                </div>
-              </div>
-              
-              <div className="bg-black/40 border border-white/5 rounded-[25px] p-6 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Taux Archivage</p>
-                  <h4 className="text-2xl font-black text-blue-400">
-                    {filteredExpenses.filter(e => e.manualDriveLink).length} / {filteredExpenses.length} <span className="text-[10px] text-white/20">Docs</span>
-                  </h4>
-                </div>
-                <div className="size-12 bg-blue-400/10 rounded-2xl flex items-center justify-center text-blue-400">
-                  <Cloud className="size-6" />
-                </div>
-              </div>
             </div>
           </div>
         </div>

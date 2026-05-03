@@ -53,6 +53,15 @@ const currencyFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 0,
 });
 
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+export const CFA_TO_USD_RATE = 560;
+
 const tonnageFormatter = new Intl.NumberFormat("fr-FR", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -332,7 +341,10 @@ export function filterData(records, filters) {
   });
 }
 
-export function formatCurrency(value) {
+export function formatCurrency(value, currency = "CFA") {
+  if (currency === "USD") {
+    return usdFormatter.format((value || 0) / CFA_TO_USD_RATE);
+  }
   return `${currencyFormatter.format(Math.round(value || 0))} CFA`;
 }
 

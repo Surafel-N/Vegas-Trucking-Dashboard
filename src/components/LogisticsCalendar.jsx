@@ -13,9 +13,19 @@ export function LogisticsCalendar({
   year: selectedYears = [],
   month: selectedMonths = [],
   selectedDates = [],
-  onSelection
+  onSelection,
+  currency = "CFA"
 }) {
   const [viewMode, setViewMode] = useState("month"); // "month", "year_months", "global_years"
+
+  const CFA_TO_USD_RATE = 560;
+
+  const formatProf = (val) => {
+    if (currency === "USD") {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(val / CFA_TO_USD_RATE);
+    }
+    return Math.round(val).toLocaleString() + " CFA";
+  };
 
   const currentViewYear = viewDate.getFullYear();
   const currentViewMonth = viewDate.getMonth();
@@ -191,7 +201,7 @@ export function LogisticsCalendar({
                               </div>
                               <div className="space-y-1 text-[10px]">
                                  <div className="flex justify-between"><span className="text-white/40 font-bold">Vol:</span><span className="font-black">{data.tonnage.toFixed(1)} T</span></div>
-                                 <div className="flex justify-between"><span className="text-white/40 font-bold">Prof:</span><span className="font-black text-[#9fe3b9]">{Math.round(data.profit).toLocaleString()}</span></div>
+                                 <div className="flex justify-between"><span className="text-white/40 font-bold">Prof:</span><span className="font-black text-[#9fe3b9]">{formatProf(data.profit)}</span></div>
                               </div>
                             </div>
                             <div className={`size-3 -translate-y-1.5 rotate-45 bg-[#1c1c1e] border-r border-b border-white/10 ${arrowPos}`} />
