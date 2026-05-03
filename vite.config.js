@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: '/Vegas-Trucking-Dashboard/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
