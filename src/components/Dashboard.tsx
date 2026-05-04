@@ -46,11 +46,11 @@ import type { DashboardSummary } from "../utils/types";
 import { FilterBar } from "./FilterBar";
 
 type DashboardProps = {
-  formatCurrency: (value: number) => string;
+  formatCurrency: (value: number, curr?: string) => string;
   formatCompactNumber: (value: number) => string;
   onSelectDriver: (driverLabel: string) => void;
   selectedChauffeur: string;
-  onDateSelect?: (date: string | null) => void;
+  onDateSelect?: (selection: any) => void;
   onReset?: () => void;
   filteredData: any[];
   calendarData: any[];
@@ -61,6 +61,8 @@ type DashboardProps = {
   selectedDates: string[];
   googleClientId?: string;
   currency?: string;
+  t: any;
+  allRecords: any[];
 };
 
 export function Dashboard({
@@ -78,7 +80,9 @@ export function Dashboard({
   formatCompactNumber,
   selectedDates = [],
   googleClientId,
-  currency = "CFA"
+  currency = "CFA",
+  t,
+  allRecords = []
 }: DashboardProps) {
 
   // --- ÉTATS PILOTES DU CALENDRIER ---
@@ -220,11 +224,11 @@ export function Dashboard({
             </div>
             <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
                 <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">Volume</p>
+                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">{t?.volume || "Volume"}</p>
                     <p className="text-base font-black text-white">{formatCompactNumber(financeStats.tonnage)} T</p>
                 </div>
                 <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">Net Profit</p>
+                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">{t?.netProfit || "Net Profit"}</p>
                     <p className="text-base font-black text-[#9fe3b9]">{formatCurrency(financeStats.netProfit, currency)}</p>
                 </div>
             </div>
@@ -235,13 +239,13 @@ export function Dashboard({
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-2xl bg-[#00F2FF]/10 text-[#00F2FF]"><Zap className="size-5" /></div>
                     <div>
-                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">Quantum Finance Analyzer</h3>
-                        <p className="text-[10px] font-bold text-white/20 uppercase mt-1 italic underline decoration-[#00F2FF]/30 underline-offset-4">Exploration des Coûts Multidimensionnelle</p>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">{t?.workshopFinances || "Quantum Finance Analyzer"}</h3>
+                        <p className="text-[10px] font-bold text-white/20 uppercase mt-1 italic underline decoration-[#00F2FF]/30 underline-offset-4">{t?.analyticalRecap || "Exploration des Coûts Multidimensionnelle"}</p>
                     </div>
                 </div>
             </header>
             <div className="flex-1 flex items-center justify-center">
-                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} />
+                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} t={t} records={allRecords} />
             </div>
         </div>
         </section>

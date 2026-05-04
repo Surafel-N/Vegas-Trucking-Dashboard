@@ -163,6 +163,27 @@ export default function App() {
       syncSheets: "Sync Sheets",
       iaSync: "IA Sync",
       fleet: "FLOTTE 2026",
+      fuel: "Gasoil",
+      logistics: "Logistique",
+      analyticalRecap: "Récapitulatif Analytique",
+      mileageTracking: "Suivi Kilométrage",
+      totalExpenses: "Total Dépenses",
+      netMarginRev: "Marge Net / Revenu",
+      workshopFinances: "Atelier & Finances",
+      iaDriveExplorer: "Gestion IA & Drive Explorer",
+      oilChangeTracking: "Suivi des Vidanges (Intervalle 10,000 KM)",
+      lastService: "Dernier Service",
+      save: "Enregistrer",
+      syncing: "Synchronisation...",
+      manualEntry: "Saisie manuelle",
+      exploreDriveIA: "Explorer un dossier Drive (IA)",
+      explore: "Explorer",
+      oilChangeUpdated: "Vidange mise à jour",
+      confirmDelete: "Supprimer cet enregistrement ?",
+      tolls: "Péages",
+      police: "Police",
+      meals: "Repas",
+      extras: "Extras",
     },
     EN: {
       dashboard: "Dashboard",
@@ -182,6 +203,27 @@ export default function App() {
       syncSheets: "Sync Sheets",
       iaSync: "AI Sync",
       fleet: "FLEET 2026",
+      fuel: "Fuel",
+      logistics: "Logistics",
+      analyticalRecap: "Analytical Summary",
+      mileageTracking: "Mileage Tracking",
+      totalExpenses: "Total Expenses",
+      netMarginRev: "Net Margin / Revenue",
+      workshopFinances: "Workshop & Finances",
+      iaDriveExplorer: "AI & Drive Explorer Management",
+      oilChangeTracking: "Oil Change Tracking (10,000 KM Interval)",
+      lastService: "Last Service",
+      save: "Save",
+      syncing: "Syncing...",
+      manualEntry: "Manual Entry",
+      exploreDriveIA: "Explore Drive Folder (AI)",
+      explore: "Explore",
+      oilChangeUpdated: "Oil Change updated",
+      confirmDelete: "Delete this record?",
+      tolls: "Tolls",
+      police: "Police",
+      meals: "Meals",
+      extras: "Extras",
     }
   };
 
@@ -797,6 +839,8 @@ export default function App() {
                  selectedDates={selectedDates}
                  googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
                  currency={currency}
+                 t={t}
+                 allRecords={manualTrips}
                  />
                  )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} />}
               {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={(t) => setManualTrips([...manualTrips, t])} />}
@@ -824,6 +868,7 @@ export default function App() {
                   setOilChanges={rolePermissions.canEdit ? setOilChanges : null}
                   onSync={syncMaintenanceAndExpenses}
                   isSyncing={isSyncingMaintenance}
+                  t={t}
                 />
               )}              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} />}
               {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}

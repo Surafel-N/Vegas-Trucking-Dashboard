@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { 
   Fuel, ShieldCheck, Utensils, Anchor, PlusCircle, 
-  Wallet, Target, Truck, Wrench
+  Wallet, Target, Truck, Wrench, Route
 } from 'lucide-react';
 
 const COLORS = {
@@ -25,13 +25,30 @@ type QuantumProps = {
   data: any[];
   maintenanceTotal: number;
   formatCurrency: (val: number) => string;
+  t: any;
+  records: any[]; // Pour le calcul des KM
 };
 
-export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency }: QuantumProps) {
+export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency, t, records }: QuantumProps) {
   
   const stats = useMemo(() => {
     const drivers = ["AMARA", "BRAHIMA", "SORO"];
     
+    // Calcul des KM (Logique extraite de FleetTrackerWidget)
+    const kmData = {};
+    const sortedRecords = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    sortedRecords.forEach(t => {
+      if (!t.driverLabel) return;
+      const labelUpper = t.driverLabel.toUpperCase();
+      let driverKey = null;
+      if (labelUpper.includes("AMARA")) driverKey = "AMARA";
+      else if (labelUpper.includes("BRAHIMA")) driverKey = "BRAHIMA";
+      else if (labelUpper.includes("SORO") || labelUpper.includes("SORRO")) driverKey = "SORO";
+      else return;
+      const kmValue = Number(t.km || t.distanceKm || 0);
+      if (kmValue > 0) kmData[driverKey] = kmValue;
+    });
+
     const sums = data.reduce((acc, row) => ({
       fuel: acc.fuel + (row.fuel_cost_cfa || 0),
       road: acc.road + (row.road_fees_cfa || 0),
@@ -49,33 +66,33 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency 
 
     // Anneau Interne : GASOIL vs LOGISTIQUE vs MAINTENANCE
     const innerData = [
-      { name: "Gasoil", value: sums.fuel, color: COLORS.fuel },
-      { name: "Logistique", value: sums.road + sums.police + sums.food + sums.extra, color: COLORS.frais },
-      { name: "Maintenance", value: maintenanceTotal, color: COLORS.maintenance }
+      { name: t?.fuel || "Gasoil", value: sums.fuel, color: COLORS.fuel },
+      { name: t?.logistics || "Logistique", value: sums.road + sums.police + sums.food + sums.extra, color: COLORS.frais },
+      { name: t?.maintenance || "Maintenance", value: maintenanceTotal, color: COLORS.maintenance }
     ].filter(d => d.value > 0);
 
     // Anneau Externe : DÉTAIL COMPLET
     const outerData = [
       ...drivers.map((name, i) => ({
-        name: `Gasoil ${name}`,
+        name: `${t?.fuel || 'Gasoil'} ${name}`,
         value: data.filter(t => t.chauffeur === name).reduce((s, r) => s + (r.fuel_cost_cfa || 0), 0),
         color: COLORS.drivers[i],
         icon: Truck
       })),
-      { name: "Péages", value: sums.road, color: COLORS.categories.péages, icon: Anchor },
-      { name: "Police", value: sums.police, color: COLORS.categories.police, icon: ShieldCheck },
-      { name: "Repas", value: sums.food, color: COLORS.categories.repas, icon: Utensils },
-      { name: "Maintenance", value: maintenanceTotal, color: COLORS.maintenance, icon: Wrench },
-      { name: "Extras", value: sums.extra, color: COLORS.categories.extra, icon: PlusCircle }
+      { name: t?.tolls || "Péages", value: sums.road, color: COLORS.categories.péages, icon: Anchor },
+      { name: t?.police || "Police", value: sums.police, color: COLORS.categories.police, icon: ShieldCheck },
+      { name: t?.meals || "Repas", value: sums.food, color: COLORS.categories.repas, icon: Utensils },
+      { name: t?.maintenance || "Maintenance", value: maintenanceTotal, color: COLORS.maintenance, icon: Wrench },
+      { name: t?.extras || "Extras", value: sums.extra, color: COLORS.categories.extra, icon: PlusCircle }
     ].filter(d => d.value > 0);
 
-    return { sums, innerData, outerData, grandTotalExpense, realNetProfit };
-  }, [data, maintenanceTotal]);
+    return { sums, innerData, outerData, grandTotalExpense, realNetProfit, kmData };
+  }, [data, maintenanceTotal, records, t]);
 
   const infographicCards = [
-    { label: "Gasoil", value: stats.sums.fuel, icon: Fuel, color: "text-[#00F2FF]", bg: "bg-[#00F2FF]/10" },
-    { label: "Maintenance", value: maintenanceTotal, icon: Wrench, color: "text-[#FF9F0A]", bg: "bg-[#FF9F0A]/10" },
-    { label: "Total Frais", value: stats.grandTotalExpense, icon: Wallet, color: "text-[#FF375F]", bg: "bg-[#FF375F]/10" },
+    { label: t?.fuel || "Gasoil", value: stats.sums.fuel, icon: Fuel, color: "text-[#00F2FF]", bg: "bg-[#00F2FF]/10" },
+    { label: t?.maintenance || "Maintenance", value: maintenanceTotal, icon: Wrench, color: "text-[#FF9F0A]", bg: "bg-[#FF9F0A]/10" },
+    { label: t?.totalExpenses || "Total Frais", value: stats.grandTotalExpense, icon: Wallet, color: "text-[#FF375F]", bg: "bg-[#FF375F]/10" },
   ];
 
   return (
@@ -123,14 +140,14 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency 
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Total Dépenses</p>
+          <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{t?.totalExpenses || "Total Dépenses"}</p>
           <span className="text-2xl font-black text-white tracking-tighter drop-shadow-lg">{formatCurrency(stats.grandTotalExpense)}</span>
         </div>
       </div>
 
       {/* INFOGRAPHICS COLUMN */}
       <div className="w-full xl:w-[40%] flex flex-col gap-3">
-        <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 px-1">Récapitulatif Analytique</h4>
+        <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 px-1">{t?.analyticalRecap || "Récapitulatif Analytique"}</h4>
         {infographicCards.map((card, i) => (
           <div key={i} className="p-3 rounded-[20px] bg-white/[0.02] border border-white/5 flex items-center justify-between group hover:bg-white/[0.04] transition-all">
             <div className="flex items-center gap-3">
@@ -145,11 +162,33 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency 
             <span className="text-[9px] font-black text-white/10 uppercase">{((card.value / (stats.grandTotalExpense || 1)) * 100).toFixed(0)}%</span>
           </div>
         ))}
+
+        {/* KM MONITORING INTEGRATION */}
+        <div className="mt-4 p-4 rounded-[28px] bg-white/[0.03] border border-white/10 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Route className="size-4 text-[#cf5d56]" />
+            <h5 className="text-[10px] font-black text-white/50 uppercase tracking-[0.1em]">{t?.mileageTracking || "Suivi Kilométrage"}</h5>
+          </div>
+          {Object.entries(stats.kmData).map(([driver, km]) => (
+            <div key={driver} className="space-y-1.5">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="font-black text-white/40">{driver}</span>
+                <span className="font-black text-white">{Number(km).toLocaleString()} <span className="text-white/30">KM</span></span>
+              </div>
+              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#cf5d56] opacity-60 rounded-full transition-all duration-1000" 
+                  style={{ width: `${Math.min(100, (Number(km) / 800000) * 100)}%` }} 
+                />
+              </div>
+            </div>
+          ))}
+        </div>
         
         {/* Performance Summary */}
-        <div className="mt-1 p-3 rounded-[20px] bg-[#30D158]/5 border border-[#30D158]/10 flex flex-col gap-1.5">
+        <div className="mt-2 p-3 rounded-[20px] bg-[#30D158]/5 border border-[#30D158]/10 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-[#30D158] uppercase">Marge Net / Revenu</span>
+                <span className="text-[9px] font-black text-[#30D158] uppercase">{t?.netMarginRev || "Marge Net / Revenu"}</span>
                 <span className="text-[10px] font-black text-white">{((stats.realNetProfit / (stats.sums.gross || 1)) * 100).toFixed(1)}%</span>
             </div>
             <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
@@ -160,3 +199,4 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency 
     </div>
   );
 }
+

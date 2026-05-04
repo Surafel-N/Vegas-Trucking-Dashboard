@@ -14,7 +14,8 @@ export function MaintenanceAdminModule({
   oilChanges = {}, 
   setOilChanges, 
   onSync, 
-  isSyncing 
+  isSyncing,
+  t // Ajout des traductions
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -24,14 +25,8 @@ export function MaintenanceAdminModule({
   const [pendingAI, setPendingAI] = useState([]);
   const [activeTab, setActiveTab] = useState('maintenance');
 
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    vehicle: '',
-    description: '',
-    cost: '',
-    imageUrl: '',
-    workPhotos: []
-  });
+  // Local state for oil change inputs to allow explicit saving
+  const [oilChangeInputs, setOilChangeInputs] = useState({});
 
   const extractFolderId = (url) => {
     const match = url.match(/folders\/([a-zA-Z0-9-_]+)/);
@@ -161,16 +156,18 @@ export function MaintenanceAdminModule({
 
   const handleOilChangeUpdate = (truck, mileage) => {
     if (!setOilChanges) return;
+    const val = parseFloat(mileage) || 0;
     setOilChanges({
       ...oilChanges,
       [truck]: { 
-        mileage: parseFloat(mileage) || 0,
+        mileage: val,
         date: new Date().toISOString().split('T')[0]
       }
     });
+    alert(`${t?.oilChangeUpdated || "Vidange mise à jour"} : ${truck}`);
   };
 
-  const handleDelete = (id) => { if (window.confirm("Supprimer ?")) setRecords(records.filter(r => r.id !== id)); };
+  const handleDelete = (id) => { if (window.confirm(t?.confirmDelete || "Supprimer ?")) setRecords(records.filter(r => r.id !== id)); };
 
   const vehicleOptions = drivers.map(d => `${d.name} ${d.sdv}`);
 
@@ -182,10 +179,10 @@ export function MaintenanceAdminModule({
         <div>
           <h2 className="text-2xl font-black text-white flex items-center gap-3">
             <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500"><Wrench className="size-6" /></div>
-            Atelier & Finances
+            {t?.workshopFinances || "Atelier & Finances"}
           </h2>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-white/40 text-sm">Gestion IA & Drive Explorer</p>
+            <p className="text-white/40 text-sm">{t?.iaDriveExplorer || "Gestion IA & Drive Explorer"}</p>
             <input type="password" placeholder="Debug Key..." value={debugKey} onChange={e => setDebugKey(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[9px] w-32 outline-none focus:border-orange-500/50" />
           </div>
         </div>
@@ -196,13 +193,13 @@ export function MaintenanceAdminModule({
               onClick={() => setActiveTab('maintenance')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'maintenance' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/20 hover:text-white/40'}`}
             >
-              Maintenances
+              {t?.maintenance || "Maintenances"}
             </button>
             <button 
               onClick={() => setActiveTab('expenses')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'expenses' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/20 hover:text-white/40'}`}
             >
-              Dépenses
+              {t?.expenses || "Dépenses"}
             </button>
           </div>
 
@@ -212,12 +209,12 @@ export function MaintenanceAdminModule({
             className="flex items-center gap-2.5 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
           >
             {isSyncing ? <RotateCcw className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
-            {isSyncing ? "Synchronisation..." : "Sync Spreadsheet"}
+            {isSyncing ? (t?.syncing || "Synchronisation...") : "Sync Spreadsheet"}
           </button>
           
           <button onClick={() => setIsAdding(true)} className="bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10">
             <Plus className="size-4" /> 
-            Saisie manuelle
+            {t?.manualEntry || "Saisie manuelle"}
           </button>
         </div>
       </header>
@@ -227,29 +224,37 @@ export function MaintenanceAdminModule({
         <section className="panel-enter rounded-[30px] border border-orange-500/20 bg-[#111] p-6 shadow-xl">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><RotateCcw className="size-5" /></div>
-            <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">Suivi des Vidanges (Intervalle 10,000 KM)</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-orange-500">{t?.oilChangeTracking || "Suivi des Vidanges (Intervalle 10,000 KM)"}</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {drivers.map(d => {
               const truckLabel = `${d.name} ${d.sdv}`;
-              const current = oilChanges[truckLabel] || { mileage: 0 };
+              const current = oilChanges[truckLabel] || { mileage: 0, date: null };
+              const currentInput = oilChangeInputs[truckLabel] !== undefined ? oilChangeInputs[truckLabel] : current.mileage;
+
               return (
                 <div key={d.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl space-y-3">
                   <div className="flex justify-between items-center">
                     <p className="text-xs font-black text-white/70">{truckLabel}</p>
-                    <span className="text-[9px] font-bold text-white/20">KM Dernier Service</span>
+                    <div className="text-right">
+                      <p className="text-[9px] font-bold text-white/20 uppercase">{t?.lastService || "Dernier Service"}</p>
+                      <p className="text-[8px] font-bold text-orange-500/50">{current.date ? new Date(current.date).toLocaleDateString('fr-FR') : '---'}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <input 
                       type="number" 
-                      placeholder="Kilométrage..." 
-                      defaultValue={current.mileage || ''}
-                      onBlur={(e) => handleOilChangeUpdate(truckLabel, e.target.value)}
-                      className="flex-1 h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-orange-500/50 transition-all"
+                      placeholder="KM..." 
+                      value={currentInput || ''}
+                      onChange={(e) => setOilChangeInputs({...oilChangeInputs, [truckLabel]: e.target.value})}
+                      className="flex-1 h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-orange-500/50 transition-all font-bold"
                     />
-                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 shadow-lg shadow-orange-500/5">
-                      <CheckCircle2 className="size-4" />
-                    </div>
+                    <button 
+                      onClick={() => handleOilChangeUpdate(truckLabel, currentInput)}
+                      className="h-10 px-3 flex items-center justify-center rounded-xl bg-orange-500/20 text-orange-500 hover:bg-orange-500 hover:text-white transition-all shadow-lg shadow-orange-500/5 font-black text-[10px] uppercase"
+                    >
+                      {t?.save || "OK"}
+                    </button>
                   </div>
                 </div>
               );
