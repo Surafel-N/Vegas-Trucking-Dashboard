@@ -103,7 +103,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
           </div>
           <div>
             <h3 className="text-sm font-black uppercase tracking-tighter">{t?.workshopFinances || "Atelier & Finances"}</h3>
-            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">{t?.fluxHistory || "Historique Flux"}</p>
+            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">{t?.workshopSummary || "Historique Flux"}</p>
           </div>
         </div>
 
@@ -207,14 +207,14 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
 
                 {selectedRecord.driveLink && (
                   <a href={selectedRecord.driveLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-blue-500/10 text-blue-400 text-sm font-black border border-blue-500/20 hover:bg-blue-500/20 transition-all">
-                    <FolderOpen className="size-5" /> {t?.openDrive || "Ouvrir sur Google Drive"}
+                    <FolderOpen className="size-5" /> {t?.openOnDrive || "Ouvrir sur Google Drive"}
                   </a>
                 )}
               </div>
 
               <div className="lg:col-span-3 space-y-4">
                 <div className="flex items-center justify-between px-1">
-                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">{t?.photoGallery || "Galerie Photos"}</p>
+                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">{t?.photoGalleryLabel || "Galerie Photos"}</p>
                   {isLoadingImages && <Loader2 className="size-4 animate-spin text-[#cf5d56]" />}
                 </div>
                 
@@ -232,7 +232,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                     ) : !isLoadingImages && (
                       <div className="col-span-2 py-12 flex flex-col items-center gap-3 bg-white/2 rounded-[32px] border border-dashed border-white/10">
                         <ImageIcon className="size-8 text-white/10" />
-                        <p className="text-xs font-bold text-white/20">{t?.noPhotosFound || "Aucune photo trouvée"}</p>
+                        <p className="text-xs font-bold text-white/20">{t?.noPhotos || "Aucune photo trouvée"}</p>
                       </div>
                     )
                   ) : (

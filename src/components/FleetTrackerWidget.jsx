@@ -8,7 +8,7 @@ const FLEET_INFO = {
   "SORRO": { driver: "SORRO", plate: "AA-579-PJ", truckNum: "TRUCK 52", color: "text-[#cf5d56]", bg: "bg-[#cf5d56]" }
 };
 
-export function FleetTrackerWidget({ records }) {
+export function FleetTrackerWidget({ records, t }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const trackerData = useMemo(() => {
@@ -66,7 +66,7 @@ export function FleetTrackerWidget({ records }) {
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-[#cf5d56]/30 shadow-lg pointer-events-none">
             <div className="size-1.5 rounded-full bg-[#cf5d56] animate-pulse"></div>
-            <span className="text-[9px] font-black text-[#cf5d56] tracking-widest uppercase">FNIOT Satellite Link</span>
+            <span className="text-[9px] font-black text-[#cf5d56] tracking-widest uppercase">{t?.fleetSatellite || "FNIOT Satellite Link"}</span>
           </div>
 
           <button 

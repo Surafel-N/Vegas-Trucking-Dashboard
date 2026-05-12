@@ -151,8 +151,11 @@ export function LogisticsCalendar({
           </div>
           <div className="flex gap-2.5 mt-2">
             <button onClick={() => setViewMode("month")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'month' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/40 hover:bg-white/5'}`}><CalendarIcon className="size-3" /> {t?.days || "Jours"}</button>
+
             <button onClick={() => setViewMode("year_months")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'year_months' ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20' : 'text-white/40 hover:bg-white/5'}`}><MonthIcon className="size-3" /> {t?.income || "Mois"}</button>
+
             <button onClick={() => setViewMode("global_years")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'global_years' ? 'bg-[#BF5AF2] text-white shadow-lg shadow-[#BF5AF2]/20' : 'text-white/40 hover:bg-white/5'}`}><Grid2X2 className="size-3" /> {t?.allYears || "Années"}</button>
+
           </div>
         </div>
         
@@ -208,8 +211,8 @@ export function LogisticsCalendar({
                                   <div className={`size-1.5 rounded-full ${isActive ? 'bg-[#61d2c0]' : 'bg-[#ff8f84]'}`} />
                               </div>
                               <div className="space-y-1 text-[10px]">
-                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.volume || "Vol"}:</span><span className="font-black">{data.tonnage.toFixed(1)} T</span></div>
-                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.netProfit || "Prof"}:</span><span className="font-black text-[#9fe3b9]">{formatProf(data.profit)}</span></div>
+                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.vol || "Vol"}:</span><span className="font-black">{data.tonnage.toFixed(1)} T</span></div>
+                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.prof || "Prof"}:</span><span className="font-black text-[#9fe3b9]">{formatProf(data.profit)}</span></div>
                               </div>
                             </div>
                             <div className={`size-3 -translate-y-1.5 rotate-45 bg-[#1c1c1e] border-r border-b border-white/10 ${arrowPos}`} />
@@ -238,8 +241,9 @@ export function LogisticsCalendar({
                             <span className="text-[10px] font-black uppercase text-white/40">{m.name}</span>
                             <div>
                                 <p className={`text-sm font-black ${isSel ? 'text-[#00F2FF]' : 'text-white/80'}`}>{m.tonnage.toFixed(0)}T</p>
-                                <p className="text-[8px] font-bold text-white/20 uppercase">{m.trips} {t?.voyages || "voyages"}</p>
+                                <p className="text-[8px] font-bold text-white/20 uppercase">{m.trips} {t?.voyages || "trips"}</p>
                             </div>
+
                         </button>
                     );
                 })}
@@ -258,6 +262,7 @@ export function LogisticsCalendar({
                                 <p className="text-lg font-black text-white">{y.tonnage.toFixed(0)}T</p>
                                 <p className="text-[10px] font-bold text-white/20 uppercase">{y.trips} {t?.totalTripsCount || "voyages total"}</p>
                             </div>
+
                         </button>
                     );
                 })}

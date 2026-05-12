@@ -325,7 +325,18 @@ export default function App() {
       netMargin: "Marge Net",
       totalRevenueShort: "Total CA",
       focusMode: "Focus Mode",
-      reduce: "Réduire"
+      reduce: "Réduire",
+      fleetLive: "Flotte en Direct",
+      quantumFinance: "Quantum Finance Analyzer",
+      vol: "Vol",
+      prof: "Prof",
+      income: "Encaissements",
+      annualView: "Vue Annuelle",
+      monthSelection: "Sélection Mois",
+      allYears: "Toutes les années",
+      allMonths: "Tous les mois",
+      allDrivers: "Tous les chauffeurs",
+      workshopSummary: "Historique Flux"
     },
     EN: {
       dashboard: "Dashboard",
@@ -485,7 +496,7 @@ export default function App() {
       totalTripsCount: "total trips",
       fluxHistory: "Flow History",
       maintenanceShort: "Maint.",
-      noRecords: "No records",
+      noRecords: "No records found",
       folder: "Folder",
       intervention: "Intervention",
       expense: "Expense",
@@ -507,7 +518,18 @@ export default function App() {
       netMargin: "Net Margin",
       totalRevenueShort: "Total Revenue",
       focusMode: "Focus Mode",
-      reduce: "Reduce"
+      reduce: "Reduce",
+      fleetLive: "Fleet Live",
+      quantumFinance: "Quantum Finance Analyzer",
+      vol: "Vol",
+      prof: "Prof",
+      income: "Revenue",
+      annualView: "Annual View",
+      monthSelection: "Month Selection",
+      allYears: "All Years",
+      allMonths: "All Months",
+      allDrivers: "All Drivers",
+      workshopSummary: "Flow History"
     }
   };
 

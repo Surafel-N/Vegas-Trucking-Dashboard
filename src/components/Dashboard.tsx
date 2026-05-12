@@ -195,7 +195,7 @@ export function Dashboard({
          <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
                  <div className="size-2 rounded-full bg-[#cf5d56] animate-pulse shadow-[0_0_8px_#cf5d56]" />
-                 <span className="text-[10px] font-black uppercase tracking-widest text-white/90 italic">Fleet Live</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-white/90 italic">{t?.fleetLive || "Fleet Live"}</span>
              </div>
              <button onClick={() => setIsGpsExpanded(!isGpsExpanded)} className="px-3 py-1 rounded-xl bg-white/5 hover:bg-[#cf5d56] hover:text-white text-[9px] font-black uppercase tracking-tighter transition-all flex items-center gap-2 border border-white/10">
                {isGpsExpanded ? <><Minimize className="size-3" /> {t?.reduce || "Réduire"}</> : <><Maximize className="size-3" /> {t?.focusMode || "Focus Mode"}</>}
@@ -245,7 +245,7 @@ export function Dashboard({
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-2xl bg-[#00F2FF]/10 text-[#00F2FF]"><Zap className="size-5" /></div>
                     <div>
-                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">{t?.workshopFinances || "Quantum Finance Analyzer"}</h3>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">{t?.quantumFinance || "Quantum Finance Analyzer"}</h3>
                         <p className="text-[10px] font-bold text-white/20 uppercase mt-1 italic underline decoration-[#00F2FF]/30 underline-offset-4">{t?.analyticalRecap || "Exploration des Coûts Multidimensionnelle"}</p>
                     </div>
                 </div>
