@@ -8,34 +8,68 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { google } from "googleapis";
+
 const app = express();
-const port = Number(process.env.PORT || 8787);
-const model = process.env.OPENAI_VISION_MODEL || "gpt-4o-mini";
-const maxUploadBytes = 12 * 1024 * 1024;
+// ... (rest of constants)
 
-const acceptedMimeTypes = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "application/pdf",
-]);
+// GOOGLE SHEETS API CONFIG
+const spreadsheetId = process.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: maxUploadBytes,
-  },
+async function getGoogleAuth() {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null;
+  try {
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+  } catch (e) {
+    console.error("Erreur parsing GOOGLE_SERVICE_ACCOUNT_JSON", e);
+    return null;
+  }
+}
+
+app.get("/api/gsheets", async (req, res) => {
+  try {
+    const auth = await getGoogleAuth();
+    if (!auth) {
+      return res.status(503).json({ error: "Service Account non configuré sur le serveur." });
+    }
+
+    const sheets = google.sheets({ version: "v4", auth });
+
+    // On récupère tout en une fois
+    // Note: Pour les liens hypertexte (maintenance), on utilise get avec fields
+    const ranges = [
+      "'AMARA TRUCK 76'!A2:O", 
+      "'BRAHIMA TRUCK 45'!A2:O", 
+      "'SORO TRUCK 52'!A2:O",
+      "'Spreedsheet'!A2:Z"
+    ];
+
+    // On fait deux appels : un batchGet pour les données simples, et un get pour les métadonnées (liens) de la feuille maintenance
+    const [tripsData, maintenanceData] = await Promise.all([
+      sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges: ranges.slice(0, 3) }),
+      sheets.spreadsheets.get({ 
+        spreadsheetId, 
+        ranges: [ranges[3]], 
+        fields: "sheets(data(rowData(values(formattedValue,hyperlink))))" 
+      })
+    ]);
+
+    res.json({
+      trips: tripsData.data.valueRanges,
+      maintenance: maintenanceData.data.sheets[0].data[0].rowData || []
+    });
+  } catch (error) {
+    console.error("Erreur GSheets API:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.use(
-  cors({
-    origin: true,
-  }),
-);
-app.use(express.json({ limit: "1mb" }));
+app.get("/api/health", (_, res) => {
 
-const systemPrompt = `
-Tu es un extracteur comptable strict.
 Ta mission: analyser une facture, un recu ou un bon de transport et retourner UNIQUEMENT un JSON valide, sans markdown.
 Champs obligatoires:
 - compagnie: string (nom du client/facture)
@@ -208,8 +242,12 @@ app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
 const distPath = path.join(__dirname, "../dist");
 app.use(express.static(distPath));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
+app.use((req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/api")) {
+    res.sendFile(path.join(distPath, "index.html"));
+  } else {
+    next();
+  }
 });
 
 app.listen(port, () => {

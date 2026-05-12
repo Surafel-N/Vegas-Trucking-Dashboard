@@ -21,9 +21,10 @@ type MaintenanceLogProps = {
   records?: MiniRepair[];
   expenseRecords?: any[];
   googleClientId?: string;
+  t: any;
 };
 
-export function MaintenanceLog({ records = [], expenseRecords = [], googleClientId }: MaintenanceLogProps) {
+export function MaintenanceLog({ records = [], expenseRecords = [], googleClientId, t }: MaintenanceLogProps) {
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'maintenance' | 'expenses'>('maintenance');
@@ -91,6 +92,8 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
     }
   };
 
+  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+
   return (
     <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-[500px] flex flex-col relative">
       <div className="flex items-center justify-between mb-6">
@@ -99,8 +102,8 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
             <Wrench className="size-5" />
           </div>
           <div>
-            <h3 className="text-sm font-black uppercase tracking-tighter">Atelier & Finances</h3>
-            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">Historique Flux</p>
+            <h3 className="text-sm font-black uppercase tracking-tighter">{t?.workshopFinances || "Atelier & Finances"}</h3>
+            <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">{t?.fluxHistory || "Historique Flux"}</p>
           </div>
         </div>
 
@@ -111,7 +114,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
               onClick={() => setActiveTab(tab as any)}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/20 hover:text-white/40'}`}
             >
-              {tab === 'maintenance' ? 'Maint.' : 'Dépenses'}
+              {tab === 'maintenance' ? (t?.maintenanceShort || 'Maint.') : (t?.expenses || 'Dépenses')}
             </button>
           ))}
         </div>
@@ -121,7 +124,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
         {displayList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-white/10 italic">
             <Wrench className="size-10 mb-2 opacity-50" />
-            <p className="text-xs font-bold uppercase tracking-widest">Aucun relevé</p>
+            <p className="text-xs font-bold uppercase tracking-widest">{t?.noRecords || "Aucun relevé"}</p>
           </div>
         ) : (
           displayList.map((item) => {
@@ -137,7 +140,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                   {folder ? (
                     <div className="flex flex-col items-center gap-1">
                       <LayoutGrid className="size-5 text-blue-400" />
-                      <span className="text-[7px] font-black uppercase text-blue-400/50">Dossier</span>
+                      <span className="text-[7px] font-black uppercase text-blue-400/50">{t?.folder || "Dossier"}</span>
                     </div>
                   ) : preview ? (
                     <img src={preview} alt="Preview" className="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
@@ -149,7 +152,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="flex justify-between items-center mb-1">
                     <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest truncate">{item.vehicle || item.driverLabel}</p>
-                    <p className="text-[9px] font-bold text-white/20 uppercase">{new Date(item.date).toLocaleDateString('fr-FR')}</p>
+                    <p className="text-[9px] font-bold text-white/20 uppercase">{new Date(item.date).toLocaleDateString(locale)}</p>
                   </div>
                   <h4 className="text-xs font-black text-white truncate">{item.description}</h4>
                   <div className="flex justify-between items-center mt-1">
@@ -175,7 +178,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                   {activeTab === 'maintenance' ? <Wrench className="size-6" /> : <Banknote className="size-6" />}
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-white">{activeTab === 'maintenance' ? 'Intervention' : 'Dépense'}</h3>
+                  <h3 className="text-xl font-black text-white">{activeTab === 'maintenance' ? (t?.intervention || 'Intervention') : (t?.expense || 'Dépense')}</h3>
                   <p className="text-white/40 text-xs uppercase tracking-widest font-bold">{selectedRecord.vehicle || selectedRecord.driverLabel}</p>
                 </div>
               </div>
@@ -189,7 +192,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                 <div className="space-y-4 bg-white/5 p-6 rounded-[32px] border border-white/5">
                   <div className="flex items-center gap-3 text-white/60">
                     <Calendar className="size-4 text-[#cf5d56]" />
-                    <span className="text-sm font-bold">{new Date(selectedRecord.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <span className="text-sm font-bold">{new Date(selectedRecord.date).toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Banknote className="size-5 text-[#9fe3b9]" />
@@ -198,20 +201,20 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                 </div>
 
                 <div className="p-6 rounded-[32px] bg-white/5 border border-white/5 space-y-3">
-                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">Détails enregistrés</p>
+                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">{t?.savedDetails || "Détails enregistrés"}</p>
                   <p className="text-base text-white/80 leading-relaxed font-medium italic">"{selectedRecord.description}"</p>
                 </div>
 
                 {selectedRecord.driveLink && (
                   <a href={selectedRecord.driveLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-blue-500/10 text-blue-400 text-sm font-black border border-blue-500/20 hover:bg-blue-500/20 transition-all">
-                    <FolderOpen className="size-5" /> Ouvrir sur Google Drive
+                    <FolderOpen className="size-5" /> {t?.openDrive || "Ouvrir sur Google Drive"}
                   </a>
                 )}
               </div>
 
               <div className="lg:col-span-3 space-y-4">
                 <div className="flex items-center justify-between px-1">
-                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">Galerie Photos (Mosaïque)</p>
+                  <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">{t?.photoGallery || "Galerie Photos"}</p>
                   {isLoadingImages && <Loader2 className="size-4 animate-spin text-[#cf5d56]" />}
                 </div>
                 
@@ -229,7 +232,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                     ) : !isLoadingImages && (
                       <div className="col-span-2 py-12 flex flex-col items-center gap-3 bg-white/2 rounded-[32px] border border-dashed border-white/10">
                         <ImageIcon className="size-8 text-white/10" />
-                        <p className="text-xs font-bold text-white/20">Aucune photo trouvée dans ce dossier</p>
+                        <p className="text-xs font-bold text-white/20">{t?.noPhotosFound || "Aucune photo trouvée"}</p>
                       </div>
                     )
                   ) : (

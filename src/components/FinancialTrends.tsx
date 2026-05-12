@@ -11,9 +11,10 @@ import {
 type FinancialTrendsProps = {
   records: any[];
   formatCurrency: (val: number) => string;
+  t: any;
 };
 
-export function FinancialTrends({ records, formatCurrency }: FinancialTrendsProps) {
+export function FinancialTrends({ records, formatCurrency, t }: FinancialTrendsProps) {
   const stats = useMemo(() => {
     if (!records || records.length === 0) {
       return { revenue: 0, expenses: 0, netProfit: 0, margin: 0 };
@@ -29,36 +30,36 @@ export function FinancialTrends({ records, formatCurrency }: FinancialTrendsProp
 
   const cards = [
     {
-      label: "Total Revenus",
+      label: t?.totalRevenue || "Total Revenus",
       value: formatCurrency(stats.revenue),
       icon: Banknote,
       color: "text-[#00F2FF]",
       bg: "bg-[#00F2FF]/10",
-      desc: "Chiffre d'affaires brut"
+      desc: t?.grossRevenue || "Chiffre d'affaires brut"
     },
     {
-      label: "Total Dépenses",
+      label: t?.totalExpenses || "Total Dépenses",
       value: formatCurrency(stats.expenses),
       icon: Wallet,
       color: "text-[#FF375F]",
       bg: "bg-[#FF375F]/10",
-      desc: "Coûts opérationnels totaux"
+      desc: t?.totalOpCosts || "Coûts opérationnels totaux"
     },
     {
-      label: "Bénéfice Net",
+      label: t?.netProfit || "Bénéfice Net",
       value: formatCurrency(stats.netProfit),
       icon: Coins,
       color: "text-[#30D158]",
       bg: "bg-[#30D158]/10",
-      desc: "Résultat après frais"
+      desc: t?.resultAfterFees || "Résultat après frais"
     },
     {
-      label: "Marge Bénéficiaire",
+      label: t?.profitMargin || "Marge Bénéficiaire",
       value: `${stats.margin.toFixed(1)}%`,
       icon: Percent,
       color: "text-[#BF5AF2]",
       bg: "bg-[#BF5AF2]/10",
-      desc: "Rentabilité sur CA"
+      desc: t?.profitabilityOnRev || "Rentabilité sur CA"
     }
   ];
 

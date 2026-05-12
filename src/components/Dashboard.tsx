@@ -101,8 +101,8 @@ export function Dashboard({
   }, [initialFilteredData, selectedDates]);
 
   // --- CALCUL MAINTENANCE FILTRÉE ---
-  const maintenanceTotal = useMemo(() => {
-    if (!maintenanceRecords || maintenanceRecords.length === 0) return 0;
+  const filteredMaintenance = useMemo(() => {
+    if (!maintenanceRecords || maintenanceRecords.length === 0) return [];
 
     return maintenanceRecords.filter(r => {
       const rDate = new Date(r.date);
@@ -115,20 +115,24 @@ export function Dashboard({
           const yFilter = filterProps?.year || [];
           const mFilter = filterProps?.month || [];
           
-          const yMatch = yFilter.includes("Toutes les années") || yFilter.includes(String(rDate.getFullYear()));
-          const mMatch = mFilter.includes("Tous les mois") || mFilter.includes(String(rDate.getMonth() + 1));
+          const yMatch = yFilter.includes(t?.allYears || "Toutes les années") || yFilter.includes(String(rDate.getFullYear()));
+          const mMatch = mFilter.includes(t?.allMonths || "Tous les mois") || mFilter.includes(String(rDate.getMonth() + 1));
           dateMatch = yMatch && mMatch;
       }
 
       // Filtre Chauffeur/Véhicule
       let chauffeurMatch = true;
-      if (selectedChauffeur !== "Tous les chauffeurs") {
+      if (selectedChauffeur !== (t?.allDrivers || "Tous les chauffeurs")) {
         chauffeurMatch = r.vehicle.includes(selectedChauffeur.split(' ')[2]) || r.vehicle.includes(selectedChauffeur.split(' ')[0]);
       }
       
       return dateMatch && chauffeurMatch;
-    }).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
-  }, [maintenanceRecords, selectedDates, filterProps, selectedChauffeur]);
+    });
+  }, [maintenanceRecords, selectedDates, filterProps, selectedChauffeur, t]);
+
+  const maintenanceTotal = useMemo(() => {
+    return filteredMaintenance.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+  }, [filteredMaintenance]);
 
   const metrics = useMemo(() => getDashboardMetrics(syncFilteredData), [syncFilteredData]);
 
@@ -182,7 +186,7 @@ export function Dashboard({
 
       {filterProps && (
          <div className="panel-enter rounded-2xl border border-white/5 bg-[#1c1c1e] p-1.5 shadow-xl">
-            <FilterBar {...filterProps} />
+            <FilterBar {...filterProps} t={t} />
          </div>
       )}
 
@@ -194,10 +198,10 @@ export function Dashboard({
                  <span className="text-[10px] font-black uppercase tracking-widest text-white/90 italic">Fleet Live</span>
              </div>
              <button onClick={() => setIsGpsExpanded(!isGpsExpanded)} className="px-3 py-1 rounded-xl bg-white/5 hover:bg-[#cf5d56] hover:text-white text-[9px] font-black uppercase tracking-tighter transition-all flex items-center gap-2 border border-white/10">
-               {isGpsExpanded ? <><Minimize className="size-3" /> Réduire</> : <><Maximize className="size-3" /> Focus Mode</>}
+               {isGpsExpanded ? <><Minimize className="size-3" /> {t?.reduce || "Réduire"}</> : <><Maximize className="size-3" /> {t?.focusMode || "Focus Mode"}</>}
              </button>
          </div>
-         <FleetTrackerWidget records={allTrips} />
+         <FleetTrackerWidget records={allTrips} t={t} />
       </section>
 
       {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
@@ -220,6 +224,8 @@ export function Dashboard({
   month={filterProps?.month}
   selectedDates={selectedDates}
   onSelection={handleSelectionFromCalendar}
+  t={t}
+  currency={currency}
 />
             </div>
             <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
@@ -245,25 +251,25 @@ export function Dashboard({
                 </div>
             </header>
             <div className="flex-1 flex items-center justify-center">
-                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} t={t} records={allRecords} />
+                <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} t={t} records={syncFilteredData} />
             </div>
         </div>
         </section>
 
         {/* ACTIVE TRENDS MODULE */}
         <section className="mb-4">
-          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} />
+          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} />
         </section>
 
         {/* FINANCIAL TRENDS MODULE */}
         <section className="mb-4">
-          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} />
+          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} />
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">          <div className="md:col-span-3 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col">
               <div className="flex items-center gap-3 mb-6 px-1">
                   <div className="p-2.5 rounded-2xl bg-[#cf5d56]/10 text-[#cf5d56]"><Target className="size-4" /></div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">Active Drivers Matrix</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">{t?.activeDriversMatrix || "Active Drivers Matrix"}</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
                 {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].map((label) => {
@@ -272,7 +278,7 @@ export function Dashboard({
                   const dProfit = driverData.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
                   const dTonnage = driverData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
                   return (
-                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? "Tous les chauffeurs" : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
+                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? (t?.allDrivers || "Tous les chauffeurs") : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
                       <div className="flex justify-between items-start mb-4"><div className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${isActive ? 'bg-black text-white' : 'bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20'}`}>{label.split(' ')[2]}</div><ArrowUpRight className={`size-4 transition-colors ${isActive ? 'text-white' : 'text-white/20'}`} /></div>
                       <div><p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${isActive ? 'text-black/60' : 'text-[#cf5d56]'}`}>UNIT {label.split(' ')[2]}</p><h4 className={`text-base font-black truncate mb-4 tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>{label.split(' ')[0]}</h4></div>
                       <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit, currency)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>
@@ -281,21 +287,22 @@ export function Dashboard({
                 })}
               </div>
           </div>
-          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} /></div>
+          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} t={t} /></div>
       </section>
 
       {/* REVENUE TREND & TONNAGE (FULL WIDTH APPLE DESIGN) */}
       <section className="col-span-12">
-          <MiniCharts records={syncFilteredData} />
+          <MiniCharts records={syncFilteredData} t={t} />
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
           <MaintenanceLog 
-            records={maintenanceRecords} 
+            records={filteredMaintenance} 
             expenseRecords={syncFilteredData.filter(t => t.tripType === "Google Sheets" || t.category === "Dépense Opérationnelle")} 
             googleClientId={googleClientId}
+            t={t}
           />
-          <OperationalAlerts records={syncFilteredData} />
+          <OperationalAlerts records={syncFilteredData} t={t} />
       </div>
 
     </div>

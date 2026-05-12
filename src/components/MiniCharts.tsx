@@ -16,9 +16,10 @@ import { TrendingUp, Package, Zap } from 'lucide-react';
 
 type MiniChartsProps = {
   records: any[];
+  t: any;
 };
 
-export function MiniCharts({ records }: MiniChartsProps) {
+export function MiniCharts({ records, t }: MiniChartsProps) {
   // --- DATA PROCESSING ---
   const tonnageData = useMemo(() => {
     const drivers = ["AMARA", "BRAHIMA", "SORO"];
@@ -30,6 +31,8 @@ export function MiniCharts({ records }: MiniChartsProps) {
     });
   }, [records]);
 
+  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+
   const trendData = useMemo(() => {
     const activeDates = [...new Set(records.map(r => r.date))].sort();
     return activeDates.map(date => {
@@ -39,13 +42,13 @@ export function MiniCharts({ records }: MiniChartsProps) {
       const net = dayRecords.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
 
       return { 
-        date: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }), 
+        date: new Date(date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' }), 
         gross,
         expenses,
         net
       };
     });
-  }, [records]);
+  }, [records, locale]);
 
   const stats = useMemo(() => {
     const totalGross = trendData.reduce((s, d) => s + d.gross, 0);
@@ -68,7 +71,7 @@ export function MiniCharts({ records }: MiniChartsProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="p-1.5 rounded-lg bg-[#61d2c0]/10 text-[#61d2c0]"><Package className="size-3.5" /></div>
-             <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Volume Flotte</h4>
+             <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">{t?.fleetVolume || "Volume Flotte"}</h4>
           </div>
           <span className="text-xs font-black text-white/80">{tonnageData.reduce((s,d)=>s+d.tonnage,0)} T</span>
         </div>
@@ -98,18 +101,18 @@ export function MiniCharts({ records }: MiniChartsProps) {
           <div className="flex items-center gap-3">
              <div className="p-2 rounded-xl bg-[#FF375F]/10 text-[#FF375F]"><TrendingUp className="size-4" /></div>
              <div>
-                <h3 className="text-sm font-black text-white tracking-tight uppercase">Performance Analytique</h3>
-                <p className="text-[9px] text-white/20 font-bold uppercase tracking-wider">{trendData.length} dernières sessions</p>
+                <h3 className="text-sm font-black text-white tracking-tight uppercase">{t?.analyticalPerformance || "Performance Analytique"}</h3>
+                <p className="text-[9px] text-white/20 font-bold uppercase tracking-wider">{trendData.length} {t?.lastSessions || "dernières sessions"}</p>
              </div>
           </div>
           
           <div className="flex gap-4">
              <div className="flex flex-col items-end">
-                <span className="text-[8px] font-black text-white/20 uppercase">Marge Net</span>
+                <span className="text-[8px] font-black text-white/20 uppercase">{t?.netMargin || "Marge Net"}</span>
                 <span className="text-sm font-black text-[#30D158]">{stats.margin.toFixed(1)}%</span>
              </div>
              <div className="flex flex-col items-end">
-                <span className="text-[8px] font-black text-white/20 uppercase">Total CA</span>
+                <span className="text-[8px] font-black text-white/20 uppercase">{t?.totalRevenueShort || "Total CA"}</span>
                 <span className="text-sm font-black text-white">{formatCurrencyShort(stats.totalGross)}</span>
              </div>
           </div>
@@ -129,10 +132,10 @@ export function MiniCharts({ records }: MiniChartsProps) {
               <YAxis axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 9 }} tickFormatter={formatCurrencyShort} />
               <Tooltip 
                 contentStyle={{ backgroundColor: 'rgba(28, 28, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', fontSize: '10px' }}
-                formatter={(val: number) => new Intl.NumberFormat('fr-FR').format(val)}
+                formatter={(val: number) => new Intl.NumberFormat(locale).format(val)}
               />
-              <Area type="monotone" dataKey="gross" name="Revenu" stroke="#00F2FF" strokeWidth={2} fill="transparent" />
-              <Area type="monotone" dataKey="net" name="Bénéfice" stroke="#30D158" strokeWidth={3} fill="url(#colorNetCompact)" />
+              <Area type="monotone" dataKey="gross" name={t?.revenue || "Revenu"} stroke="#00F2FF" strokeWidth={2} fill="transparent" />
+              <Area type="monotone" dataKey="net" name={t?.netProfit || "Bénéfice"} stroke="#30D158" strokeWidth={3} fill="url(#colorNetCompact)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -140,11 +143,11 @@ export function MiniCharts({ records }: MiniChartsProps) {
         <div className="flex items-center gap-6 pt-4 border-t border-white/5">
             <div className="flex items-center gap-2">
                 <div className="size-1.5 rounded-full bg-[#00F2FF]" />
-                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Revenus</span>
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t?.revenue || "Revenus"}</span>
             </div>
             <div className="flex items-center gap-2">
                 <div className="size-1.5 rounded-full bg-[#30D158]" />
-                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Bénéfice</span>
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{t?.netProfit || "Bénéfice"}</span>
             </div>
             <div className="ml-auto flex items-center gap-1.5 text-[9px] font-black text-[#FF375F] uppercase">
                 <Zap className="size-3" />

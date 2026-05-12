@@ -14,7 +14,8 @@ export function LogisticsCalendar({
   month: selectedMonths = [],
   selectedDates = [],
   onSelection,
-  currency = "CFA"
+  currency = "CFA",
+  t
 }) {
   const [viewMode, setViewMode] = useState("month"); // "month", "year_months", "global_years"
 
@@ -24,24 +25,26 @@ export function LogisticsCalendar({
     if (currency === "USD") {
       return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(val / CFA_TO_USD_RATE);
     }
-    return Math.round(val).toLocaleString() + " CFA";
+    return Math.round(val).toLocaleString() + (currency === "CFA" ? " CFA" : "");
   };
 
   const currentViewYear = viewDate.getFullYear();
   const currentViewMonth = viewDate.getMonth();
 
   const monthName = useMemo(() => {
+    if (t?.months) return t.months[currentViewMonth];
     return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(viewDate);
-  }, [viewDate]);
+  }, [viewDate, t]);
 
   const todayISO = new Date().toISOString().split('T')[0];
 
   // Filtrage des records par chauffeur
   const filteredRecords = useMemo(() => {
-    return selectedChauffeur === "Tous les chauffeurs" || selectedChauffeur === "Tous"
+    const allLabel = t?.allDrivers || "Tous les chauffeurs";
+    return selectedChauffeur === allLabel || selectedChauffeur === "Tous"
       ? records 
       : records.filter(r => String(r.driverLabel || "").trim() === String(selectedChauffeur).trim());
-  }, [records, selectedChauffeur]);
+  }, [records, selectedChauffeur, t]);
 
   // Activité pour la vue MENSUELLE
   const activityMap = useMemo(() => {
@@ -62,7 +65,7 @@ export function LogisticsCalendar({
   const monthsActivity = useMemo(() => {
     const months = Array(12).fill(0).map((_, i) => ({
       idx: i + 1,
-      name: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(new Date(currentViewYear, i, 1)),
+      name: t?.months ? t.months[i].substring(0,3) : new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(new Date(currentViewYear, i, 1)),
       tonnage: 0,
       trips: 0
     }));
@@ -75,7 +78,7 @@ export function LogisticsCalendar({
       }
     });
     return months;
-  }, [filteredRecords, currentViewYear]);
+  }, [filteredRecords, currentViewYear, t]);
 
   // Activité pour la vue GLOBALE ANNÉES
   const globalYearsActivity = useMemo(() => {
@@ -86,7 +89,7 @@ export function LogisticsCalendar({
         yearsMap[y].tonnage += r.tonnage || 0;
         if ((r.tonnage || 0) > 0) yearsMap[y].trips += (r.tonnage > 100 ? 2 : 1);
     });
-    return Object.values(yearsMap).sort((a,b) => a.name.localeCompare(b.name));
+    return Object.values(yearsMap).sort((a,b) => (a.name as string).localeCompare(b.name as string));
   }, [filteredRecords]);
 
   const calendarGrid = useMemo(() => {
@@ -111,21 +114,25 @@ export function LogisticsCalendar({
   const toggleMonthSelection = (mIdx) => {
       const val = String(mIdx);
       let newMonths;
-      const current = selectedMonths.filter(v => v !== "Tous les mois");
+      const allMonthsLabel = t?.allMonths || "Tous les mois";
+      const current = selectedMonths.filter(v => v !== allMonthsLabel);
       if (current.includes(val)) newMonths = current.filter(v => v !== val);
       else newMonths = [...current, val];
-      if (newMonths.length === 0) newMonths = ["Tous les mois"];
+      if (newMonths.length === 0) newMonths = [allMonthsLabel];
       onSelection('month', newMonths);
   };
 
   const toggleYearSelection = (yStr) => {
       let newYears;
-      const current = selectedYears.filter(v => v !== "Toutes les années");
+      const allYearsLabel = t?.allYears || "Toutes les années";
+      const current = selectedYears.filter(v => v !== allYearsLabel);
       if (current.includes(yStr)) newYears = current.filter(v => v !== yStr);
       else newYears = [...current, yStr];
-      if (newYears.length === 0) newYears = ["Toutes les années"];
+      if (newYears.length === 0) newYears = [allYearsLabel];
       onSelection('year', newYears);
   };
+
+  const daysLabels = t?.daysShort || "LMMJVSD".split('');
 
   return (
     <div className="flex flex-col h-full w-full select-none font-sans relative">
@@ -134,7 +141,7 @@ export function LogisticsCalendar({
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-black capitalize text-white tracking-tighter leading-none">
-                {viewMode === "month" ? monthName : viewMode === "year_months" ? "Sélection Mois" : "Vue Annuelle"}
+                {viewMode === "month" ? monthName : viewMode === "year_months" ? (t?.monthSelection || "Sélection Mois") : (t?.annualView || "Vue Annuelle")}
             </h2>
             <div className="flex flex-col items-center bg-white/5 rounded-lg px-1 ml-1">
                 <button onClick={() => handleYearChange(1)} className="text-white/20 hover:text-white transition-all"><ChevronUp className="size-3" /></button>
@@ -143,9 +150,9 @@ export function LogisticsCalendar({
             </div>
           </div>
           <div className="flex gap-2.5 mt-2">
-            <button onClick={() => setViewMode("month")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'month' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/40 hover:bg-white/5'}`}><CalendarIcon className="size-3" /> Jours</button>
-            <button onClick={() => setViewMode("year_months")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'year_months' ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20' : 'text-white/40 hover:bg-white/5'}`}><MonthIcon className="size-3" /> Mois</button>
-            <button onClick={() => setViewMode("global_years")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'global_years' ? 'bg-[#BF5AF2] text-white shadow-lg shadow-[#BF5AF2]/20' : 'text-white/40 hover:bg-white/5'}`}><Grid2X2 className="size-3" /> Années</button>
+            <button onClick={() => setViewMode("month")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'month' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/40 hover:bg-white/5'}`}><CalendarIcon className="size-3" /> {t?.days || "Jours"}</button>
+            <button onClick={() => setViewMode("year_months")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'year_months' ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20' : 'text-white/40 hover:bg-white/5'}`}><MonthIcon className="size-3" /> {t?.income || "Mois"}</button>
+            <button onClick={() => setViewMode("global_years")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'global_years' ? 'bg-[#BF5AF2] text-white shadow-lg shadow-[#BF5AF2]/20' : 'text-white/40 hover:bg-white/5'}`}><Grid2X2 className="size-3" /> {t?.allYears || "Années"}</button>
           </div>
         </div>
         
@@ -159,10 +166,11 @@ export function LogisticsCalendar({
       {/* Sélecteur Chauffeur */}
       <div className="flex gap-1 overflow-x-auto no-scrollbar mb-4 bg-black/20 p-1 rounded-xl border border-white/5">
         {(chauffeurOptions || ["Tous"]).map((name) => {
-          const isSelected = selectedChauffeur === name || (name === "Tous" && selectedChauffeur === "Tous les chauffeurs");
+          const allLabel = t?.allDrivers || "Tous les chauffeurs";
+          const isSelected = selectedChauffeur === name || (name === "Tous" && selectedChauffeur === allLabel);
           return (
-            <button key={name} onClick={() => onChauffeurChange(name === "Tous" ? "Tous les chauffeurs" : name)}
-              className={`px-3 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-widest transition-all ${isSelected ? "bg-[#cf5d56] text-white shadow-md" : "text-white/30 hover:bg-white/5"}`}>{name === "Tous" || name === "Tous les chauffeurs" ? "Flotte" : name.split(' ')[0]}</button>
+            <button key={name} onClick={() => onChauffeurChange(name === "Tous" ? allLabel : name)}
+              className={`px-3 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-widest transition-all ${isSelected ? "bg-[#cf5d56] text-white shadow-md" : "text-white/30 hover:bg-white/5"}`}>{name === "Tous" || name === allLabel ? (t?.fleet || "Flotte") : name.split(' ')[0]}</button>
           );
         })}
       </div>
@@ -171,7 +179,7 @@ export function LogisticsCalendar({
       <div className="flex-1 flex flex-col min-h-0">
         {viewMode === "month" && (
            <>
-            <div className="grid grid-cols-7 mb-2 text-center text-[10px] font-black text-white/20 uppercase">{"LMMJVSD".split('').map((d,i) => <div key={i}>{d}</div>)}</div>
+            <div className="grid grid-cols-7 mb-2 text-center text-[10px] font-black text-white/20 uppercase">{daysLabels.map((d,i) => <div key={i}>{d}</div>)}</div>
             <div className="flex-1 grid grid-cols-7 grid-rows-6 gap-1.5">
                {calendarGrid.map((item, index) => {
                  const data = item.isCurrent ? activityMap[item.day] : null;
@@ -200,8 +208,8 @@ export function LogisticsCalendar({
                                   <div className={`size-1.5 rounded-full ${isActive ? 'bg-[#61d2c0]' : 'bg-[#ff8f84]'}`} />
                               </div>
                               <div className="space-y-1 text-[10px]">
-                                 <div className="flex justify-between"><span className="text-white/40 font-bold">Vol:</span><span className="font-black">{data.tonnage.toFixed(1)} T</span></div>
-                                 <div className="flex justify-between"><span className="text-white/40 font-bold">Prof:</span><span className="font-black text-[#9fe3b9]">{formatProf(data.profit)}</span></div>
+                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.volume || "Vol"}:</span><span className="font-black">{data.tonnage.toFixed(1)} T</span></div>
+                                 <div className="flex justify-between"><span className="text-white/40 font-bold">{t?.netProfit || "Prof"}:</span><span className="font-black text-[#9fe3b9]">{formatProf(data.profit)}</span></div>
                               </div>
                             </div>
                             <div className={`size-3 -translate-y-1.5 rotate-45 bg-[#1c1c1e] border-r border-b border-white/10 ${arrowPos}`} />
@@ -230,7 +238,7 @@ export function LogisticsCalendar({
                             <span className="text-[10px] font-black uppercase text-white/40">{m.name}</span>
                             <div>
                                 <p className={`text-sm font-black ${isSel ? 'text-[#00F2FF]' : 'text-white/80'}`}>{m.tonnage.toFixed(0)}T</p>
-                                <p className="text-[8px] font-bold text-white/20 uppercase">{m.trips} voyages</p>
+                                <p className="text-[8px] font-bold text-white/20 uppercase">{m.trips} {t?.voyages || "voyages"}</p>
                             </div>
                         </button>
                     );
@@ -248,7 +256,7 @@ export function LogisticsCalendar({
                             <span className="text-xs font-black text-white/40">{y.name}</span>
                             <div>
                                 <p className="text-lg font-black text-white">{y.tonnage.toFixed(0)}T</p>
-                                <p className="text-[10px] font-bold text-white/20 uppercase">{y.trips} voyages total</p>
+                                <p className="text-[10px] font-bold text-white/20 uppercase">{y.trips} {t?.totalTripsCount || "voyages total"}</p>
                             </div>
                         </button>
                     );

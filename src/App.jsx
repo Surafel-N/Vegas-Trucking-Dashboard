@@ -184,6 +184,148 @@ export default function App() {
       police: "Police",
       meals: "Repas",
       extras: "Extras",
+      volume: "Volume",
+      netProfit: "Profit Net",
+      revenue: "Revenus",
+      activeDriversMatrix: "Matrice Chauffeurs Actifs",
+      allDrivers: "Tous les chauffeurs",
+      allMonths: "Tous les mois",
+      allYears: "Toutes les années",
+      allDestinations: "Toutes les destinations",
+      date: "Date",
+      driver: "Chauffeur",
+      destination: "Destination",
+      tonnage: "Tonnage",
+      status: "Statut",
+      actions: "Actions",
+      months: ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"],
+      daysShort: ["L", "M", "M", "J", "V", "S", "D"],
+      active: "Actif",
+      inactive: "Inactif",
+      noVehicle: "Aucun véhicule",
+      detailedDriversList: "Liste détaillée des chauffeurs",
+      phone: "Téléphone",
+      license: "Permis",
+      vehicle: "Véhicule",
+      addManualTrip: "Ajouter un trajet manuel",
+      start: "Départ",
+      distance: "Distance",
+      add: "Ajouter",
+      logbook: "Journal de Bord & Comptabilité Dynamique",
+      smartColumns: "Colonnes intelligentes actives",
+      totalExp: "Total Exp",
+      brut: "Brut (CA)",
+      net: "Net (Profit)",
+      comments: "Commentaires",
+      cloudExpenses: "Dépenses Cloud",
+      gedArchiving: "G.E.D & Archivage Numérique",
+      syncMaintenance: "Sync Maintenance",
+      syncingInProgress: "Sync en cours...",
+      elementsSelected: "Éléments sélectionnés",
+      deleteSelection: "Supprimer la sélection",
+      expenseEntry: "Saisie Dépense",
+      amount: "Montant",
+      category: "Catégorie",
+      subCategory: "Sous-catégorie",
+      validate: "Valider",
+      archivedHistory: "Historique Archivé",
+      identification: "Identification",
+      dataInventoryManager: "Data & Inventory Manager",
+      manageHistory: "Gérez tout l'historique et ajoutez des trajets au Dashboard.",
+      sourcesAll: "Sources (Toutes)",
+      excelOnly: "Fichiers Excel uniquement",
+      dashboardOnly: "Dashboard uniquement",
+      monthsAll: "Mois (Tous)",
+      driverAll: "Chauffeur (Tous)",
+      newTrip: "NOUVEAU TRAJET",
+      departure: "Départ",
+      arrival: "Arrivée",
+      tonnageUnit: "Tonnage (T)",
+      revenueCFA: "Recette (CFA)",
+      routeToll: "Route/Péage",
+      bonusExtra: "Bonus/Extra",
+      tripsSelected: "trajet(s) sélectionné(s)",
+      addToDashboard: "Ajouter au Dashboard",
+      removeFromDashboard: "Supprimer du Dashboard",
+      itinerary: "Itinéraire",
+      noDataFound: "Aucune donnée trouvée.",
+      editing: "En édition",
+      administrationCMS: "Administration CMS",
+      businessRulesLabel: "Règles Métier",
+      uiCustomization: "Personnalisation UI",
+      massiveImport: "Importation Massive",
+      advanced: "Avancé",
+      manageDataConfig: "Gère les données et la configuration dynamique du site.",
+      voyageThreshold: "Seuil tonnage pour 2 voyages",
+      targetMargin: "Objectif Marge Bénéficiaire (%)",
+      instantApply: "Les modifications s'appliquent instantanément au Dashboard.",
+      dragDropWidgets: "Drag & Drop Widgets (Ordre & Visibilité)",
+      dragToReorder: "Fais glisser les cartes pour réorganiser l'ordre d'affichage sur le Dashboard.",
+      sidebarCustomization: "Personnalisation du Menu Latéral (Navigation)",
+      toggleSections: "Active ou désactive les sections visibles dans le menu de navigation principal.",
+      dangerZone: "Zone de Danger",
+      irreversibleActions: "Ces actions sont irréversibles. Elles supprimeront toutes les données locales stockées dans votre navigateur.",
+      purgeRangeLabel: "Purge par plage",
+      purgeMaintenanceLabel: "Purge Maintenances",
+      purgeTripsOnly: "PURGER UNIQUEMENT LES TRAJETS (2026)",
+      resetAllData: "RÉINITIALISER TOUTES LES DONNÉES",
+      technicalSupport: "Support Technique",
+      activeTrends: "Tendances Activité",
+      financialTrends: "Tendances Financières",
+      operationalAlerts: "Alertes Opérationnelles",
+      fleetStatus: "État de la Flotte",
+      profitability: "Rentabilité",
+      activeDays: "Jours Actifs",
+      tripsCount: "Nombre de Trajets",
+      totalLoadedMonth: "Total Chargé",
+      monthlyVolume: "Volume global période",
+      maxMonthlyLoad: "Charge Max",
+      loadRecord: "Record de chargement",
+      averageLoad: "Chargement Moyen",
+      tripEfficiency: "Efficacité par voyage",
+      numberOfTrips: "Nombre de Voyages",
+      daysWithLoading: "Jours avec chargement",
+      totalRevenue: "Total Revenus",
+      grossRevenue: "Chiffre d'affaires brut",
+      totalOpCosts: "Coûts opérationnels totaux",
+      resultAfterFees: "Résultat après frais",
+      profitMargin: "Marge Bénéficiaire",
+      profitabilityOnRev: "Rentabilité sur CA",
+      profitableTrips: "Voyages Profitables",
+      fleetSummary: "Résumé Flotte",
+      opMargin: "Marge Opérationnelle",
+      currentFocus: "Focus Actuel",
+      monthSelection: "Sélection Mois",
+      annualView: "Vue Annuelle",
+      days: "Jours",
+      fleet: "Flotte",
+      voyages: "voyages",
+      totalTripsCount: "voyages total",
+      fluxHistory: "Historique Flux",
+      maintenanceShort: "Maint.",
+      noRecords: "Aucun relevé",
+      folder: "Dossier",
+      intervention: "Intervention",
+      expense: "Dépense",
+      savedDetails: "Détails enregistrés",
+      openDrive: "Ouvrir sur Google Drive",
+      photoGallery: "Galerie Photos",
+      noPhotosFound: "Aucune photo trouvée",
+      fleetAlerts: "Alertes Flotte",
+      activeMonitoring: "Surveillance Active",
+      negativeMargin: "Marge Négative",
+      lossOf: "Perte de",
+      fuelWithoutTonnage: "Fuel sans Tonnage",
+      activitySummary: "Activité",
+      operationsRecorded: "opérations enregistrées",
+      zeroAnomalies: "Zéro anomalies",
+      fleetVolume: "Volume Flotte",
+      analyticalPerformance: "Performance Analytique",
+      lastSessions: "dernières sessions",
+      netMargin: "Marge Net",
+      totalRevenueShort: "Total CA",
+      focusMode: "Focus Mode",
+      reduce: "Réduire"
     },
     EN: {
       dashboard: "Dashboard",
@@ -224,6 +366,148 @@ export default function App() {
       police: "Police",
       meals: "Meals",
       extras: "Extras",
+      volume: "Volume",
+      netProfit: "Net Profit",
+      revenue: "Revenue",
+      activeDriversMatrix: "Active Drivers Matrix",
+      allDrivers: "All Drivers",
+      allMonths: "All Months",
+      allYears: "All Years",
+      allDestinations: "All Destinations",
+      date: "Date",
+      driver: "Driver",
+      destination: "Destination",
+      tonnage: "Tonnage",
+      status: "Status",
+      actions: "Actions",
+      months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+      daysShort: ["M", "T", "W", "T", "F", "S", "S"],
+      active: "Active",
+      inactive: "Inactive",
+      noVehicle: "No vehicle",
+      detailedDriversList: "Detailed Drivers List",
+      phone: "Phone",
+      license: "License",
+      vehicle: "Vehicle",
+      addManualTrip: "Add Manual Trip",
+      start: "Start",
+      distance: "Distance",
+      add: "Add",
+      logbook: "Logbook & Dynamic Accounting",
+      smartColumns: "Smart columns active",
+      totalExp: "Total Exp",
+      brut: "Gross (Rev)",
+      net: "Net (Profit)",
+      comments: "Comments",
+      cloudExpenses: "Cloud Expenses",
+      gedArchiving: "D.M.S & Digital Archiving",
+      syncMaintenance: "Sync Maintenance",
+      syncingInProgress: "Sync in progress...",
+      elementsSelected: "Elements selected",
+      deleteSelection: "Delete selection",
+      expenseEntry: "Expense Entry",
+      amount: "Amount",
+      category: "Category",
+      subCategory: "Sub-category",
+      validate: "Validate",
+      archivedHistory: "Archived History",
+      identification: "Identification",
+      dataInventoryManager: "Data & Inventory Manager",
+      manageHistory: "Manage full history and add trips to Dashboard.",
+      sourcesAll: "Sources (All)",
+      excelOnly: "Excel files only",
+      dashboardOnly: "Dashboard only",
+      monthsAll: "Months (All)",
+      driverAll: "Driver (All)",
+      newTrip: "NEW TRIP",
+      departure: "Departure",
+      arrival: "Arrival",
+      tonnageUnit: "Tonnage (T)",
+      revenueCFA: "Revenue (CFA)",
+      routeToll: "Route/Toll",
+      bonusExtra: "Bonus/Extra",
+      tripsSelected: "trip(s) selected",
+      addToDashboard: "Add to Dashboard",
+      removeFromDashboard: "Remove from Dashboard",
+      itinerary: "Itinerary",
+      noDataFound: "No data found.",
+      editing: "Editing",
+      administrationCMS: "CMS Administration",
+      businessRulesLabel: "Business Rules",
+      uiCustomization: "UI Customization",
+      massiveImport: "Massive Import",
+      advanced: "Advanced",
+      manageDataConfig: "Manage data and site dynamic configuration.",
+      voyageThreshold: "Tonnage threshold for 2 trips",
+      targetMargin: "Target Profit Margin (%)",
+      instantApply: "Changes apply instantly to the Dashboard.",
+      dragDropWidgets: "Drag & Drop Widgets (Order & Visibility)",
+      dragToReorder: "Drag cards to reorder display on the Dashboard.",
+      sidebarCustomization: "Sidebar Customization (Navigation)",
+      toggleSections: "Enable or disable sections visible in the main menu.",
+      dangerZone: "Danger Zone",
+      irreversibleActions: "These actions are irreversible. They will delete all local data.",
+      purgeRangeLabel: "Purge by range",
+      purgeMaintenanceLabel: "Purge Maintenances",
+      purgeTripsOnly: "PURGE TRIPS ONLY (2026)",
+      resetAllData: "RESET ALL DATA",
+      technicalSupport: "Technical Support",
+      activeTrends: "Activity Trends",
+      financialTrends: "Financial Trends",
+      operationalAlerts: "Operational Alerts",
+      fleetStatus: "Fleet Status",
+      profitability: "Profitability",
+      activeDays: "Active Days",
+      tripsCount: "Number of Trips",
+      totalLoadedMonth: "Total Loaded",
+      monthlyVolume: "Period Volume",
+      maxMonthlyLoad: "Max Load",
+      loadRecord: "Load Record",
+      averageLoad: "Average Load",
+      tripEfficiency: "Efficiency per Trip",
+      numberOfTrips: "Number of Trips",
+      daysWithLoading: "Days with Loading",
+      totalRevenue: "Total Revenue",
+      grossRevenue: "Gross Revenue",
+      totalOpCosts: "Total Operational Costs",
+      resultAfterFees: "Result After Fees",
+      profitMargin: "Profit Margin",
+      profitabilityOnRev: "Profitability on Revenue",
+      profitableTrips: "Profitable Trips",
+      fleetSummary: "Fleet Summary",
+      opMargin: "Operational Margin",
+      currentFocus: "Current Focus",
+      monthSelection: "Month Selection",
+      annualView: "Annual View",
+      days: "Days",
+      fleet: "Fleet",
+      voyages: "trips",
+      totalTripsCount: "total trips",
+      fluxHistory: "Flow History",
+      maintenanceShort: "Maint.",
+      noRecords: "No records",
+      folder: "Folder",
+      intervention: "Intervention",
+      expense: "Expense",
+      savedDetails: "Saved Details",
+      openDrive: "Open on Google Drive",
+      photoGallery: "Photo Gallery",
+      noPhotosFound: "No photos found",
+      fleetAlerts: "Fleet Alerts",
+      activeMonitoring: "Active Monitoring",
+      negativeMargin: "Negative Margin",
+      lossOf: "Loss of",
+      fuelWithoutTonnage: "Fuel without Tonnage",
+      activitySummary: "Activity",
+      operationsRecorded: "operations recorded",
+      zeroAnomalies: "Zero anomalies",
+      fleetVolume: "Fleet Volume",
+      analyticalPerformance: "Analytical Performance",
+      lastSessions: "last sessions",
+      netMargin: "Net Margin",
+      totalRevenueShort: "Total Revenue",
+      focusMode: "Focus Mode",
+      reduce: "Reduce"
     }
   };
 
@@ -261,157 +545,15 @@ export default function App() {
         callback: async (tr) => {
           if (tr.access_token) {
             const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
-            
-            // Utilisation exclusive de la feuille 'Spreedsheet' comme source de maintenance/dépenses
-            const ranges = ["'Spreedsheet'!A2:Z"];
+            const range = "'Spreedsheet'!A2:Z";
             const fields = "sheets(data(rowData(values(formattedValue,hyperlink))))";
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?ranges=${encodeURIComponent(ranges[0])}&fields=${fields}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?ranges=${encodeURIComponent(range)}&fields=${fields}`;
             
             const res = await fetch(url, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
             const data = await res.json();
+            const counts = processMaintenanceData(data.sheets[0].data[0].rowData);
             
-            const driverKeys = [{ c: "AMARA", s: "76" }, { c: "BRAHIMA", s: "45" }, { c: "SORO", s: "52" }];
-            
-            // On prépare des accumulateurs pour ne pas écraser les données
-            let maintenanceList = [];
-            let expensesList = [];
-
-            data.sheets.forEach((sheet) => {
-              const rows = sheet.data[0].rowData || [];
-              
-              rows.forEach((row, index) => {
-                const values = row.values || [];
-                if (values.length === 0) return;
-
-                // --- EXTRACTION ET SCAN GLOBAL ---
-                const rowTexts = values.map(v => v?.formattedValue ? String(v.formattedValue) : "");
-                const fullRowContent = rowTexts.join(" ").toLowerCase();
-                
-                const dateRaw = rowTexts[0] || "";
-                if (!dateRaw.includes("26")) return; // Uniquement 2026
-
-                // Montant en Colonne I (Index 8)
-                const amountRaw = rowTexts[8] || "";
-                const driveLink = values[8]?.hyperlink || null;
-                
-                const parseNum = (v) => {
-                  let s = String(v).replace(/\s/g, "");
-                  const match = s.match(/[\d,.]+/);
-                  if (!match) return 0;
-                  s = match[0];
-                  if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
-                  return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
-                };
-                
-                const amount = parseNum(amountRaw);
-                if (amount === 0) return; // Ignore les lignes sans montant
-
-                // --- RÉCUPÉRATION DU COMMENTAIRE (Priorité M et N) ---
-                const commentM = rowTexts[12] || "";
-                const commentN = rowTexts[13] || "";
-                let bestComment = `${commentM} ${commentN}`.trim();
-                
-                // Fallback : si M et N sont vides, on cherche la cellule la plus longue après la colonne B
-                if (!bestComment) {
-                  const possible = rowTexts.slice(2).filter(t => t.length > 3 && t !== amountRaw && t !== dateRaw);
-                  bestComment = possible.sort((a, b) => b.length - a.length)[0] || "";
-                }
-
-                // --- FILTRE DE VALIDATION STRICTE ---
-                if (!bestComment) return;
-                
-                const cleanComment = bestComment.replace(/\s/g, '').toLowerCase();
-                const kmOnlyRegex = /^[\d.,]+(km|kms|k|klm)$/i;
-                const amountOnlyRegex = /^[\d.,]+(cfa|f|fcfa)?$/i;
-                const numberOnlyRegex = /^[\d.,]+$/;
-
-                if (kmOnlyRegex.test(cleanComment) || amountOnlyRegex.test(cleanComment) || numberOnlyRegex.test(cleanComment)) {
-                  console.log(`[IGNORE] Ligne ignorée (Bruit numérique) : ${bestComment}`);
-                  return;
-                }
-
-                // --- DICTIONNAIRE TECHNIQUE ---
-                const maintenanceKeywords = [
-                  'tire', 'oil', 'repair', 'rod', 'maint', 'spare', 'change', 'garage', 
-                  'mechanic', 'mecanic', 'frein', 'brake', 'tube', 'labor', 'filter', 
-                  'battery', 'bearing', 'suspension', 'clutch', 'joint', 'gasket', 
-                  'alternator', 'starter', 'belt', 'pump', 'radiator', 'shock', 'rim',
-                  'pneu', 'vidange', 'moteur', 'batterie', 'roulement', 'amortisseur', 
-                  'embrayage', 'boite', 'pont', 'transmission', 'alternateur',
-                  'demarreur', 'courroie', 'pompe', 'radiateur', 'huil', 'entretien', 
-                  'révision', 'revision', 'facture', 'pièce', 'mecanicien',
-                  'main d', 'lavage', 'graissage', 'parallélisme', 'équilibrage', 'valve',
-                  'durite', 'soufflet', 'disque', 'plaquette', 'étrier', 'injecteur'
-                ];
-                
-                const hasMaintenanceKeyword = maintenanceKeywords.some(keyword => fullRowContent.includes(keyword));
-                const hasKm = fullRowContent.includes('km');
-                const hasDriveLink = !!driveLink || fullRowContent.includes('http') || fullRowContent.includes('drive.google');
-
-                const isMaintenance = hasMaintenanceKeyword || hasKm || hasDriveLink;
-
-                let isoDate = "2026-01-01";
-                const p = dateRaw.toLowerCase().split(" ");
-                if (p.length >= 3) {
-                  const day = p[1].padStart(2, '0');
-                  const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
-                  let m = "01";
-                  monthsFr.forEach((name, idx) => { if (p[2].startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
-                  isoDate = `2026-${m}-${day}`;
-                }
-
-                // --- DÉTECTION DU CHAUFFEUR DANS LE COMMENTAIRE ---
-                const driverNames = ["AMARA", "BRAHIMA", "SORO"];
-                let detectedDriver = { c: "AMARA", s: "76" }; // Default
-                driverNames.forEach(name => {
-                  if (fullRowContent.includes(name.toLowerCase())) {
-                    if (name === "AMARA") detectedDriver = { c: "AMARA", s: "76" };
-                    if (name === "BRAHIMA") detectedDriver = { c: "BRAHIMA", s: "45" };
-                    if (name === "SORO") detectedDriver = { c: "SORO", s: "52" };
-                  }
-                });
-
-                // --- EXTRACTION DU TYPE DE RÉPARATION ---
-                const detectedRepairType = maintenanceKeywords.find(kw => fullRowContent.includes(kw)) || "Réparation";
-
-                // --- CAPTURE DU LIEN DRIVE ---
-                const driveLinkRegex = /(https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+)/;
-                const foundLink = fullRowContent.match(driveLinkRegex);
-                const finalDriveLink = driveLink || (foundLink ? foundLink[0] : null);
-
-                const payload = {
-                  id: `gs-${detectedDriver.c}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
-                  date: isoDate,
-                  amount: amount,
-                  description: bestComment || `Maintenance ${detectedRepairType}`,
-                  driveLink: finalDriveLink,
-                  source: "Google Sheets"
-                };
-
-                if (isMaintenance) {
-                  maintenanceList.push({
-                    ...payload,
-                    vehicle: `${detectedDriver.c} TRUCK ${detectedDriver.s}`,
-                    cost: amount,
-                    status: "Completed",
-                    repairType: detectedRepairType
-                  });
-                } else {
-                  expensesList.push({
-                    ...payload,
-                    driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`,
-                    category: "Dépense Opérationnelle",
-                    subCategory: "Sync Spreadsheet"
-                  });
-                }
-              });
-            });
-
-            // Mise à jour finale et unique des états pour garantir l'accumulation
-            setMaintenanceRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...maintenanceList]);
-            setExpenseRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...expensesList]);
-
-            alert(`SYNC TERMINÉE : ${maintenanceList.length} Maintenances et ${expensesList.length} Dépenses récupérées.\nCommentaires (M+N) fusionnés.`);
+            alert(`SYNC TERMINÉE : ${counts.maintenance} Maintenances et ${counts.expenses} Dépenses récupérées.`);
             setIsSyncingMaintenance(false);
           }
         },
@@ -506,7 +648,217 @@ export default function App() {
   useEffect(() => { saveJson(APP_STORAGE_KEYS.pending_ai_tickets, pendingTickets); }, [pendingTickets]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.audit, auditLogs); }, [auditLogs]);
   useEffect(() => { saveJson(APP_STORAGE_KEYS.closings, dailyClosings); }, [dailyClosings]);
-  useEffect(() => { saveJson(APP_STORAGE_KEYS.maintenance, maintenanceRecords); }, [maintenanceRecords]);
+  const processTripsData = (valueRanges) => {
+    if (!valueRanges) return;
+    const driverKeys = [{ c: "AMARA", s: "TRUCK 76" }, { c: "BRAHIMA", s: "TRUCK 45" }, { c: "SORO", s: "TRUCK 52" }];
+    let imported = [];
+
+    valueRanges.forEach((vr, i) => {
+      (vr.values || []).forEach(row => {
+        let isoDate = "";
+        if (row[0]) {
+          const cleanDate = String(row[0]).replace(/^[a-z]+\s+/i, "").toLowerCase();
+          if (cleanDate.includes("/") || cleanDate.includes("-")) {
+            const parts = cleanDate.split(/[\/\-]/);
+            if (parts.length === 3) {
+              let [d, m, y] = parts[0].length === 4 ? [parts[2], parts[1], parts[0]] : [parts[0], parts[1], parts[2]];
+              if (y.length === 2) y = "20" + y;
+              isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
+          } else {
+            const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+            const parts = cleanDate.split(/\s+/);
+            if (parts.length >= 2) {
+              const d = parts[0].padStart(2, '0');
+              let m = "01";
+              const monthStr = parts[1];
+              monthsFr.forEach((name, idx) => { if (monthStr.startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
+              let y = parts[2] || "2026";
+              if (y.length === 2) y = "20" + y;
+              isoDate = `${y}-${m}-${d}`;
+            }
+          }
+        }
+
+        if (!isoDate) return;
+
+        const parseNum = (v) => {
+           if (!v) return 0;
+           let s = String(v).replace(/\s/g, "");
+           if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
+           return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
+        };
+
+        const chauffeur = driverKeys[i].c;
+        let fuel = 0, roadSubTotal = 0, totalExpense = 0, km = 0, tonnage = 0, totalGross = 0;
+        let start = row[1] || "";
+        let destination = row[2] || "";
+
+        if (isoDate >= "2026-02-01") {
+          fuel = parseNum(row[3]);
+          const tolls = parseNum(row[4]);
+          const police = parseNum(row[5]);
+          const food = parseNum(row[6]);
+          const bonus = parseNum(row[7]);
+          roadSubTotal = parseNum(row[8]) || (tolls + police + food + bonus);
+          totalExpense = parseNum(row[9]) || (fuel + roadSubTotal);
+          tonnage = parseNum(row[10]);
+          totalGross = parseNum(row[11]);
+          km = parseNum(row[12]);
+        } else if (isoDate >= "2026-01-01") {
+          if (chauffeur === "AMARA") {
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[9]);
+          } else if (chauffeur === "BRAHIMA") {
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
+            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = parseNum(row[11]);
+          } else { // SORO
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[8]);
+            tonnage = parseNum(row[9]); totalGross = parseNum(row[10]); km = 0;
+          }
+        } else {
+          if (chauffeur === "AMARA") {
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = 0;
+          } else if (chauffeur === "BRAHIMA") {
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
+            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = 0;
+          } else { // SORO
+            fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[10]);
+          }
+        }
+
+        imported.push({
+          id: `gs-${chauffeur}-${isoDate}-${Math.random()}`,
+          date: isoDate, chauffeur, driverLabel: `${chauffeur} ${driverKeys[i].s}`, sdv: driverKeys[i].s,
+          start, destination, fuel_cost_cfa: fuel, road_fees_cfa: roadSubTotal, total_expense_cfa: totalExpense,
+          tonnage, total_gross_cfa: totalGross, total_net_cfa: totalGross - totalExpense,
+          km, tripType: "Google Sheets", comments: `Synchronisé (${isoDate < "2026-01-01" ? '2025' : (isoDate < "2026-02-01" ? 'Jan 2026' : 'Standard')})`,
+          month: new Date(isoDate).getMonth() + 1, year: new Date(isoDate).getFullYear()
+        });
+      });
+    });
+
+    setManualTrips(prev => {
+      const newImportKeys = new Set(imported.map(t => `${t.date}-${t.chauffeur}`));
+      const filteredPrev = prev.filter(t => !newImportKeys.has(`${t.date}-${t.chauffeur}`));
+      return [...filteredPrev, ...imported];
+    });
+    return imported.length;
+  };
+
+  const processMaintenanceData = (rowData) => {
+    if (!rowData) return;
+    let maintenanceList = [];
+    let expensesList = [];
+
+    rowData.forEach((row) => {
+      const values = row.values || [];
+      if (values.length === 0) return;
+      const rowTexts = values.map(v => v?.formattedValue ? String(v.formattedValue) : "");
+      const fullRowContent = rowTexts.join(" ").toLowerCase();
+      const dateRaw = rowTexts[0] || "";
+      if (!dateRaw.includes("26")) return;
+      const amountRaw = rowTexts[8] || "";
+      const driveLink = values[8]?.hyperlink || null;
+      
+      const parseNum = (v) => {
+        let s = String(v).replace(/\s/g, "");
+        const match = s.match(/[\d,.]+/);
+        if (!match) return 0;
+        s = match[0];
+        if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
+        return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
+      };
+      
+      const amount = parseNum(amountRaw);
+      if (amount === 0) return;
+
+      const commentM = rowTexts[12] || "";
+      const commentN = rowTexts[13] || "";
+      let bestComment = `${commentM} ${commentN}`.trim();
+      if (!bestComment) {
+        const possible = rowTexts.slice(2).filter(t => t.length > 3 && t !== amountRaw && t !== dateRaw);
+        bestComment = possible.sort((a, b) => b.length - a.length)[0] || "";
+      }
+      if (!bestComment) return;
+
+      const maintenanceKeywords = ['tire', 'oil', 'repair', 'rod', 'maint', 'spare', 'change', 'garage', 'mechanic', 'mecanic', 'frein', 'brake', 'tube', 'labor', 'filter', 'battery', 'bearing', 'suspension', 'clutch', 'joint', 'gasket', 'alternator', 'starter', 'belt', 'pump', 'radiator', 'shock', 'rim', 'pneu', 'vidange', 'moteur', 'batterie', 'roulement', 'amortisseur', 'embrayage', 'boite', 'pont', 'transmission', 'alternateur', 'demarreur', 'courroie', 'pompe', 'radiateur', 'huil', 'entretien', 'révision', 'revision', 'facture', 'pièce', 'mecanicien', 'main d', 'lavage', 'graissage', 'parallélisme', 'équilibrage', 'valve', 'durite', 'soufflet', 'disque', 'plaquette', 'étrier', 'injecteur'];
+      const isMaintenance = maintenanceKeywords.some(keyword => fullRowContent.includes(keyword)) || fullRowContent.includes('km') || !!driveLink || fullRowContent.includes('http') || fullRowContent.includes('drive.google');
+
+      let isoDate = "2026-01-01";
+      const p = dateRaw.toLowerCase().split(" ");
+      if (p.length >= 3) {
+        const day = p[1].padStart(2, '0');
+        const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
+        let m = "01";
+        monthsFr.forEach((name, idx) => { if (p[2].startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
+        isoDate = `2026-${m}-${day}`;
+      }
+
+      const driverNames = ["AMARA", "BRAHIMA", "SORO"];
+      let detectedDriver = { c: "AMARA", s: "76" };
+      driverNames.forEach(name => {
+        if (fullRowContent.includes(name.toLowerCase())) {
+          if (name === "AMARA") detectedDriver = { c: "AMARA", s: "76" };
+          if (name === "BRAHIMA") detectedDriver = { c: "BRAHIMA", s: "45" };
+          if (name === "SORO") detectedDriver = { c: "SORO", s: "52" };
+        }
+      });
+
+      const detectedRepairType = maintenanceKeywords.find(kw => fullRowContent.includes(kw)) || "Réparation";
+      const driveLinkRegex = /(https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+)/;
+      const foundLink = fullRowContent.match(driveLinkRegex);
+      const finalDriveLink = driveLink || (foundLink ? foundLink[0] : null);
+
+      const payload = {
+        id: `gs-${detectedDriver.c}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+        date: isoDate, amount: amount, description: bestComment || `Maintenance ${detectedRepairType}`,
+        driveLink: finalDriveLink, source: "Google Sheets"
+      };
+
+      if (isMaintenance) {
+        maintenanceList.push({ ...payload, vehicle: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, cost: amount, status: "Completed", repairType: detectedRepairType });
+      } else {
+        expensesList.push({ ...payload, driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, category: "Dépense Opérationnelle", subCategory: "Sync Spreadsheet" });
+      }
+    });
+
+    setMaintenanceRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...maintenanceList]);
+    setExpenseRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...expensesList]);
+    return { maintenance: maintenanceList.length, expenses: expensesList.length };
+  };
+
+  // Fonction de synchronisation silencieuse (sans popup)
+  const performSilentSync = async () => {
+    if (isSyncing || isSyncingMaintenance) return;
+    setIsSyncing(true);
+    setIsSyncingMaintenance(true);
+
+    try {
+      const backendRes = await fetch("/api/gsheets");
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        const tripsCount = processTripsData(data.trips);
+        const maintCount = processMaintenanceData(data.maintenance);
+        console.log(`Auto-sync: ${tripsCount} trajets, ${maintCount.maintenance} maintenances.`);
+      } else {
+        console.warn("Silent sync failed. Ensure Service Account is configured on backend.");
+      }
+    } catch (err) {
+      console.error("Auto-sync error:", err);
+    } finally {
+      setIsSyncing(false);
+      setIsSyncingMaintenance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authUser && !isSyncing && !isSyncingMaintenance) {
+      performSilentSync();
+    }
+  }, [authUser]);
 
   const handleLogout = () => { setAuthUser(null); localStorage.removeItem(APP_STORAGE_KEYS.auth); };
 
@@ -547,161 +899,35 @@ export default function App() {
 
   const syncWithGoogleSheets = async () => {
     if (!window.google?.accounts?.oauth2) {
-      alert("Le module de synchronisation Google n'est pas encore chargé ou est bloqué par votre navigateur (vérifiez les bloqueurs de pub).");
+      alert("Le module de synchronisation Google n'est pas encore chargé.");
       return;
     }
-    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-      alert("ID Client Google non configuré dans l'environnement.");
-      return;
-    }
-
     setIsSyncing(true);
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
         scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
         callback: async (tr) => {
-          if (tr.error) {
-            console.error("Erreur Auth Google:", tr.error);
-            alert("Erreur lors de l'authentification Google.");
-            setIsSyncing(false);
-            return;
-          }
           if (tr.access_token) {
             try {
               const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
               const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O`, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
               const data = await res.json();
-              const driverKeys = [{ c: "AMARA", s: "TRUCK 76" }, { c: "BRAHIMA", s: "TRUCK 45" }, { c: "SORO", s: "TRUCK 52" }];
-              let imported = [];
-
-              data.valueRanges.forEach((vr, i) => {
-                (vr.values || []).forEach(row => {
-                  let isoDate = "";
-                  if (row[0]) {
-                    const cleanDate = String(row[0]).replace(/^[a-z]+\s+/i, "").toLowerCase();
-                    if (cleanDate.includes("/") || cleanDate.includes("-")) {
-                      const parts = cleanDate.split(/[\/\-]/);
-                      if (parts.length === 3) {
-                        let [d, m, y] = parts[0].length === 4 ? [parts[2], parts[1], parts[0]] : [parts[0], parts[1], parts[2]];
-                        if (y.length === 2) y = "20" + y;
-                        isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                      }
-                    } else {
-                      const monthsFr = ["janv", "févr", "mars", "avril", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc"];
-                      const parts = cleanDate.split(/\s+/);
-                      if (parts.length >= 2) {
-                        const d = parts[0].padStart(2, '0');
-                        let m = "01";
-                        const monthStr = parts[1];
-                        monthsFr.forEach((name, idx) => { if (monthStr.startsWith(name)) m = String(idx + 1).padStart(2, '0'); });
-                        let y = parts[2] || "2026";
-                        if (y.length === 2) y = "20" + y;
-                        isoDate = `${y}-${m}-${d}`;
-                      }
-                    }
-                  }
-
-                  if (!isoDate) return;
-
-                  const parseNum = (v) => {
-                     if (!v) return 0;
-                     let s = String(v).replace(/\s/g, "");
-                     if (s.includes(".") && !s.includes(",")) { if (s.split(".").pop().length === 3 || s.length > 5) s = s.replace(/\./g, ""); }
-                     return parseFloat(s.replace(/,/g, ".").replace(/[^0-9.-]/g, "")) || 0;
-                  };
-
-                  const chauffeur = driverKeys[i].c;
-                  let fuel = 0, roadSubTotal = 0, totalExpense = 0, km = 0, tonnage = 0, totalGross = 0;
-                  let start = row[1] || "";
-                  let destination = row[2] || "";
-
-                // MAPPING LOGIC BASED ON DATE AND DRIVER
-                if (isoDate >= "2026-02-01") {
-                  // Format standard 2026 (Février+) - Uniforme pour tous
-                  fuel = parseNum(row[3]);
-                  const tolls = parseNum(row[4]);
-                  const police = parseNum(row[5]);
-                  const food = parseNum(row[6]);
-                  const bonus = parseNum(row[7]);
-                  roadSubTotal = parseNum(row[8]) || (tolls + police + food + bonus);
-                  totalExpense = parseNum(row[9]) || (fuel + roadSubTotal);
-                  tonnage = parseNum(row[10]);
-                  totalGross = parseNum(row[11]);
-                  km = parseNum(row[12]);
-                } else if (isoDate >= "2026-01-01") {
-                  // Janvier 2026 - Spécifique par chauffeur
-                  if (chauffeur === "AMARA") {
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[9]);
-                  } else if (chauffeur === "BRAHIMA") {
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
-                    tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = parseNum(row[11]);
-                  } else { // SORO
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[8]);
-                    tonnage = parseNum(row[9]); totalGross = parseNum(row[10]); km = 0;
-                  }
-                } else {
-                  // Année 2025 - Spécifique par chauffeur
-                  if (chauffeur === "AMARA") {
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = 0;
-                  } else if (chauffeur === "BRAHIMA") {
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
-                    tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = 0;
-                  } else { // SORO
-                    fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-                    tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[10]);
-                  }
-                }
-
-                imported.push({
-                  id: `gs-${chauffeur}-${isoDate}-${Math.random()}`,
-                  date: isoDate, 
-                  chauffeur, 
-                  driverLabel: `${chauffeur} ${driverKeys[i].s}`, 
-                  sdv: driverKeys[i].s,
-                  start,
-                  destination,
-                  fuel_cost_cfa: fuel, 
-                  road_fees_cfa: roadSubTotal, 
-                  total_expense_cfa: totalExpense,
-                  tonnage, 
-                  total_gross_cfa: totalGross,
-                  total_net_cfa: totalGross - totalExpense,
-                  km,
-                  tripType: "Google Sheets",
-                  comments: `Synchronisé (${isoDate < "2026-01-01" ? '2025' : (isoDate < "2026-02-01" ? 'Jan 2026' : 'Standard')})`,
-                  month: new Date(isoDate).getMonth() + 1, 
-                  year: new Date(isoDate).getFullYear()
-                });
-              });
-            });
-            setManualTrips(prev => {
-              // 1. On crée une liste des clés "Date-Chauffeur" qui arrivent de Google Sheets
-              const newImportKeys = new Set(imported.map(t => `${t.date}-${t.chauffeur}`));
-              
-              // 2. On filtre l'ancien état : on garde tout ce qui n'est PAS dans l'import actuel
-              // (Cela écrase les doublons sur la même date pour le même chauffeur)
-              const filteredPrev = prev.filter(t => !newImportKeys.has(`${t.date}-${t.chauffeur}`));
-              
-              return [...filteredPrev, ...imported];
-            });
-            alert(`${imported.length} trajets synchronisés ! Les doublons éventuels ont été écrasés.`);
-            setIsSyncing(false);
+              const count = processTripsData(data.valueRanges);
+              alert(`${count} trajets synchronisés !`);
+              setIsSyncing(false);
             } catch (err) {
-              console.error("Erreur d'analyse des données Google Sheets:", err);
-              alert("Une erreur est survenue pendant la lecture des données Google Sheets.");
+              console.error(err);
+              alert("Erreur lecture Google Sheets.");
               setIsSyncing(false);
             }
           }
         }
       });
       client.requestAccessToken();
-    } catch (e) { 
-      console.error("Sync Error:", e);
-      alert("Une erreur est survenue lors de l'initialisation de la synchro.");
-      setIsSyncing(false); 
+    } catch (e) {
+      console.error(e);
+      setIsSyncing(false);
     }
   };
 
@@ -842,8 +1068,8 @@ export default function App() {
                  t={t}
                  allRecords={manualTrips}
                  />
-                 )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} />}
-              {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={(t) => setManualTrips([...manualTrips, t])} />}
+                 )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} t={t} />}
+              {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={(t) => setManualTrips([...manualTrips, t])} t={t} />}
               {activeSection === "depenses" && (
                 <ExpenseModule 
                   expenses={expenseRecords} 
@@ -852,6 +1078,7 @@ export default function App() {
                   formatCurrency={formatCurrency}
                   onSync={syncMaintenanceAndExpenses}
                   isSyncing={isSyncingMaintenance}
+                  t={t}
                 />
               )}
               {activeSection === "encaissements" && <FinanceWorkspace type="income" records={incomeRecords} setRecords={rolePermissions.canEdit ? setIncomeRecords : null} categories={categories} setCategories={rolePermissions.canEdit ? setCategories : null} />}
@@ -870,7 +1097,7 @@ export default function App() {
                   isSyncing={isSyncingMaintenance}
                   t={t}
                 />
-              )}              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} />}
+              )}              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} t={t} />}
               {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
               {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}
               {activeSection === "admin" && <SmartBulkImporter setTrips={rolePermissions.canEdit ? setManualTrips : null} setAuditLogs={rolePermissions.canEdit ? setAuditLogs : null} />}
@@ -885,9 +1112,10 @@ export default function App() {
                   onClearAllStorage={() => { localStorage.clear(); window.location.reload(); }} 
                   onPurgeTrips={() => setManualTrips([])} 
                   onPurgeRange={handlePurgeRange}
-                  onPurgeMaintenance={onPurgeMaintenance}
-                />
-              )}
+                  onPurgeMaintenance={handlePurgeMaintenance}
+                  t={t}
+                  />
+                  )}
             </div>
           </ErrorBoundary>
         </div>

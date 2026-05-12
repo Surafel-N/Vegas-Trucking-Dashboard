@@ -4,9 +4,10 @@ import { TrendingUp, Package, Maximize2, Hash, ArrowUpRight, BarChart3 } from 'l
 type ActiveTrendsProps = {
   records: any[];
   formatCurrency: (val: number) => string;
+  t: any;
 };
 
-export function ActiveTrends({ records, formatCurrency }: ActiveTrendsProps) {
+export function ActiveTrends({ records, formatCurrency, t }: ActiveTrendsProps) {
   const stats = useMemo(() => {
     if (!records || records.length === 0) {
       return { maxLoad: 0, avgLoad: 0, tripCount: 0, totalLoad: 0 };
@@ -31,36 +32,36 @@ export function ActiveTrends({ records, formatCurrency }: ActiveTrendsProps) {
 
   const cards = [
     {
-      label: "Total Chargé ce Mois",
+      label: t?.totalLoadedMonth || "Total Chargé ce Mois",
       value: `${stats.totalLoad.toFixed(1)} T`,
       icon: TrendingUp,
       color: "text-emerald-400",
       bg: "bg-emerald-400/10",
-      desc: "Volume global mensuel"
+      desc: t?.monthlyVolume || "Volume global mensuel"
     },
     {
-      label: "Charge Max Mensuelle",
+      label: t?.maxMonthlyLoad || "Charge Max Mensuelle",
       value: `${stats.maxLoad.toFixed(1)} T`,
       icon: Maximize2,
       color: "text-orange-400",
       bg: "bg-orange-400/10",
-      desc: "Record de chargement"
+      desc: t?.loadRecord || "Record de chargement"
     },
     {
-      label: "Chargement Moyen",
+      label: t?.averageLoad || "Chargement Moyen",
       value: `${stats.avgLoad.toFixed(1)} T`,
       icon: Package,
       color: "text-blue-400",
       bg: "bg-blue-400/10",
-      desc: "Efficacité par voyage"
+      desc: t?.tripEfficiency || "Efficacité par voyage"
     },
     {
-      label: "Nombre de Voyages",
+      label: t?.numberOfTrips || "Nombre de Voyages",
       value: stats.tripCount,
       icon: Hash,
       color: "text-[#cf5d56]",
       bg: "bg-[#cf5d56]/10",
-      desc: "Jours avec chargement"
+      desc: t?.daysWithLoading || "Jours avec chargement"
     }
   ];
 

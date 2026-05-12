@@ -44,7 +44,7 @@ const initialFormState = {
   manualDriveLink: ""
 };
 
-export default function ExpenseModule({ expenses, setExpenses, drivers, formatCurrency, onSync, isSyncing }) {
+export default function ExpenseModule({ expenses, setExpenses, drivers, formatCurrency, onSync, isSyncing, t }) {
   // Global States
   const [formData, setFormData] = useState(initialFormState);
   const [file, setFile] = useState(null);
@@ -232,9 +232,9 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
           </div>
           <div>
             <h2 className="text-3xl font-black tracking-tighter flex items-center gap-3 uppercase">
-              Dépenses <span className="text-[#cf5d56]">Cloud</span>
+              {t?.cloudExpenses || "Dépenses Cloud"}
             </h2>
-            <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">G.E.D & Archivage Numérique v5.0</p>
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">{t?.gedArchiving || "G.E.D & Archivage Numérique"}</p>
           </div>
         </div>
         
@@ -245,7 +245,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
             className="flex items-center gap-3 px-6 py-3 bg-[#cf5d56] hover:bg-[#cf5d56]/80 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#cf5d56]/20 transition-all active:scale-95"
           >
             {isSyncing ? <RefreshCcw className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-            {isSyncing ? "Sync en cours..." : "Sync Maintenance"}
+            {isSyncing ? (t?.syncingInProgress || "Sync en cours...") : (t?.syncMaintenance || "Sync Maintenance")}
           </button>
           <div className="flex items-center gap-3 px-4 py-3 bg-black/40 rounded-2xl border border-white/5">
             <div className={`size-2 rounded-full ${accessToken ? 'bg-green-500 animate-pulse' : 'bg-white/20'}`} />
@@ -261,14 +261,14 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
         {/* FORM */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl relative overflow-hidden">
-            <h3 className="text-xl font-bold mb-8 flex items-center gap-2"><Plus className="text-[#cf5d56]" /> Saisie Dépense</h3>
+            <h3 className="text-xl font-bold mb-8 flex items-center gap-2"><Plus className="text-[#cf5d56]" /> {t?.expenseEntry || "Saisie Dépense"}</h3>
             <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
               <div className="grid grid-cols-2 gap-4">
                 <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-                <input type="number" required placeholder="Montant" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+                <input type="number" required placeholder={t?.amount || "Montant"} value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
               </div>
               <select required value={formData.driverLabel} onChange={e => setFormData({ ...formData, driverLabel: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]">
-                <option value="">Chauffeur...</option>
+                <option value="">{t?.driver || "Chauffeur"}...</option>
                 {drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.sdv} - {d.name}</option>)}
               </select>
 
@@ -279,7 +279,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                   onChange={e => setFormData({ ...formData, category: e.target.value, subCategory: "" })} 
                   className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]"
                 >
-                  <option value="">Catégorie...</option>
+                  <option value="">{t?.category || "Catégorie"}...</option>
                   {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
 
@@ -290,13 +290,13 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                   onChange={e => setFormData({ ...formData, subCategory: e.target.value })} 
                   className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56] disabled:opacity-30"
                 >
-                  <option value="">Sous-catégorie...</option>
+                  <option value="">{t?.subCategory || "Sous-catégorie"}...</option>
                   {formData.category && CATEGORIES[formData.category].map(sub => <option key={sub} value={sub}>{sub}</option>)}
                 </select>
               </div>
 
               <textarea placeholder="Description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-sm outline-none focus:border-[#cf5d56] min-h-[80px]" />
-              <button type="submit" className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-4 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest">Valider</button>
+              <button type="submit" className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-4 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest">{t?.validate || "Valider"}</button>
             </form>
           </div>
         </div>
@@ -305,10 +305,10 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl min-h-[600px] flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-              <h3 className="text-xl font-bold">Historique Archivé</h3>
+              <h3 className="text-xl font-bold">{t?.archivedHistory || "Historique Archivé"}</h3>
               <div className="flex items-center gap-3">
-                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">Tous les mois</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">Tous les chauffeurs</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">{t?.allMonths || "Tous les mois"}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">{t?.allDrivers || "Tous les chauffeurs"}</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
               </div>
             </div>
 
@@ -321,11 +321,11 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                         {selectedExpenses.length === filteredExpenses.length && filteredExpenses.length > 0 ? <CheckSquare className="size-4 text-[#cf5d56]" /> : <Square className="size-4" />}
                       </button>
                     </th>
-                    <th className="pb-4">Identification</th>
-                    <th className="pb-4">Description</th>
-                    <th className="pb-4 text-right">Montant</th>
+                    <th className="pb-4">{t?.identification || "Identification"}</th>
+                    <th className="pb-4">{t?.comments || "Description"}</th>
+                    <th className="pb-4 text-right">{t?.amount || "Montant"}</th>
                     <th className="pb-4 text-center">G.E.D</th>
-                    <th className="pb-4 pr-6 text-right">Action</th>
+                    <th className="pb-4 pr-6 text-right">{t?.actions || "Action"}</th>
                   </tr>
                 </thead>
                 <tbody>

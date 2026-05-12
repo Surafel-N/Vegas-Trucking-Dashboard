@@ -5,7 +5,7 @@ type OperationalAlertsProps = {
   records: any[];
 };
 
-export function OperationalAlerts({ records }: OperationalAlertsProps) {
+export function OperationalAlerts({ records, t }: OperationalAlertsProps) {
   const alerts = useMemo(() => {
     const list: { id: string; type: 'critical' | 'warning' | 'info'; title: string; desc: string; date?: string }[] = [];
 
@@ -14,8 +14,8 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
       list.push({
         id: `neg-${r.id}`,
         type: 'critical',
-        title: "Marge Négative",
-        desc: `${r.driverLabel}: Perte de ${Math.abs(r.total_net_cfa).toLocaleString()} CFA`,
+        title: t?.negativeMargin || "Marge Négative",
+        desc: `${r.driverLabel}: ${t?.lossOf || "Perte de"} ${Math.abs(r.total_net_cfa).toLocaleString()} CFA`,
         date: r.date
       });
     });
@@ -25,7 +25,7 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
       list.push({
         id: `fuel-${r.id}`,
         type: 'warning',
-        title: "Fuel sans Tonnage",
+        title: t?.fuelWithoutTonnage || "Fuel sans Tonnage",
         desc: `${r.driverLabel}: ${r.fuel_cost_cfa.toLocaleString()} CFA sans voyage.`,
         date: r.date
       });
@@ -35,13 +35,15 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
       list.push({
         id: 'summary-1',
         type: 'info',
-        title: "Activité",
-        desc: `${records.length} opérations enregistrées.`,
+        title: t?.activitySummary || "Activité",
+        desc: `${records.length} ${t?.operationsRecorded || "opérations enregistrées"}.`,
       });
     }
 
     return list.sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 10);
-  }, [records]);
+  }, [records, t]);
+
+  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 
   return (
     <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-full flex flex-col">
@@ -50,8 +52,8 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
           <ShieldAlert className="size-5" />
         </div>
         <div>
-           <h3 className="text-sm font-black uppercase tracking-tighter">Alertes Flotte</h3>
-           <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">Surveillance Active</p>
+           <h3 className="text-sm font-black uppercase tracking-tighter">{t?.fleetAlerts || "Alertes Flotte"}</h3>
+           <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">{t?.activeMonitoring || "Surveillance Active"}</p>
         </div>
       </div>
 
@@ -76,7 +78,7 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
                   'text-blue-300'
                 }`}>{alert.title}</h4>
                 <p className="text-[11px] text-white/40 mt-1 leading-relaxed font-medium">{alert.desc}</p>
-                {alert.date && <p className="text-[9px] font-black uppercase text-white/10 mt-2 tracking-tighter">{new Date(alert.date).toLocaleDateString('fr-FR')}</p>}
+                {alert.date && <p className="text-[9px] font-black uppercase text-white/10 mt-2 tracking-tighter">{new Date(alert.date).toLocaleDateString(locale)}</p>}
               </div>
             </div>
           </div>
@@ -85,7 +87,7 @@ export function OperationalAlerts({ records }: OperationalAlertsProps) {
         {alerts.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-white/10 italic">
             <CheckCircle2 className="size-10 mb-2 opacity-50" />
-            <p className="text-xs font-bold uppercase tracking-widest">Zéro anomalies</p>
+            <p className="text-xs font-bold uppercase tracking-widest">{t?.zeroAnomalies || "Zéro anomalies"}</p>
           </div>
         )}
       </div>

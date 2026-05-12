@@ -1,22 +1,22 @@
 import { Activity, CalendarDays, CircleDollarSign, Truck } from "lucide-react";
 
-export function FleetStatus({ totalTrips, activeDays, profitableTrips, driverLabel, profitMargin }) {
+export function FleetStatus({ totalTrips, activeDays, profitableTrips, driverLabel, profitMargin, t }) {
   const items = [
     {
-      label: "Jours d'Activité",
+      label: t?.activeDays || "Jours d'Activité",
       value: activeDays,
       icon: CalendarDays,
       accent: "bg-white/5 text-white/60",
     },
     {
-      label: "Voyages Profitables",
+      label: t?.profitableTrips || "Voyages Profitables",
       value: profitableTrips,
       icon: CircleDollarSign,
       accent: "bg-[#9fe3b9]/10 text-[#9fe3b9]",
     },
-  ];
+    ];
 
-  return (
+    return (
     <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-full flex flex-col justify-between">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3 mb-4">
@@ -24,12 +24,12 @@ export function FleetStatus({ totalTrips, activeDays, profitableTrips, driverLab
               <Truck className="size-5" />
            </div>
            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#cf5d56] leading-none mb-1">Résumé Flotte</p>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#cf5d56] leading-none mb-1">{t?.fleetSummary || "Résumé Flotte"}</p>
               <h3 className="text-xl font-black tracking-tighter uppercase italic">{driverLabel}</h3>
            </div>
         </div>
         <div className="inline-block w-fit rounded-full border border-white/5 bg-white/5 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/40">
-          Marge Opérationnelle: <span className="text-white ml-1">{profitMargin}</span>
+          {t?.opMargin || "Marge Opérationnelle"}: <span className="text-white ml-1">{profitMargin}</span>
         </div>
       </div>
 
@@ -51,8 +51,8 @@ export function FleetStatus({ totalTrips, activeDays, profitableTrips, driverLab
 
       <div className="mt-6 flex items-center gap-3 rounded-[25px] border border-[#cf5d56]/10 bg-[#cf5d56]/5 p-4 text-[11px] font-medium text-white/40">
         <div className="size-2 rounded-full bg-[#cf5d56] animate-pulse" />
-        Focus Actuel: <span className="font-black text-white uppercase tracking-tighter">{driverLabel}</span>
+        {t?.currentFocus || "Focus Actuel"}: <span className="font-black text-white uppercase tracking-tighter">{driverLabel}</span>
       </div>
     </section>
-  );
-}
+    );
+    }

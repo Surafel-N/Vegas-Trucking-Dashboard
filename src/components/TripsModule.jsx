@@ -14,7 +14,7 @@ const EMPTY_TRIP = {
   comment: "",
 };
 
-export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onAddTrip: onCreateTrip }) {
+export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onAddTrip: onCreateTrip, t }) {
   const [form, setForm] = useState(EMPTY_TRIP);
 
   const enrichedTrips = useMemo(
@@ -25,6 +25,8 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
       })),
     [trips, expenses, incomes],
   );
+
+  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 
   // Dynamic Columns Detection from metadata (customExpenses)
   const dynamicKeys = useMemo(() => {
@@ -69,28 +71,28 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
     <section className="space-y-6">
       {canWrite && (
         <section className="rounded-[30px] border border-white/8 bg-[#161616] p-6 text-white shadow-xl">
-          <h3 className="text-xl font-semibold tracking-tight">Ajouter un trajet manuel</h3>
+          <h3 className="text-xl font-semibold tracking-tight">{t?.addManualTrip || "Ajouter un trajet manuel"}</h3>
           <form onSubmit={submitTrip} className="mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             <input type="date" value={form.date} onChange={e => updateField("date", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
             <select value={form.driverId} onChange={e => updateField("driverId", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]">
-              <option value="">Chauffeur...</option>
+              <option value="">{t?.driver || "Chauffeur"}...</option>
               {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
-            <input placeholder="Départ" value={form.start} onChange={e => updateField("start", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <input placeholder="Destination" value={form.destination} onChange={e => updateField("destination", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <input placeholder="Distance (KM)" type="number" value={form.distanceKm} onChange={e => updateField("distanceKm", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <input placeholder="Volume (T)" type="number" value={form.volume} onChange={e => updateField("volume", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <input placeholder="Revenu" type="number" value={form.amount} onChange={e => updateField("amount", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <input placeholder="Dépenses directes" type="number" value={form.directExpense} onChange={e => updateField("directExpense", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
-            <button type="submit" className="md:col-span-3 xl:col-span-2 rounded-xl bg-[#cf5d56] font-bold text-white transition hover:brightness-110">Ajouter</button>
+            <input placeholder={t?.start || "Départ"} value={form.start} onChange={e => updateField("start", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder={t?.destination || "Destination"} value={form.destination} onChange={e => updateField("destination", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder={`${t?.distance || "Distance"} (KM)`} type="number" value={form.distanceKm} onChange={e => updateField("distanceKm", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder={`${t?.tonnage || "Volume"} (T)`} type="number" value={form.volume} onChange={e => updateField("volume", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder={t?.revenue || "Revenu"} type="number" value={form.amount} onChange={e => updateField("amount", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <input placeholder={t?.directExpenses || "Dépenses directes"} type="number" value={form.directExpense} onChange={e => updateField("directExpense", e.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-[#cf5d56]" />
+            <button type="submit" className="md:col-span-3 xl:col-span-2 rounded-xl bg-[#cf5d56] font-bold text-white transition hover:brightness-110">{t?.add || "Ajouter"}</button>
           </form>
         </section>
       )}
 
       <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,#161616_0%,#101010_100%)] p-5 text-white shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold tracking-tight">Journal de Bord & Comptabilité Dynamique</h3>
-          <span className="text-[10px] uppercase tracking-widest text-white/30 bg-white/5 px-3 py-1 rounded-full border border-white/10">Colonnes intelligentes actives</span>
+          <h3 className="text-xl font-semibold tracking-tight">{t?.logbook || "Journal de Bord & Comptabilité Dynamique"}</h3>
+          <span className="text-[10px] uppercase tracking-widest text-white/30 bg-white/5 px-3 py-1 rounded-full border border-white/10">{t?.smartColumns || "Colonnes intelligentes actives"}</span>
         </div>
         
         <div className="mt-4 overflow-hidden rounded-[22px] border border-white/8">
@@ -98,31 +100,31 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
             <table className="min-w-max border-separate border-spacing-0 table-fixed">
               <thead className="sticky top-0 bg-black/80 backdrop-blur-md text-left text-[10px] uppercase tracking-widest text-white/40">
                 <tr>
-                  <th className="px-4 py-4 w-28 sticky left-0 bg-black z-10 border-r border-white/5">Date</th>
-                  <th className="px-4 py-4 w-40">Chauffeur</th>
-                  <th className="px-4 py-4 w-60">Trajet</th>
-                  <th className="px-4 py-4 w-24 text-center">Tonnage</th>
+                  <th className="px-4 py-4 w-28 sticky left-0 bg-black z-10 border-r border-white/5">{t?.date || "Date"}</th>
+                  <th className="px-4 py-4 w-40">{t?.driver || "Chauffeur"}</th>
+                  <th className="px-4 py-4 w-60">{t?.trips || "Trajet"}</th>
+                  <th className="px-4 py-4 w-24 text-center">{t?.tonnage || "Tonnage"}</th>
                   <th className="px-4 py-4 w-24 text-center">KM</th>
                   
                   {/* Core Base Column */}
-                  <th className="px-4 py-4 w-32 text-right">Fuel (Base)</th>
+                  <th className="px-4 py-4 w-32 text-right">{t?.fuel || "Fuel"} (Base)</th>
                   
                   {/* Dynamic Columns from Custom Expenses */}
                   {dynamicKeys.map(key => (
                     <th key={key} className="px-4 py-4 w-32 text-right text-[#61d2c0] bg-white/[0.02] italic">{key}</th>
                   ))}
 
-                  <th className="px-4 py-4 w-32 text-right bg-white/5 font-bold text-white border-l border-white/10">Total Exp</th>
-                  <th className="px-4 py-4 w-32 text-right bg-[#61d2c0]/10 font-bold text-[#61d2c0]">Brut (CA)</th>
-                  <th className="px-4 py-4 w-32 text-right bg-[#9fe3b9]/10 font-bold text-[#9fe3b9]">Net (Profit)</th>
-                  <th className="px-4 py-4 w-80">Commentaires</th>
+                  <th className="px-4 py-4 w-32 text-right bg-white/5 font-bold text-white border-l border-white/10">{t?.totalExp || "Total Exp"}</th>
+                  <th className="px-4 py-4 w-32 text-right bg-[#61d2c0]/10 font-bold text-[#61d2c0]">{t?.brut || "Brut (CA)"}</th>
+                  <th className="px-4 py-4 w-32 text-right bg-[#9fe3b9]/10 font-bold text-[#9fe3b9]">{t?.net || "Net (Profit)"}</th>
+                  <th className="px-4 py-4 w-80">{t?.comments || "Commentaires"}</th>
                 </tr>
               </thead>
               <tbody className="text-[12px] text-white/70">
                 {enrichedTrips.map((trip) => {
                   const format = (v) => {
                     if (typeof v !== "number") return v || "-";
-                    return v.toLocaleString('fr-FR');
+                    return v.toLocaleString(locale);
                   };
                   return (
                     <tr key={trip.id} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors group">

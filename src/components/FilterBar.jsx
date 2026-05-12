@@ -19,7 +19,8 @@ export function FilterBar({
   onStartDateChange,
   onEndDateChange,
   onReset,
-  onClearAllStorage
+  onClearAllStorage,
+  t
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -39,13 +40,13 @@ export function FilterBar({
             className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-white/10"
           >
             {isOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-            {isOpen ? "Fermer" : "Filtres"}
+            {isOpen ? (t?.reduce || "Fermer") : (t?.settings || "Filtres")}
           </button>
 
           <button
             type="button"
             onClick={onReset}
-            title="Réinitialiser"
+            title={t?.save || "Réinitialiser"}
             className="rounded-lg border border-white/10 bg-white/4 p-1.5 text-white/74 transition hover:bg-white/8"
           >
             <RotateCcw className="size-3.5" />
@@ -55,7 +56,7 @@ export function FilterBar({
 
       <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 ${isOpen ? 'grid' : 'hidden'}`}>
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Chauffeur</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.driver || "Chauffeur"}</span>
           <div className="relative">
             <UserRound className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
             <select
@@ -69,9 +70,10 @@ export function FilterBar({
         </label>
 
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Mois</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.income || "Mois"}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {months.map((m) => {
+              const allMonthsLabel = t?.allMonths || "Tous les mois";
               const isSelected = Array.isArray(month) ? month.includes(String(m.value)) : month === String(m.value);
               return (
                 <button
@@ -79,16 +81,16 @@ export function FilterBar({
                   onClick={() => {
                     let newMonths;
                     const val = String(m.value);
-                    if (val === "Tous les mois") {
-                      newMonths = ["Tous les mois"];
+                    if (val === allMonthsLabel || val === "Tous les mois") {
+                      newMonths = [allMonthsLabel];
                     } else {
-                      const current = Array.isArray(month) ? month.filter(v => v !== "Tous les mois") : [];
+                      const current = Array.isArray(month) ? month.filter(v => v !== allMonthsLabel && v !== "Tous les mois") : [];
                       if (current.includes(val)) {
                         newMonths = current.filter(v => v !== val);
                       } else {
                         newMonths = [...current, val];
                       }
-                      if (newMonths.length === 0) newMonths = ["Tous les mois"];
+                      if (newMonths.length === 0) newMonths = [allMonthsLabel];
                     }
                     onMonthChange(newMonths);
                   }}
@@ -106,25 +108,26 @@ export function FilterBar({
         </div>
 
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Années</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.allYears || "Années"}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {years.map((y) => {
+              const allYearsLabel = t?.allYears || "Toutes les années";
               const isSelected = Array.isArray(year) ? year.includes(y) : year === y;
               return (
                 <button
                   key={y}
                   onClick={() => {
                     let newYears;
-                    if (y === "Toutes les années") {
-                      newYears = ["Toutes les années"];
+                    if (y === allYearsLabel || y === "Toutes les années") {
+                      newYears = [allYearsLabel];
                     } else {
-                      const current = Array.isArray(year) ? year.filter(v => v !== "Toutes les années") : [];
+                      const current = Array.isArray(year) ? year.filter(v => v !== allYearsLabel && v !== "Toutes les années") : [];
                       if (current.includes(y)) {
                         newYears = current.filter(v => v !== y);
                       } else {
                         newYears = [...current, y];
                       }
-                      if (newYears.length === 0) newYears = ["Toutes les années"];
+                      if (newYears.length === 0) newYears = [allYearsLabel];
                     }
                     onYearChange(newYears);
                   }}
@@ -134,7 +137,7 @@ export function FilterBar({
                       : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {y === "Toutes les années" ? "ALL" : y}
+                  {y === allYearsLabel || y === "Toutes les années" ? "ALL" : y}
                 </button>
               );
             })}
@@ -142,7 +145,7 @@ export function FilterBar({
         </div>
 
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Destination</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.destination || "Destination"}</span>
           <select
             value={destination}
             onChange={(e) => onDestinationChange(e.target.value)}
@@ -151,6 +154,7 @@ export function FilterBar({
             {destinations.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>
+...
 
         <label className="space-y-1">
           <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Début</span>
