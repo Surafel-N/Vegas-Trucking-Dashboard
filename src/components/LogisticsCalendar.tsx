@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, CalendarDays, ChevronUp, ChevronDown, TrendingUp, Grid2X2, Calendar as MonthIcon } from "lucide-react";
+import { ALL_CHAUFFEURS, ALL_MONTHS, ALL_YEARS } from "../lib/dashboard";
 
 export function LogisticsCalendar({ 
   records, 
@@ -40,11 +41,11 @@ export function LogisticsCalendar({
 
   // Filtrage des records par chauffeur
   const filteredRecords = useMemo(() => {
-    const allLabel = t?.allDrivers || "Tous les chauffeurs";
-    return selectedChauffeur === allLabel || selectedChauffeur === "Tous"
+    const chauffeurVal = String(selectedChauffeur || "").trim();
+    return chauffeurVal === ALL_CHAUFFEURS
       ? records 
-      : records.filter(r => String(r.driverLabel || "").trim() === String(selectedChauffeur).trim());
-  }, [records, selectedChauffeur, t]);
+      : records.filter(r => String(r.driverLabel || "").trim() === chauffeurVal);
+  }, [records, selectedChauffeur]);
 
   // Activité pour la vue MENSUELLE
   const activityMap = useMemo(() => {
@@ -114,21 +115,19 @@ export function LogisticsCalendar({
   const toggleMonthSelection = (mIdx) => {
       const val = String(mIdx);
       let newMonths;
-      const allMonthsLabel = t?.allMonths || "Tous les mois";
-      const current = selectedMonths.filter(v => v !== allMonthsLabel);
+      const current = selectedMonths.filter(v => v !== ALL_MONTHS);
       if (current.includes(val)) newMonths = current.filter(v => v !== val);
       else newMonths = [...current, val];
-      if (newMonths.length === 0) newMonths = [allMonthsLabel];
+      if (newMonths.length === 0) newMonths = [ALL_MONTHS];
       onSelection('month', newMonths);
   };
 
   const toggleYearSelection = (yStr) => {
       let newYears;
-      const allYearsLabel = t?.allYears || "Toutes les années";
-      const current = selectedYears.filter(v => v !== allYearsLabel);
+      const current = selectedYears.filter(v => v !== ALL_YEARS);
       if (current.includes(yStr)) newYears = current.filter(v => v !== yStr);
       else newYears = [...current, yStr];
-      if (newYears.length === 0) newYears = [allYearsLabel];
+      if (newYears.length === 0) newYears = [ALL_YEARS];
       onSelection('year', newYears);
   };
 
@@ -168,12 +167,11 @@ export function LogisticsCalendar({
 
       {/* Sélecteur Chauffeur */}
       <div className="flex gap-1 overflow-x-auto no-scrollbar mb-4 bg-black/20 p-1 rounded-xl border border-white/5">
-        {(chauffeurOptions || ["Tous"]).map((name) => {
-          const allLabel = t?.allDrivers || "Tous les chauffeurs";
-          const isSelected = selectedChauffeur === name || (name === "Tous" && selectedChauffeur === allLabel);
+        {(chauffeurOptions || [ALL_CHAUFFEURS]).map((name) => {
+          const isSelected = selectedChauffeur === name;
           return (
-            <button key={name} onClick={() => onChauffeurChange(name === "Tous" ? allLabel : name)}
-              className={`px-3 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-widest transition-all ${isSelected ? "bg-[#cf5d56] text-white shadow-md" : "text-white/30 hover:bg-white/5"}`}>{name === "Tous" || name === allLabel ? (t?.fleet || "Flotte") : name.split(' ')[0]}</button>
+            <button key={name} onClick={() => onChauffeurChange(name)}
+              className={`px-3 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-widest transition-all ${isSelected ? "bg-[#cf5d56] text-white shadow-md" : "text-white/30 hover:bg-white/5"}`}>{name === ALL_CHAUFFEURS ? (t?.fleet || "Flotte") : name.split(' ')[0]}</button>
           );
         })}
       </div>

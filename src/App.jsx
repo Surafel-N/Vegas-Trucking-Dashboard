@@ -594,7 +594,7 @@ export default function App() {
   ], [manualTrips]);
   const [chauffeur, setChauffeur] = useState(ALL_CHAUFFEURS);
   const [month, setMonth] = useState([ALL_MONTHS]);
-  const [year, setYear] = useState(["2026"]);
+  const [year, setYear] = useState([ALL_YEARS]);
   const [destination, setDestination] = useState(ALL_DESTINATIONS);
   const [selectedDates, setSelectedDates] = useState([]); // Nouveau: Liste de jours précis
 
@@ -605,7 +605,8 @@ export default function App() {
 
   const filteredData = useMemo(() => {
     return trips.filter(t => {
-      const cMatch = chauffeur === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === String(chauffeur).trim();
+      const chauffeurVal = String(chauffeur || "").trim();
+      const cMatch = chauffeurVal === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === chauffeurVal;
       
       // Multi-Mois
       const mMatch = month.includes(ALL_MONTHS) || month.length === 0 || month.includes(String(t.month));
@@ -623,7 +624,8 @@ export default function App() {
 
   const calendarData = useMemo(() => {
     return trips.filter(t => {
-      const cMatch = chauffeur === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === String(chauffeur).trim();
+      const chauffeurVal = String(chauffeur || "").trim();
+      const cMatch = chauffeurVal === ALL_CHAUFFEURS || String(t.driverLabel || "").trim() === chauffeurVal;
       const yMatch = year.includes(ALL_YEARS) || year.length === 0 || year.includes(String(t.year));
       return cMatch && yMatch;
     });
@@ -781,7 +783,6 @@ export default function App() {
       const rowTexts = values.map(v => v?.formattedValue ? String(v.formattedValue) : "");
       const fullRowContent = rowTexts.join(" ").toLowerCase();
       const dateRaw = rowTexts[0] || "";
-      if (!dateRaw.includes("26")) return;
       const amountRaw = rowTexts[8] || "";
       const driveLink = values[8]?.hyperlink || null;
       
@@ -991,8 +992,8 @@ export default function App() {
     setMaintenanceRecords(prev => prev.filter(m => {
       const [y, mStr, d] = m.date.split("-");
       const matchYear = String(y) === String(targetYear);
-      const matchMonth = targetMonth === "Tous" || String(mStr) === String(targetMonth);
-      const matchDay = targetDay === "Tous" || String(d) === String(targetDay);
+      const matchMonth = targetMonth === ALL_MONTHS || String(mStr) === String(targetMonth);
+      const matchDay = targetDay === ALL_MONTHS || String(d) === String(targetDay);
       return !(matchYear && matchMonth && matchDay);
     }));
     
@@ -1000,8 +1001,8 @@ export default function App() {
       if (e.source !== "Google Sheets") return true;
       const [y, mStr, d] = e.date.split("-");
       const matchYear = String(y) === String(targetYear);
-      const matchMonth = targetMonth === "Tous" || String(mStr) === String(targetMonth);
-      const matchDay = targetDay === "Tous" || String(d) === String(targetDay);
+      const matchMonth = targetMonth === ALL_MONTHS || String(mStr) === String(targetMonth);
+      const matchDay = targetDay === ALL_MONTHS || String(d) === String(targetDay);
       return !(matchYear && matchMonth && matchDay);
     }));
     alert("Maintenance purgée.");

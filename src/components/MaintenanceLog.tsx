@@ -92,7 +92,11 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
     }
   };
 
-  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+  const formatDate = (dateStr: string, options?: Intl.DateTimeFormatOptions) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(locale, options);
+  };
 
   return (
     <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-[500px] flex flex-col relative">
@@ -152,7 +156,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="flex justify-between items-center mb-1">
                     <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest truncate">{item.vehicle || item.driverLabel}</p>
-                    <p className="text-[9px] font-bold text-white/20 uppercase">{new Date(item.date).toLocaleDateString(locale)}</p>
+                    <p className="text-[9px] font-bold text-white/20 uppercase">{formatDate(item.date)}</p>
                   </div>
                   <h4 className="text-xs font-black text-white truncate">{item.description}</h4>
                   <div className="flex justify-between items-center mt-1">
@@ -192,7 +196,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
                 <div className="space-y-4 bg-white/5 p-6 rounded-[32px] border border-white/5">
                   <div className="flex items-center gap-3 text-white/60">
                     <Calendar className="size-4 text-[#cf5d56]" />
-                    <span className="text-sm font-bold">{new Date(selectedRecord.date).toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <span className="text-sm font-bold">{formatDate(selectedRecord.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Banknote className="size-5 text-[#9fe3b9]" />

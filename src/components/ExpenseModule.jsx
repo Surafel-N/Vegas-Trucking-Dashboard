@@ -21,6 +21,7 @@ import {
   XCircle,
   Settings2
 } from 'lucide-react';
+import { ALL_CHAUFFEURS, ALL_MONTHS } from '../lib/dashboard';
 
 const CATEGORIES = {
   "Entretien": ["Pneus", "Vidange", "Freins", "Moteur", "Carrosserie"],
@@ -142,13 +143,13 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
   };
 
   // 4. Filters
-  const [filterMonth, setFilterMonth] = useState('ALL');
-  const [filterDriver, setFilterDriver] = useState('ALL');
+  const [filterMonth, setFilterMonth] = useState(ALL_MONTHS);
+  const [filterDriver, setFilterDriver] = useState(ALL_CHAUFFEURS);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
-      const matchMonth = filterMonth === 'ALL' || (e.date && e.date.startsWith(filterMonth));
-      const matchDriver = filterDriver === 'ALL' || e.driverLabel === filterDriver;
+      const matchMonth = filterMonth === ALL_MONTHS || (e.date && e.date.startsWith(filterMonth));
+      const matchDriver = filterDriver === ALL_CHAUFFEURS || e.driverLabel === filterDriver;
       return matchMonth && matchDriver;
     });
   }, [expenses, filterMonth, filterDriver]);
@@ -307,8 +308,8 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
               <h3 className="text-xl font-bold">{t?.archivedHistory || "Historique Archivé"}</h3>
               <div className="flex items-center gap-3">
-                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">{t?.allMonths || "Tous les mois"}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value="ALL">{t?.allDrivers || "Tous les chauffeurs"}</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_MONTHS}>{t?.allMonths || "Tous les mois"}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_CHAUFFEURS}>{t?.allDrivers || "Tous les chauffeurs"}</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
               </div>
             </div>
 

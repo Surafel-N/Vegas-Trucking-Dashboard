@@ -4,6 +4,7 @@ import {
   Image as ImageIcon, ExternalLink, Sparkles, Loader2, CheckCircle2,
   FolderOpen, Eye, FileText, RotateCcw
 } from 'lucide-react';
+import { ALL_CHAUFFEURS } from '../lib/dashboard';
 
 export function MaintenanceAdminModule({ 
   records = [], 
@@ -320,18 +321,24 @@ export function MaintenanceAdminModule({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-white/[0.01]">
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Date</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? 'Véhicule' : 'Chauffeur'}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Description</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Coût</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.date || "Date"}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? (t?.vehicle || 'Véhicule') : (t?.driver || 'Chauffeur')}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.comments || "Description"}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.amount || "Coût"}</th>
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Preuves / Photos</th>
               <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {displayRecords.sort((a,b) => b.date.localeCompare(a.date)).map(row => (
+            {displayRecords.sort((a,b) => b.date.localeCompare(a.date)).map(row => {
+              const rowDate = new Date(row.date);
+              const formattedDate = !isNaN(rowDate.getTime()) 
+                ? rowDate.toLocaleDateString(t?.months?.[0] === "January" ? "en-US" : "fr-FR")
+                : row.date;
+
+              return (
               <tr key={row.id} className="hover:bg-white/[0.02] transition-colors group">
-                <td className="px-6 py-4 text-xs font-bold text-white/70">{new Date(row.date).toLocaleDateString('fr-FR')}</td>
+                <td className="px-6 py-4 text-xs font-bold text-white/70">{formattedDate}</td>
                 <td className="px-6 py-4 text-xs font-black text-orange-500">{row.vehicle || row.driverLabel}</td>
                 <td className="px-6 py-4 text-xs text-white/50">{row.description}</td>
                 <td className="px-6 py-4 text-xs font-black text-white">{(row.cost || row.amount || 0).toLocaleString()} CFA</td>
@@ -393,7 +400,8 @@ export function MaintenanceAdminModule({
                   <button onClick={() => handleDelete(row.id)} className="p-2 text-white/10 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><Trash2 className="size-4" /></button>
                 </td>
               </tr>
-            ))}
+            );
+          })}
           </tbody>
         </table>
       </section>

@@ -40,7 +40,10 @@ import {
   getDashboardMetrics,  formatCurrency, 
   formatCompactNumber, 
   formatTonnage, 
-  formatPercent 
+  formatPercent,
+  ALL_CHAUFFEURS,
+  ALL_MONTHS,
+  ALL_YEARS
 } from "../lib/dashboard";
 import type { DashboardSummary } from "../utils/types";
 import { FilterBar } from "./FilterBar";
@@ -115,14 +118,14 @@ export function Dashboard({
           const yFilter = filterProps?.year || [];
           const mFilter = filterProps?.month || [];
           
-          const yMatch = yFilter.includes(t?.allYears || "Toutes les années") || yFilter.includes(String(rDate.getFullYear()));
-          const mMatch = mFilter.includes(t?.allMonths || "Tous les mois") || mFilter.includes(String(rDate.getMonth() + 1));
+          const yMatch = yFilter.includes(ALL_YEARS) || yFilter.includes(String(rDate.getFullYear()));
+          const mMatch = mFilter.includes(ALL_MONTHS) || mFilter.includes(String(rDate.getMonth() + 1));
           dateMatch = yMatch && mMatch;
       }
 
       // Filtre Chauffeur/Véhicule
       let chauffeurMatch = true;
-      if (selectedChauffeur !== (t?.allDrivers || "Tous les chauffeurs")) {
+      if (selectedChauffeur !== ALL_CHAUFFEURS) {
         chauffeurMatch = r.vehicle.includes(selectedChauffeur.split(' ')[2]) || r.vehicle.includes(selectedChauffeur.split(' ')[0]);
       }
       
@@ -179,7 +182,7 @@ export function Dashboard({
       }
   };
 
-  const isAllYears = Array.isArray(filterProps?.year) && filterProps.year.includes("Toutes les années");
+  const isAllYears = Array.isArray(filterProps?.year) && filterProps.year.includes(ALL_YEARS);
 
   return (
     <div className="flex flex-col gap-4 w-full h-full pb-6 font-sans antialiased text-white relative">
@@ -278,7 +281,7 @@ export function Dashboard({
                   const dProfit = driverData.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
                   const dTonnage = driverData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
                   return (
-                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? (t?.allDrivers || "Tous les chauffeurs") : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
+                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? ALL_CHAUFFEURS : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
                       <div className="flex justify-between items-start mb-4"><div className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${isActive ? 'bg-black text-white' : 'bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20'}`}>{label.split(' ')[2]}</div><ArrowUpRight className={`size-4 transition-colors ${isActive ? 'text-white' : 'text-white/20'}`} /></div>
                       <div><p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${isActive ? 'text-black/60' : 'text-[#cf5d56]'}`}>UNIT {label.split(' ')[2]}</p><h4 className={`text-base font-black truncate mb-4 tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>{label.split(' ')[0]}</h4></div>
                       <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit, currency)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>

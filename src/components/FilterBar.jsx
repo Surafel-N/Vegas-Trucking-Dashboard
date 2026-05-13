@@ -1,5 +1,6 @@
 import { CalendarRange, Filter, RotateCcw, UserRound, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { ALL_CHAUFFEURS, ALL_MONTHS, ALL_YEARS, ALL_DESTINATIONS } from "../lib/dashboard";
 
 export function FilterBar({
   chauffeurs,
@@ -64,7 +65,7 @@ export function FilterBar({
               onChange={(e) => onChauffeurChange(e.target.value)}
               className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] pl-9 pr-4 text-xs text-white outline-none transition focus:border-[#cf5d56]"
             >
-              {chauffeurs.map((c) => <option key={c} value={c}>{c}</option>)}
+              {chauffeurs.map((c) => <option key={c} value={c}>{c === ALL_CHAUFFEURS ? (t?.allDrivers || "Tous les chauffeurs") : c}</option>)}
             </select>
           </div>
         </label>
@@ -73,7 +74,6 @@ export function FilterBar({
           <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.income || "Mois"}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {months.map((m) => {
-              const allMonthsLabel = t?.allMonths || "Tous les mois";
               const isSelected = Array.isArray(month) ? month.includes(String(m.value)) : month === String(m.value);
               return (
                 <button
@@ -81,16 +81,16 @@ export function FilterBar({
                   onClick={() => {
                     let newMonths;
                     const val = String(m.value);
-                    if (val === allMonthsLabel || val === "Tous les mois") {
-                      newMonths = [allMonthsLabel];
+                    if (val === ALL_MONTHS) {
+                      newMonths = [ALL_MONTHS];
                     } else {
-                      const current = Array.isArray(month) ? month.filter(v => v !== allMonthsLabel && v !== "Tous les mois") : [];
+                      const current = Array.isArray(month) ? month.filter(v => v !== ALL_MONTHS) : [];
                       if (current.includes(val)) {
                         newMonths = current.filter(v => v !== val);
                       } else {
                         newMonths = [...current, val];
                       }
-                      if (newMonths.length === 0) newMonths = [allMonthsLabel];
+                      if (newMonths.length === 0) newMonths = [ALL_MONTHS];
                     }
                     onMonthChange(newMonths);
                   }}
@@ -100,7 +100,7 @@ export function FilterBar({
                       : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {m.label.length > 3 ? m.label.substring(0, 3) : m.label}
+                  {m.value === ALL_MONTHS ? "ALL" : (m.label.length > 3 ? m.label.substring(0, 3) : m.label)}
                 </button>
               );
             })}
@@ -111,23 +111,22 @@ export function FilterBar({
           <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.allYears || "Années"}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {years.map((y) => {
-              const allYearsLabel = t?.allYears || "Toutes les années";
               const isSelected = Array.isArray(year) ? year.includes(y) : year === y;
               return (
                 <button
                   key={y}
                   onClick={() => {
                     let newYears;
-                    if (y === allYearsLabel || y === "Toutes les années") {
-                      newYears = [allYearsLabel];
+                    if (y === ALL_YEARS) {
+                      newYears = [ALL_YEARS];
                     } else {
-                      const current = Array.isArray(year) ? year.filter(v => v !== allYearsLabel && v !== "Toutes les années") : [];
+                      const current = Array.isArray(year) ? year.filter(v => v !== ALL_YEARS) : [];
                       if (current.includes(y)) {
                         newYears = current.filter(v => v !== y);
                       } else {
                         newYears = [...current, y];
                       }
-                      if (newYears.length === 0) newYears = [allYearsLabel];
+                      if (newYears.length === 0) newYears = [ALL_YEARS];
                     }
                     onYearChange(newYears);
                   }}
@@ -137,7 +136,7 @@ export function FilterBar({
                       : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  {y === allYearsLabel || y === "Toutes les années" ? "ALL" : y}
+                  {y === ALL_YEARS ? "ALL" : y}
                 </button>
               );
             })}
@@ -151,7 +150,7 @@ export function FilterBar({
             onChange={(e) => onDestinationChange(e.target.value)}
             className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
           >
-            {destinations.map((d) => <option key={d} value={d}>{d}</option>)}
+            {destinations.map((d) => <option key={d} value={d}>{d === ALL_DESTINATIONS ? (t?.allDestinations || "Toutes les destinations") : d}</option>)}
           </select>
         </label>
 ...

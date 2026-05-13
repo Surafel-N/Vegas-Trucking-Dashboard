@@ -4,6 +4,7 @@ import {
   Edit3, Plus, X, Check, Save, Copy, Zap, 
   Fuel, ShieldCheck, Utensils, Banknote, Anchor, Route
 } from 'lucide-react';
+import { ALL_CHAUFFEURS, ALL_MONTHS, ALL_YEARS } from '../lib/dashboard';
 
 const MONTHS_FR = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
@@ -12,9 +13,9 @@ const MONTHS_FR = [
 
 export function ReportsModule({ records = [], manualTrips = [], setRecords, chauffeurs = [], canDelete = false, canEdit = true, t }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [filterMonth, setFilterMonth] = useState("Tous");
-  const [filterYear, setFilterYear] = useState("Toutes");
-  const [filterDriver, setFilterDriver] = useState("Tous");
+  const [filterMonth, setFilterMonth] = useState(ALL_MONTHS);
+  const [filterYear, setFilterYear] = useState(ALL_YEARS);
+  const [filterDriver, setFilterDriver] = useState(ALL_CHAUFFEURS);
   const [filterType, setFilterType] = useState("Tous"); // Filtre par source (Excel vs Dashboard)
   
   const [isAdding, setIsAdding] = useState(false);
@@ -23,16 +24,16 @@ export function ReportsModule({ records = [], manualTrips = [], setRecords, chau
 
   const years = useMemo(() => {
     const y = new Set(records.map(r => r.year).filter(Boolean));
-    return [t?.allYears || "Toutes", ...Array.from(y).sort((a, b) => (b as number) - (a as number))];
-  }, [records, t]);
+    return [ALL_YEARS, ...Array.from(y).sort((a, b) => (b as number) - (a as number))];
+  }, [records]);
 
   const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 
   const filteredRecords = useMemo(() => {
     return records.filter(t_row => {
-      const matchDriver = filterDriver === "Tous" || String(t_row.driverLabel || "").trim() === String(filterDriver).trim();
-      const matchMonth = filterMonth === "Tous" || String(t_row.month) === String(filterMonth);
-      const matchYear = filterYear === "Toutes" || String(t_row.year) === String(filterYear);
+      const matchDriver = filterDriver === ALL_CHAUFFEURS || String(t_row.driverLabel || "").trim() === String(filterDriver).trim();
+      const matchMonth = filterMonth === ALL_MONTHS || String(t_row.month) === String(filterMonth);
+      const matchYear = filterYear === ALL_YEARS || String(t_row.year) === String(filterYear);
       const matchType = filterType === "Tous" || (filterType === "Excel" ? t_row.tripType === "Régulier" : t_row.tripType !== "Régulier");
       return matchDriver && matchMonth && matchYear && matchType;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -206,13 +207,13 @@ export function ReportsModule({ records = [], manualTrips = [], setRecords, chau
           </select>
 
           <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold outline-none cursor-pointer">
-            <option value="Tous">{t?.monthsAll || "Mois (Tous)"}</option>
+            <option value={ALL_MONTHS}>{t?.monthsAll || "Mois (Tous)"}</option>
             {t?.months?.map((name, i) => <option key={i+1} value={i+1}>{name}</option>)}
           </select>
 
           <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#cf5d56] font-bold outline-none cursor-pointer">
-            <option value="Tous">{t?.driverAll || "Chauffeur (Tous)"}</option>
-            {chauffeurs.filter(c => c !== "Tous les chauffeurs").map(c => <option key={c} value={c}>{c}</option>)}
+            <option value={ALL_CHAUFFEURS}>{t?.driverAll || "Chauffeur (Tous)"}</option>
+            {chauffeurs.filter(c => c !== ALL_CHAUFFEURS).map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
           {canEdit && (
@@ -237,7 +238,7 @@ export function ReportsModule({ records = [], manualTrips = [], setRecords, chau
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] uppercase font-bold text-white/40">{t?.driver || "Chauffeur"}</label>
               <select value={editForm.driverLabel} onChange={e => setEditForm({...editForm, driverLabel: e.target.value})} className="bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white">
-                {chauffeurs.filter(c => c !== "Tous les chauffeurs").map(c => <option key={c} value={c}>{c}</option>)}
+                {chauffeurs.filter(c => c !== ALL_CHAUFFEURS).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -346,7 +347,7 @@ export function ReportsModule({ records = [], manualTrips = [], setRecords, chau
                         <td className="p-2"><input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="w-full bg-black border border-white/20 rounded p-1 text-xs text-white" /></td>
                         <td className="p-2">
                           <select value={editForm.driverLabel} onChange={e => setEditForm({...editForm, driverLabel: e.target.value})} className="w-full bg-black border border-white/20 rounded p-1 text-xs text-white">
-                            {chauffeurs.filter(c => c !== "Tous les chauffeurs").map(c => <option key={c} value={c}>{c}</option>)}
+                            {chauffeurs.filter(c => c !== ALL_CHAUFFEURS).map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </td>
                         <td className="p-2">

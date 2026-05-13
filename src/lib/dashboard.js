@@ -2,10 +2,10 @@ import sdv1Raw from "../../data/SDV_1.csv?raw";
 import sdv2Raw from "../../data/SDV_2.csv?raw";
 import sdv3Raw from "../../data/SDV_3.csv?raw";
 
-export const ALL_CHAUFFEURS = "Tous les chauffeurs";
-export const ALL_DESTINATIONS = "Toutes les destinations";
-export const ALL_MONTHS = "Tous les mois";
-export const ALL_YEARS = "Toutes les années";
+export const ALL_CHAUFFEURS = "__ALL_CHAUFFEURS__";
+export const ALL_DESTINATIONS = "__ALL_DESTINATIONS__";
+export const ALL_MONTHS = "__ALL_MONTHS__";
+export const ALL_YEARS = "__ALL_YEARS__";
 
 const SDV_SOURCES = [
   { chauffeur: "AMARA", sdv: "TRUCK 76", sourceFile: "SDV_1.csv", raw: sdv1Raw },

@@ -15,6 +15,7 @@ import {
   Database,
   AlertTriangle
 } from "lucide-react";
+import { ALL_MONTHS } from "../lib/dashboard";
 
 export function SettingsModule({
   drivers,
@@ -40,7 +41,7 @@ export function SettingsModule({
   const [activeTab, setActiveSection] = useState("drivers");
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [purgeRange, setPurgeRange] = useState({ start: 1, end: 1, year: "2026" });
-  const [maintPurge, setMaintPurge] = useState({ year: "2026", month: "Tous", day: "Tous" });
+  const [maintPurge, setMaintPurge] = useState({ year: "2026", month: ALL_MONTHS, day: ALL_MONTHS });
 
   const onDragStart = (e, index) => {
     setDraggedIndex(index);
@@ -382,14 +383,14 @@ export function SettingsModule({
                     <div className="space-y-1">
                       <label className="text-[8px] font-bold text-white/20 uppercase">Mois</label>
                       <select value={maintPurge.month} onChange={e => setMaintPurge({...maintPurge, month: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                        <option value="Tous">Tous</option>
+                        <option value={ALL_MONTHS}>Tous</option>
                         {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={String(m).padStart(2, '0')}>Mois {m}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[8px] font-bold text-white/20 uppercase">Jour (Facultatif)</label>
                       <select value={maintPurge.day} onChange={e => setMaintPurge({...maintPurge, day: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                        <option value="Tous">Tous</option>
+                        <option value={ALL_MONTHS}>Tous</option>
                         {Array.from({length: 31}, (_, i) => i + 1).map(d => <option key={d} value={String(d).padStart(2, '0')}>{d}</option>)}
                       </select>
                     </div>
