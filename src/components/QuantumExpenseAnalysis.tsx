@@ -100,7 +100,7 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency,
       
       {/* DONUT COLUMN */}
       <div className="relative w-full xl:w-[60%] h-[450px]">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={450}>
           <PieChart>
             <Tooltip 
               contentStyle={{ backgroundColor: '#1c1c1e', border: 'none', borderRadius: '12px', fontSize: '12px' }} 
