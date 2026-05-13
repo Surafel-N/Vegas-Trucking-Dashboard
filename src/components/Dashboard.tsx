@@ -250,7 +250,7 @@ export function Dashboard({
                     </div>
                 </div>
             </header>
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center min-h-[450px] min-w-0">
                 <QuantumExpenseAnalysis data={syncFilteredData} maintenanceTotal={maintenanceTotal} formatCurrency={(v) => formatCurrency(v, currency)} t={t} records={syncFilteredData} />
             </div>
         </div>

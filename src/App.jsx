@@ -858,16 +858,43 @@ export default function App() {
     setIsSyncing(true);
     setIsSyncingMaintenance(true);
 
+    const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
     try {
+      // 1. Tentative via le Backend (Service Account - Méthode la plus sûre)
       const backendRes = await fetch("/api/gsheets");
       if (backendRes.ok) {
         const data = await backendRes.json();
         const tripsCount = processTripsData(data.trips);
         const maintCount = processMaintenanceData(data.maintenance);
-        console.log(`Auto-sync: ${tripsCount} trajets, ${maintCount.maintenance} maintenances.`);
-      } else {
-        console.warn("Silent sync failed. Ensure Service Account is configured on backend.");
+        console.log(`Auto-sync (Backend): ${tripsCount} trajets, ${maintCount.maintenance} maintenances.`);
+        setIsSyncing(false);
+        setIsSyncingMaintenance(false);
+        return;
       }
+
+      // 2. Fallback via API Key (Si le document est en "Tous les utilisateurs disposant du lien")
+      if (apiKey) {
+        console.log("Tentative de synchro via API Key...");
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O&ranges='Spreedsheet'!A2:Z&key=${apiKey}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          // Conversion du format batchGet simple en format attendu par les helpers
+          const tripsData = data.valueRanges.slice(0, 3);
+          const maintenanceData = data.valueRanges[3]?.values?.map(row => ({ values: row.map(v => ({ formattedValue: v })) })) || [];
+          
+          processTripsData(tripsData);
+          processMaintenanceData(maintenanceData);
+          console.log("Auto-sync (API Key) réussie.");
+          setIsSyncing(false);
+          setIsSyncingMaintenance(false);
+          return;
+        }
+      }
+
+      console.warn("Silent sync failed. No backend response and API Key invalid or sheet private.");
     } catch (err) {
       console.error("Auto-sync error:", err);
     } finally {

@@ -76,7 +76,7 @@ export function MiniCharts({ records, t }: MiniChartsProps) {
           <span className="text-xs font-black text-white/80">{tonnageData.reduce((s,d)=>s+d.tonnage,0)} T</span>
         </div>
         
-        <div className="flex-1 h-[140px]">
+        <div className="flex-1 h-[140px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={tonnageData}>
               <XAxis dataKey="name" hide />
@@ -118,7 +118,7 @@ export function MiniCharts({ records, t }: MiniChartsProps) {
           </div>
         </div>
 
-        <div className="flex-1 h-[200px]">
+        <div className="flex-1 h-[200px] min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
