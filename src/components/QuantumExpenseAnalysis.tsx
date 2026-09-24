@@ -35,18 +35,28 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency,
     const drivers = ["AMARA", "BRAHIMA", "SORO"];
     
     // Calcul des KM (Logique extraite de FleetTrackerWidget)
-    const kmData = {};
+    const kmData: Record<string, number> = {
+      AMARA: 117324,
+      BRAHIMA: 110593,
+      SORO: 110975
+    };
     const sortedRecords = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     sortedRecords.forEach(t => {
       if (!t.driverLabel) return;
       const labelUpper = t.driverLabel.toUpperCase();
-      let driverKey = null;
+      let driverKey: "AMARA" | "BRAHIMA" | "SORO" | null = null;
       if (labelUpper.includes("AMARA")) driverKey = "AMARA";
       else if (labelUpper.includes("BRAHIMA")) driverKey = "BRAHIMA";
       else if (labelUpper.includes("SORO") || labelUpper.includes("SORRO")) driverKey = "SORO";
       else return;
-      const kmValue = Number(t.km || t.distanceKm || 0);
-      if (kmValue > 0) kmData[driverKey] = kmValue;
+      let kmValue = Number(t.km || t.distanceKm || 0);
+      if (driverKey === "SORO" && kmValue === 712827) kmValue = 71283;
+      if (driverKey === "BRAHIMA" && kmValue === 196266) kmValue = 106266;
+      if (driverKey === "BRAHIMA" && kmValue === 10492) kmValue = 107492;
+      if (driverKey === "SORO" && kmValue === 59757 && (t.date || "") < "2025-10-01") kmValue = 50757;
+      if (kmValue >= 20000 && kmValue < 200000) {
+        kmData[driverKey] = Math.max(kmData[driverKey], kmValue);
+      }
     });
 
     const sums = data.reduce((acc, row) => ({
@@ -165,24 +175,31 @@ export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency,
 
         {/* KM MONITORING INTEGRATION */}
         <div className="mt-4 p-4 rounded-[28px] bg-white/[0.03] border border-white/10 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Route className="size-4 text-[#cf5d56]" />
-            <h5 className="text-[10px] font-black text-white/50 uppercase tracking-[0.1em]">{t?.mileageTracking || "Suivi Kilométrage"}</h5>
-          </div>
-          {Object.entries(stats.kmData).map(([driver, km]) => (
-            <div key={driver} className="space-y-1.5">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="font-black text-white/40">{driver}</span>
-                <span className="font-black text-white">{Number(km).toLocaleString()} <span className="text-white/30">KM</span></span>
-              </div>
-              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-[#cf5d56] opacity-60 rounded-full transition-all duration-1000" 
-                  style={{ width: `${Math.min(100, (Number(km) / 800000) * 100)}%` }} 
-                />
-              </div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Route className="size-4 text-[#cf5d56]" />
+              <h5 className="text-[10px] font-black text-white/50 uppercase tracking-[0.1em]">{t?.mileageTracking || "Suivi Kilométrage"}</h5>
             </div>
-          ))}
+            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Odomètre Réel</span>
+          </div>
+          {Object.entries(stats.kmData).map(([driver, km]) => {
+            const numKm = Number(km);
+            const cycleProgress = ((numKm % 10000) / 10000) * 100;
+            return (
+              <div key={driver} className="space-y-1.5">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="font-black text-white/50">{driver}</span>
+                  <span className="font-black font-mono text-white">{numKm.toLocaleString("fr-FR")} <span className="text-white/30 font-sans">KM</span></span>
+                </div>
+                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-[#cf5d56] opacity-80 rounded-full transition-all duration-1000" 
+                    style={{ width: `${Math.min(100, Math.max(8, cycleProgress))}%` }} 
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
         
         {/* Performance Summary */}

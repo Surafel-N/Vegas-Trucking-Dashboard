@@ -36,6 +36,7 @@ import { MiniCharts } from "./MiniCharts";
 import { QuantumExpenseAnalysis } from "./QuantumExpenseAnalysis";
 import { ActiveTrends } from "./ActiveTrends";
 import { FinancialTrends } from "./FinancialTrends";
+import { OilChangeGaugeWidget } from "./OilChangeGaugeWidget";
 import {
   getDashboardMetrics,  formatCurrency, 
   formatCompactNumber, 
@@ -61,6 +62,7 @@ type DashboardProps = {
   maintenanceRecords: any[];
   allTrips: any[];
   oilChanges: any;
+  setOilChanges?: React.Dispatch<React.SetStateAction<any>> | null;
   selectedDates: string[];
   googleClientId?: string;
   currency?: string;
@@ -79,6 +81,7 @@ export function Dashboard({
   maintenanceRecords = [],
   allTrips = [],
   oilChanges = {},
+  setOilChanges,
   formatCurrency,
   formatCompactNumber,
   selectedDates = [],
@@ -184,6 +187,20 @@ export function Dashboard({
 
   const isAllYears = Array.isArray(filterProps?.year) && filterProps.year.includes(ALL_YEARS);
 
+  const handleUpdateOilChange = (truckLabel: string, mileage: number, date: string, comment?: string) => {
+    if (setOilChanges) {
+      setOilChanges((prev: any) => ({
+        ...prev,
+        [truckLabel]: { 
+          mileage, 
+          date, 
+          comment: comment || "Vidange manuelle", 
+          interval: 10000 
+        }
+      }));
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 w-full h-full pb-6 font-sans antialiased text-white relative">
 
@@ -208,6 +225,17 @@ export function Dashboard({
       </section>
 
       {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
+
+      {/* OIL CHANGE & ODOMETER GAUGE SECTION */}
+      <section className="panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl">
+        <OilChangeGaugeWidget 
+          allTrips={allTrips} 
+          oilChanges={oilChanges} 
+          onUpdateOilChange={handleUpdateOilChange} 
+          canEdit={!!setOilChanges} 
+          t={t} 
+        />
+      </section>
 
       <section className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
         <div className="col-span-12 lg:col-span-5 xl:col-span-4 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col items-stretch min-h-[500px]">
@@ -305,7 +333,7 @@ export function Dashboard({
             googleClientId={googleClientId}
             t={t}
           />
-          <OperationalAlerts records={syncFilteredData} t={t} />
+          <OperationalAlerts records={syncFilteredData} allTrips={allTrips} oilChanges={oilChanges} t={t} />
       </div>
 
     </div>

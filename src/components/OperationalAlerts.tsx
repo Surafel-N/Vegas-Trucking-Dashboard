@@ -3,11 +3,73 @@ import { useMemo } from "react";
 
 type OperationalAlertsProps = {
   records: any[];
+  allTrips?: any[];
+  oilChanges?: any;
+  t?: any;
 };
 
-export function OperationalAlerts({ records, t }: OperationalAlertsProps) {
+export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: OperationalAlertsProps) {
   const alerts = useMemo(() => {
     const list: { id: string; type: 'critical' | 'warning' | 'info'; title: string; desc: string; date?: string }[] = [];
+
+    // 1. Alertes Vidange Odomètre (Spreadsheet Comments & LocalStorage)
+    if (oilChanges) {
+      const trucks = [
+        { label: "AMARA TRUCK 76", fallbackKm: 117324 },
+        { label: "BRAHIMA TRUCK 45", fallbackKm: 110593 },
+        { label: "SORO TRUCK 52", fallbackKm: 110975 }
+      ];
+      
+      const tripList = (allTrips && allTrips.length > 0) ? allTrips : records;
+      
+      trucks.forEach(({ label, fallbackKm }) => {
+        const info = oilChanges[label];
+        if (!info) return;
+        
+        const truckTrips = tripList.filter(t => {
+          const l = String(t.driverLabel || t.chauffeur || "").toUpperCase();
+          return l.includes(label.split(' ')[0]) || l.includes(label.split(' ')[2]);
+        });
+        
+        let maxTripKm = 0;
+        truckTrips.forEach(t => {
+          let k = Number(t.km || 0);
+          if (k === 712827) k = 71283;
+          else if (k === 196266) k = 106266;
+          else if (k === 10492) k = 107492;
+          else if (k === 59757 && t.date < "2025-10-01") k = 50757;
+          else if (k > 200000) k = 0;
+          if (k >= 20000 && k <= 150000 && k > maxTripKm) {
+            maxTripKm = k;
+          }
+        });
+        
+        const currentKm = Math.max(fallbackKm, maxTripKm);
+        const lastKm = Number(info.mileage) || 0;
+        const interval = Number(info.interval) || 10000;
+        const driven = Math.max(0, currentKm - lastKm);
+        
+        if (driven >= interval) {
+          const overdue = driven - interval;
+          list.push({
+            id: `vidange-crit-${label}`,
+            type: 'critical',
+            title: `VIDANGE URGENTE : ${label.split(' ')[0]}`,
+            desc: `Dépassement de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${driven.toLocaleString("fr-FR")} KM depuis la vidange du ${info.date} à ${lastKm.toLocaleString("fr-FR")} KM).`,
+            date: info.date
+          });
+        } else if (driven >= interval * 0.8) {
+          const remaining = interval - driven;
+          list.push({
+            id: `vidange-warn-${label}`,
+            type: 'warning',
+            title: `VIDANGE IMMINENTE : ${label.split(' ')[0]}`,
+            desc: `Plus que ${remaining.toLocaleString("fr-FR")} KM avant la prochaine vidange (${driven.toLocaleString("fr-FR")} / ${interval.toLocaleString("fr-FR")} KM).`,
+            date: info.date
+          });
+        }
+      });
+    }
 
     const negativeTrips = records.filter(r => (r.total_net_cfa || 0) < 0);
     negativeTrips.forEach(r => {
@@ -40,8 +102,12 @@ export function OperationalAlerts({ records, t }: OperationalAlertsProps) {
       });
     }
 
-    return list.sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 10);
-  }, [records, t]);
+    return list.sort((a, b) => {
+      if (a.type === 'critical' && b.type !== 'critical') return -1;
+      if (b.type === 'critical' && a.type !== 'critical') return 1;
+      return (b.date || "").localeCompare(a.date || "");
+    }).slice(0, 10);
+  }, [records, allTrips, oilChanges, t]);
 
   const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 

@@ -94,7 +94,30 @@ const APP_STORAGE_KEYS = {
   rules: "sdv_cms_rules_v1",
   ui: "sdv_cms_ui_v1",
   pending_ai_tickets: "sdv_pending_ai_tickets_v1",
-  maintenance: "sdv_maintenance_v1"
+  maintenance: "sdv_maintenance_v1",
+  oil_changes: "sdv_oil_changes_v1"
+};
+
+// Données initiales certifiées de dernière vidange (extraites des commentaires Spreedsheet)
+export const INITIAL_OIL_CHANGES = {
+  "AMARA TRUCK 76": {
+    mileage: 100312,
+    date: "2026-04-16",
+    comment: "Vidange effectuée le 16/04/2026 (Spreedsheet row 326)",
+    interval: 10000
+  },
+  "BRAHIMA TRUCK 45": {
+    mileage: 93962,
+    date: "2026-04-16",
+    comment: "Vidange effectuée le 16/04/2026 (Spreedsheet row 326)",
+    interval: 10000
+  },
+  "SORO TRUCK 52": {
+    mileage: 91000,
+    date: "2026-04-24",
+    comment: "Vidange effectuée le 24/04/2026 (Spreedsheet row 334)",
+    interval: 10000
+  }
 };
 
 const DEFAULT_DRIVERS = [
@@ -556,7 +579,15 @@ export default function App() {
   });
   const [manualTrips, setManualTrips] = useState(() => loadJson(APP_STORAGE_KEYS.trips, []));
   const [maintenanceRecords, setMaintenanceRecords] = useState(() => loadJson(APP_STORAGE_KEYS.maintenance, []));
-  const [oilChanges, setOilChanges] = useState(() => loadJson('sdv_oil_changes_v1', {}));
+  const [oilChanges, setOilChanges] = useState(() => {
+    const saved = loadJson(APP_STORAGE_KEYS.oil_changes, {});
+    return {
+      "AMARA TRUCK 76": saved["AMARA TRUCK 76"]?.mileage ? saved["AMARA TRUCK 76"] : INITIAL_OIL_CHANGES["AMARA TRUCK 76"],
+      "BRAHIMA TRUCK 45": saved["BRAHIMA TRUCK 45"]?.mileage ? saved["BRAHIMA TRUCK 45"] : INITIAL_OIL_CHANGES["BRAHIMA TRUCK 45"],
+      "SORO TRUCK 52": saved["SORO TRUCK 52"]?.mileage ? saved["SORO TRUCK 52"] : INITIAL_OIL_CHANGES["SORO TRUCK 52"],
+      ...saved
+    };
+  });
   const [pendingTickets, setPendingTickets] = useState(() => loadJson(APP_STORAGE_KEYS.pending_ai_tickets, []));
   const [auditLogs, setAuditLogs] = useState(() => loadJson(APP_STORAGE_KEYS.audit, []));
   const [categories, setCategories] = useState(() => loadJson(APP_STORAGE_KEYS.categories, { expense: ["Carburant", "Péage", "Police", "Repas"], income: ["Recette trajet"] }));
@@ -576,6 +607,10 @@ export default function App() {
   useEffect(() => {
     saveJson(APP_STORAGE_KEYS.maintenance, maintenanceRecords);
   }, [maintenanceRecords]);
+
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.oil_changes, oilChanges);
+  }, [oilChanges]);
 
   const syncMaintenanceAndExpenses = async () => {
     setIsSyncingMaintenance(true);
@@ -752,30 +787,69 @@ export default function App() {
           totalExpense = parseNum(row[9]) || (fuel + roadSubTotal);
           tonnage = parseNum(row[10]);
           totalGross = parseNum(row[11]);
-          km = parseNum(row[12]);
         } else if (isoDate >= "2026-01-01") {
           if (chauffeur === "AMARA") {
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[9]);
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]);
           } else if (chauffeur === "BRAHIMA") {
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
-            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = parseNum(row[11]);
+            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]);
           } else { // SORO
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[8]);
-            tonnage = parseNum(row[9]); totalGross = parseNum(row[10]); km = 0;
+            tonnage = parseNum(row[9]); totalGross = parseNum(row[10]);
           }
         } else {
           if (chauffeur === "AMARA") {
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = 0;
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]);
           } else if (chauffeur === "BRAHIMA") {
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[6]);
-            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]); km = 0;
+            tonnage = parseNum(row[7]); totalGross = parseNum(row[8]);
           } else { // SORO
             fuel = parseNum(row[3]); roadSubTotal = parseNum(row[4]); totalExpense = parseNum(row[5]);
-            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]); km = parseNum(row[10]);
+            tonnage = parseNum(row[6]); totalGross = parseNum(row[7]);
           }
         }
+
+        // Extraction intelligente et fiable du Kilométrage (KM)
+        let rawKm = 0;
+        // 1. Chercher explicitement dans les cellules contenant "km"
+        for (let colIdx = 1; colIdx < row.length; colIdx++) {
+          const val = String(row[colIdx] || "").trim();
+          if (/cfa|\$|total|distance/i.test(val)) continue;
+          if (/km/i.test(val)) {
+            const digits = val.replace(/[^0-9]/g, "");
+            const parsed = parseInt(digits, 10);
+            if (parsed >= 1000) {
+              rawKm = parsed;
+              break;
+            }
+          }
+        }
+
+        // 2. Si pas trouvé par "km", tester colonnes 13, 14, 12, 11 sans confusion financière
+        if (!rawKm) {
+          for (const cIdx of [13, 14, 12, 11, 10, 9]) {
+            const cellVal = String(row[cIdx] || "").trim();
+            if (!cellVal || /cfa|\$/i.test(cellVal)) continue;
+            const digits = cellVal.replace(/[^0-9]/g, "");
+            const parsed = parseInt(digits, 10);
+            if (parsed >= 20000 && parsed <= 150000) {
+              rawKm = parsed;
+              break;
+            }
+          }
+        }
+
+        // 3. Correction des erreurs et coquilles humaines documentées du Spreadsheet
+        if (rawKm === 712827) rawKm = 71283; // SORO typo du 04/01/2026
+        else if (rawKm === 196266) rawKm = 106266; // BRAHIMA typo d'août 2026
+        else if (rawKm === 10492) rawKm = 107492; // BRAHIMA typo du 13/09/2026
+        else if (rawKm === 59757 && isoDate < "2025-10-01") rawKm = 50757; // SORO typo du 26/09/2025
+        else if (rawKm > 200000) rawKm = 0; // Outlier excessif ignoré
+        else if (rawKm < 1000) rawKm = 0; // Distance de trajet isolée ignorée
+
+        km = rawKm;
 
         imported.push({
           id: `gs-${chauffeur}-${isoDate}-${Math.random()}`,
@@ -870,6 +944,39 @@ export default function App() {
       } else {
         expensesList.push({ ...payload, driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, category: "Dépense Opérationnelle", subCategory: "Sync Spreadsheet" });
       }
+
+      // Détection automatique de vidange dans les commentaires Spreedsheet
+      if (/oil\s*change|vidange/i.test(fullRowContent)) {
+        const text = fullRowContent.toLowerCase();
+        setOilChanges(prev => {
+          const updated = { ...prev };
+          if (text.includes("amara")) {
+            updated["AMARA TRUCK 76"] = {
+              mileage: updated["AMARA TRUCK 76"]?.mileage || 100312,
+              date: isoDate,
+              comment: bestComment || "Vidange (Spreedsheet)",
+              interval: 10000
+            };
+          }
+          if (text.includes("brahima")) {
+            updated["BRAHIMA TRUCK 45"] = {
+              mileage: updated["BRAHIMA TRUCK 45"]?.mileage || 93962,
+              date: isoDate,
+              comment: bestComment || "Vidange (Spreedsheet)",
+              interval: 10000
+            };
+          }
+          if (text.includes("soro")) {
+            updated["SORO TRUCK 52"] = {
+              mileage: updated["SORO TRUCK 52"]?.mileage || 91000,
+              date: isoDate,
+              comment: bestComment || "Vidange (Spreedsheet)",
+              interval: 10000
+            };
+          }
+          return updated;
+        });
+      }
     });
 
     setMaintenanceRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...maintenanceList]);
@@ -902,7 +1009,7 @@ export default function App() {
       // 2. Fallback via API Key (Si le document est en "Tous les utilisateurs disposant du lien")
       if (apiKey) {
         console.log("Tentative de synchro via API Key...");
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O&ranges='Spreedsheet'!A2:Z&key=${apiKey}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:Z&ranges='BRAHIMA TRUCK 45'!A2:Z&ranges='SORO TRUCK 52'!A2:Z&ranges='Spreedsheet'!A2:Z&key=${apiKey}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -1135,7 +1242,7 @@ export default function App() {
                    destinations: destinationOptions, destination, onDestinationChange: setDestination,
                    onReset: () => { setChauffeur(ALL_CHAUFFEURS); setMonth([ALL_MONTHS]); setSelectedDates([]); }
                  }}
-                 maintenanceRecords={maintenanceRecords} oilChanges={oilChanges}
+                 maintenanceRecords={maintenanceRecords} oilChanges={oilChanges} setOilChanges={rolePermissions.canEdit ? setOilChanges : null}
                  selectedDates={selectedDates}
                  googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
                  currency={currency}

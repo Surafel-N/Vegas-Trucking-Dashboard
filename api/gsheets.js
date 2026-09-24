@@ -22,9 +22,9 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: "v4", auth });
     
     const ranges = [
-      "'AMARA TRUCK 76'!A2:O", 
-      "'BRAHIMA TRUCK 45'!A2:O", 
-      "'SORO TRUCK 52'!A2:O",
+      "'AMARA TRUCK 76'!A2:Z", 
+      "'BRAHIMA TRUCK 45'!A2:Z", 
+      "'SORO TRUCK 52'!A2:Z",
       "'Spreedsheet'!A2:Z"
     ];
 
