@@ -78,10 +78,12 @@ import { AuditLogModule } from "./components/AuditLogModule";
 import { DriversModule } from "./components/DriversModule";
 import ManualEntryModule from "./components/ManualEntryModule";
 import AITicketValidationModule from "./components/AITicketValidationModule";
+import AccountingModule, { INITIAL_INVOICES } from "./components/AccountingModule";
 
 const APP_STORAGE_KEYS = {
   auth: "sdv_auth_session_v1",
   trips: "sdv_manual_trips_v1",
+  invoices: "sdv_invoices_v1",
   closings: "sdv_closings_v1",
   categories: "sdv_categories_v1",
   audit: "sdv_audit_logs_v1",
@@ -107,6 +109,7 @@ const DEFAULT_UI_CONFIG = {
     { id: "dashboard", label: "Tableau de Bord", enabled: true },
     { id: "drivers", label: "Chauffeurs", enabled: true },
     { id: "trips", label: "Trajets", enabled: true },
+    { id: "comptabilite", label: "Comptabilité", enabled: true },
     { id: "depenses", label: "Dépenses", enabled: true },
     { id: "encaissements", label: "Encaissements", enabled: true },
     { id: "documents", label: "Validation IA", enabled: true },
@@ -149,6 +152,7 @@ export default function App() {
       dashboard: "Tableau de Bord",
       drivers: "Chauffeurs",
       trips: "Trajets",
+      comptabilite: "Comptabilité",
       expenses: "Dépenses",
       income: "Encaissements",
       validation: "Validation IA",
@@ -342,6 +346,7 @@ export default function App() {
       dashboard: "Dashboard",
       drivers: "Drivers",
       trips: "Trips",
+      comptabilite: "Accounting",
       expenses: "Expenses",
       income: "Revenue",
       validation: "AI Validation",
@@ -539,7 +544,16 @@ export default function App() {
   const [vehicles, setVehicles] = useState(() => loadJson(APP_STORAGE_KEYS.vehicles, []));
   const [destinationsList, setDestinationsList] = useState(() => loadJson(APP_STORAGE_KEYS.destinations, []));
   const [businessRules, setBusinessRules] = useState(() => loadJson(APP_STORAGE_KEYS.rules, {}));
-  const [uiConfig, setUiConfig] = useState(() => loadJson(APP_STORAGE_KEYS.ui, DEFAULT_UI_CONFIG));
+  const [uiConfig, setUiConfig] = useState(() => {
+    const loaded = loadJson(APP_STORAGE_KEYS.ui, DEFAULT_UI_CONFIG);
+    if (!loaded || !loaded.menu) return DEFAULT_UI_CONFIG;
+    const existing = new Set(loaded.menu.map(m => m.id));
+    const missing = DEFAULT_UI_CONFIG.menu.filter(d => !existing.has(d.id));
+    if (missing.length > 0) {
+      return { ...loaded, menu: [...loaded.menu, ...missing] };
+    }
+    return loaded;
+  });
   const [manualTrips, setManualTrips] = useState(() => loadJson(APP_STORAGE_KEYS.trips, []));
   const [maintenanceRecords, setMaintenanceRecords] = useState(() => loadJson(APP_STORAGE_KEYS.maintenance, []));
   const [oilChanges, setOilChanges] = useState(() => loadJson('sdv_oil_changes_v1', {}));
@@ -549,6 +563,11 @@ export default function App() {
   const [expenseRecords, setExpenseRecords] = useState(() => loadFinanceRecords("expenses"));
   const [incomeRecords, setIncomeRecords] = useState(() => loadFinanceRecords("incomes"));
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
+  const [invoices, setInvoices] = useState(() => loadJson(APP_STORAGE_KEYS.invoices, INITIAL_INVOICES));
+
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.invoices, invoices);
+  }, [invoices]);
 
   useEffect(() => {
     saveFinanceRecords("expenses", expenseRecords);
@@ -632,7 +651,7 @@ export default function App() {
   }, [trips, chauffeur, year]);
 
   const iconMap = {
-    dashboard: LayoutDashboard, drivers: Users, trips: Truck, depenses: Wallet,
+    dashboard: LayoutDashboard, drivers: Users, trips: Truck, comptabilite: ReceiptText, depenses: Wallet,
     encaissements: Banknote, documents: Sparkles, closing: Activity,
     reports: Database, maintenance: Settings2, settings: Settings,
     audit: ShieldCheck, "quick-entry": PlusCircle, admin: RefreshCcw
@@ -642,6 +661,7 @@ export default function App() {
     dashboard: t.dashboard,
     drivers: t.drivers,
     trips: t.trips,
+    comptabilite: t.comptabilite || "Comptabilité",
     depenses: t.expenses,
     encaissements: t.income,
     documents: t.validation,
@@ -655,11 +675,15 @@ export default function App() {
   };
 
   const filteredMenu = useMemo(() => {
-    const base = uiConfig?.menu?.length > 0 ? uiConfig.menu : DEFAULT_UI_CONFIG.menu;
+    const rawMenu = uiConfig?.menu?.length > 0 ? uiConfig.menu : DEFAULT_UI_CONFIG.menu;
+    const existing = new Set(rawMenu.map(i => i.id));
+    const missing = DEFAULT_UI_CONFIG.menu.filter(d => !existing.has(d.id));
+    const base = [...rawMenu, ...missing];
+
     return base
       .filter(item => {
         if (item.enabled === false) return false;
-        if (authUser?.role === "viewer") return ["dashboard", "reports"].includes(item.id);
+        if (authUser?.role === "viewer") return ["dashboard", "reports", "comptabilite"].includes(item.id);
         return true;
       })
       .map(item => ({
@@ -1141,6 +1165,16 @@ export default function App() {
                   formatTonnage={formatTonnage} 
                   canWrite={rolePermissions.canEdit} 
                   onAddTrip={(t) => setManualTrips([...manualTrips, t])} 
+                  t={t} 
+                />
+              )}
+              {activeSection === "comptabilite" && (
+                <AccountingModule 
+                  invoices={invoices} 
+                  setInvoices={rolePermissions.canEdit ? setInvoices : null} 
+                  formatCurrency={formatCurrency} 
+                  formatTonnage={formatTonnage} 
+                  canWrite={rolePermissions.canEdit} 
                   t={t} 
                 />
               )}
