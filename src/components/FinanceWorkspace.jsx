@@ -30,6 +30,7 @@ function SectionTitle({ icon: Icon, title, description }) {
 }
 
 function FinanceItem({ item, formatCurrency, onDelete }) {
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
   return (
     <div className="rounded-[20px] border border-white/8 bg-black/18 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -38,7 +39,7 @@ function FinanceItem({ item, formatCurrency, onDelete }) {
           <p className="mt-1 text-xs text-white/46">{item.date}</p>
         </div>
         <p className={`text-sm font-semibold ${item.amountTone || "text-[#9fe3b9]"}`}>
-          {typeof item.amount === "number" ? formatCurrency(item.amount) : "--"}
+          {typeof item.amount === "number" ? format(item.amount) : "--"}
         </p>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-white/52">
@@ -68,23 +69,33 @@ function FinanceItem({ item, formatCurrency, onDelete }) {
 }
 
 export function FinanceWorkspace({
-  activeSection,
-  expenseRecords,
-  incomeRecords,
-  drivers,
-  trips,
-  expenseCategories,
-  incomeCategories,
-  documentRecords,
+  activeSection = "depenses",
+  type = "income",
+  records = [],
+  setRecords,
+  categories = [],
+  setCategories,
+  expenseRecords = [],
+  incomeRecords = [],
+  drivers = [],
+  trips = [],
+  expenseCategories = [],
+  incomeCategories = [],
+  documentRecords = [],
   formatCurrency,
-  onAddExpense,
-  onAddIncome,
-  canWrite,
-  onDeleteExpense,
-  onDeleteIncome,
-  onDeleteDocument,
-  onClearAllFinance,
+  onAddExpense = () => {},
+  onAddIncome = () => {},
+  canWrite = true,
+  onDeleteExpense = () => {},
+  onDeleteIncome = () => {},
+  onDeleteDocument = () => {},
+  onClearAllFinance = () => {},
 }) {
+  const safeExpenses = expenseRecords || [];
+  const safeIncomes = incomeRecords || (type === "income" ? records : []) || [];
+  const safeDocs = documentRecords || [];
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
+
   const [expenseReference, setExpenseReference] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -112,16 +123,16 @@ export function FinanceWorkspace({
 
   const totals = useMemo(
     () => ({
-      expenses: expenseRecords.reduce((sum, item) => sum + item.amount, 0),
-      incomes: incomeRecords.reduce((sum, item) => sum + item.amount, 0),
-      docs: documentRecords.length,
+      expenses: safeExpenses.reduce((sum, item) => sum + (item.amount || 0), 0),
+      incomes: safeIncomes.reduce((sum, item) => sum + (item.amount || 0), 0),
+      docs: safeDocs.length,
     }),
-    [expenseRecords, incomeRecords, documentRecords],
+    [safeExpenses, safeIncomes, safeDocs],
   );
 
   const timelineRows = useMemo(
-    () => buildFinanceTimeline(expenseRecords, incomeRecords, documentRecords),
-    [expenseRecords, incomeRecords, documentRecords],
+    () => buildFinanceTimeline(safeExpenses, safeIncomes, safeDocs),
+    [safeExpenses, safeIncomes, safeDocs],
   );
 
   const filteredTimeline = useMemo(() => {
@@ -229,11 +240,11 @@ export function FinanceWorkspace({
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
           <p className="text-sm text-white/46">Total depenses saisies</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-[#ff8f84]">{formatCurrency(totals.expenses)}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-[#ff8f84]">{format(totals.expenses)}</p>
         </div>
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
           <p className="text-sm text-white/46">Total encaissements saisis</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-[#9fe3b9]">{formatCurrency(totals.incomes)}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-[#9fe3b9]">{format(totals.incomes)}</p>
         </div>
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
           <p className="text-sm text-white/46">Documents recus</p>
@@ -450,7 +461,7 @@ export function FinanceWorkspace({
                     <td className="whitespace-nowrap px-4 py-3 text-white">{item.reference}</td>
                     <td className="whitespace-nowrap px-4 py-3">{item.date}</td>
                     <td className={`whitespace-nowrap px-4 py-3 ${item.amountTone}`}>
-                      {typeof item.displayAmount === "number" ? formatCurrency(item.displayAmount) : "--"}
+                      {typeof item.displayAmount === "number" ? format(item.displayAmount) : "--"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-[#61d2c0] hover:underline">

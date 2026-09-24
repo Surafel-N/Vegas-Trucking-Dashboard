@@ -1,4 +1,5 @@
-export function AuditLogModule({ logs }) {
+export function AuditLogModule({ logs = [] }) {
+  const safeLogs = logs || [];
   return (
     <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,#161616_0%,#101010_100%)] p-5 text-white">
       <h3 className="text-xl font-semibold tracking-tight">Journal d'audit</h3>
@@ -17,7 +18,7 @@ export function AuditLogModule({ logs }) {
               </tr>
             </thead>
             <tbody className="text-sm text-white/72">
-              {logs.map((log) => (
+              {safeLogs.map((log) => (
                 <tr key={log.id} className="border-t border-white/6 hover:bg-white/[0.03]">
                   <td className="px-4 py-3">{log.createdAt}</td>
                   <td className="px-4 py-3 text-white">{log.userName}</td>

@@ -1086,7 +1086,7 @@ export default function App() {
       </header>
 
         <div className="p-4 md:p-6 flex-1 overflow-x-hidden">
-          <ErrorBoundary>
+          <ErrorBoundary resetKey={activeSection}>
             <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
               {activeSection === "dashboard" && (
                <Dashboard
@@ -1118,8 +1118,32 @@ export default function App() {
                  t={t}
                  allRecords={manualTrips}
                  />
-                 )}              {activeSection === "drivers" && <DriversModule drivers={drivers} setDrivers={setDrivers} t={t} />}
-              {activeSection === "trips" && <TripsModule trips={filteredData} chauffeurs={chauffeurOptions} onAddTrip={(t) => setManualTrips([...manualTrips, t])} t={t} />}
+                 )}
+              {activeSection === "drivers" && (
+                <DriversModule 
+                  drivers={drivers} 
+                  setDrivers={rolePermissions.canEdit ? setDrivers : null} 
+                  trips={filteredData || trips} 
+                  expenses={expenseRecords} 
+                  incomes={incomeRecords} 
+                  formatCurrency={formatCurrency} 
+                  t={t} 
+                />
+              )}
+              {activeSection === "trips" && (
+                <TripsModule 
+                  trips={filteredData || trips} 
+                  drivers={drivers} 
+                  expenses={expenseRecords} 
+                  incomes={incomeRecords} 
+                  chauffeurs={chauffeurOptions} 
+                  formatCurrency={formatCurrency} 
+                  formatTonnage={formatTonnage} 
+                  canWrite={rolePermissions.canEdit} 
+                  onAddTrip={(t) => setManualTrips([...manualTrips, t])} 
+                  t={t} 
+                />
+              )}
               {activeSection === "depenses" && (
                 <ExpenseModule 
                   expenses={expenseRecords} 
@@ -1131,9 +1155,43 @@ export default function App() {
                   t={t}
                 />
               )}
-              {activeSection === "encaissements" && <FinanceWorkspace type="income" records={incomeRecords} setRecords={rolePermissions.canEdit ? setIncomeRecords : null} categories={categories} setCategories={rolePermissions.canEdit ? setCategories : null} />}
-              {activeSection === "documents" && <AITicketValidationModule pendingTickets={pendingTickets} setPendingTickets={rolePermissions.canEdit ? setPendingTickets : null} onApprove={rolePermissions.canEdit ? handleApproveAITicket : null} drivers={drivers} />}
-              {activeSection === "closing" && <DailyClosingModule closings={dailyClosings} setClosings={rolePermissions.canEdit ? setDailyClosings : null} />}
+              {activeSection === "encaissements" && (
+                <FinanceWorkspace 
+                  activeSection="encaissements" 
+                  type="income" 
+                  records={incomeRecords} 
+                  setRecords={rolePermissions.canEdit ? setIncomeRecords : null} 
+                  categories={categories} 
+                  setCategories={rolePermissions.canEdit ? setCategories : null}
+                  expenseRecords={expenseRecords}
+                  incomeRecords={incomeRecords}
+                  drivers={drivers}
+                  trips={filteredData || trips}
+                  formatCurrency={formatCurrency}
+                  canWrite={rolePermissions.canEdit}
+                />
+              )}
+              {activeSection === "documents" && (
+                <AITicketValidationModule 
+                  pendingTickets={pendingTickets} 
+                  setPendingTickets={rolePermissions.canEdit ? setPendingTickets : null} 
+                  onApprove={rolePermissions.canEdit ? handleApproveAITicket : null} 
+                  drivers={drivers} 
+                />
+              )}
+              {activeSection === "closing" && (
+                <DailyClosingModule 
+                  closings={dailyClosings} 
+                  setClosings={rolePermissions.canEdit ? setDailyClosings : null} 
+                  trips={filteredData || trips} 
+                  drivers={drivers} 
+                  expenses={expenseRecords} 
+                  incomes={incomeRecords} 
+                  formatCurrency={formatCurrency} 
+                  canWrite={rolePermissions.canEdit} 
+                  onCloseDay={(closing) => setDailyClosings(prev => [closing, ...(prev || [])])} 
+                />
+              )}
               {activeSection === "maintenance" && (
                 <MaintenanceAdminModule
                   records={maintenanceRecords}

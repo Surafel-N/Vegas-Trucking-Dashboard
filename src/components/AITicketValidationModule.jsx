@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Check, X, Edit3, Image as ImageIcon, AlertCircle, Route } from 'lucide-react';
 
-export default function AITicketValidationModule({ pendingTickets, setPendingTickets, onApprove, drivers }) {
+export default function AITicketValidationModule({ pendingTickets = [], setPendingTickets, onApprove, drivers = [] }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [formData, setFormData] = useState({});
+
+  const safeTickets = pendingTickets || [];
 
   const handleSelect = (ticket) => {
     setSelectedTicket(ticket);
@@ -11,21 +13,22 @@ export default function AITicketValidationModule({ pendingTickets, setPendingTic
   };
 
   const handleApprove = () => {
+    if (!onApprove) return;
     // On envoie le ticket corrigé/validé vers le Dashboard principal
     onApprove({ ...selectedTicket, finalData: formData });
     // On le retire de la file d'attente
-    setPendingTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+    if (setPendingTickets) setPendingTickets(prev => (prev || []).filter(t => t.id !== selectedTicket.id));
     setSelectedTicket(null);
   };
 
   const handleReject = () => {
     if (window.confirm("Voulez-vous vraiment supprimer ce ticket sans l'intégrer ?")) {
-      setPendingTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+      if (setPendingTickets) setPendingTickets(prev => (prev || []).filter(t => t.id !== selectedTicket.id));
       setSelectedTicket(null);
     }
   };
 
-  if (pendingTickets.length === 0) {
+  if (safeTickets.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-white/50">
         <div className="rounded-full bg-white/5 p-6 mb-4">
@@ -43,9 +46,9 @@ export default function AITicketValidationModule({ pendingTickets, setPendingTic
       <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <AlertCircle className="size-5 text-[#4285F4]" />
-          En attente de validation ({pendingTickets.length})
+          En attente de validation ({safeTickets.length})
         </h2>
-        {pendingTickets.map(ticket => (
+        {safeTickets.map(ticket => (
           <button
             key={ticket.id}
             onClick={() => handleSelect(ticket)}
@@ -56,10 +59,10 @@ export default function AITicketValidationModule({ pendingTickets, setPendingTic
             }`}
           >
             <div className="flex justify-between items-center w-full">
-              <span className="font-bold text-sm text-white">Reçu le {new Date(ticket.receivedAt).toLocaleDateString()}</span>
+              <span className="font-bold text-sm text-white">Reçu le {ticket.receivedAt ? new Date(ticket.receivedAt).toLocaleDateString() : "-"}</span>
               <span className="text-xs bg-white/10 px-2 py-1 rounded-md text-white/70">{ticket.source}</span>
             </div>
-            <p className="text-xs text-white/50 truncate">Détails IA: Camion {ticket.aiData.chauffeur || '?'}, {ticket.aiData.tonnage || '?'}T</p>
+            <p className="text-xs text-white/50 truncate">Détails IA: Camion {ticket?.aiData?.chauffeur || '?'}, {ticket?.aiData?.tonnage || '?'}T</p>
           </button>
         ))}
       </div>

@@ -76,18 +76,35 @@ export function computeTripProfit(trip, expenses = [], incomes = []) {
 }
 
 
-export function computeDriverPerformance({ drivers = [], trips = [], expenses = [], incomes = [] }) {
-  return (drivers || []).map((driver) => {
-    const driverTrips = (trips || []).filter((trip) => trip.driverId === driver.id);
+export function computeDriverPerformance(arg1, arg2, arg3, arg4) {
+  let drivers, trips, expenses, incomes;
+  if (Array.isArray(arg1)) {
+    drivers = arg1;
+    trips = arg2;
+    expenses = arg3;
+    incomes = arg4;
+  } else if (arg1 && typeof arg1 === "object") {
+    drivers = arg1.drivers;
+    trips = arg1.trips;
+    expenses = arg1.expenses;
+    incomes = arg1.incomes;
+  }
+  const safeDrivers = drivers || [];
+  const safeTrips = trips || [];
+  const safeExpenses = expenses || [];
+  const safeIncomes = incomes || [];
 
-    const tripIncome = driverTrips.reduce((sum, trip) => sum + trip.total_gross_cfa, 0);
-    const tripExpense = driverTrips.reduce((sum, trip) => sum + trip.total_expense_cfa, 0);
+  return safeDrivers.map((driver) => {
+    const driverTrips = safeTrips.filter((trip) => trip && (trip.driverId === driver.id || trip.driverLabel === driver.name || trip.chauffeur === driver.name));
 
-    const directIncome = incomes
-      .filter((item) => item.driverId === driver.id)
+    const tripIncome = driverTrips.reduce((sum, trip) => sum + (trip.total_gross_cfa || 0), 0);
+    const tripExpense = driverTrips.reduce((sum, trip) => sum + (trip.total_expense_cfa || 0), 0);
+
+    const directIncome = safeIncomes
+      .filter((item) => item && (item.driverId === driver.id || item.driverLabel === driver.name))
       .reduce((sum, item) => sum + (item.amount || 0), 0);
-    const directExpense = expenses
-      .filter((item) => item.driverId === driver.id)
+    const directExpense = safeExpenses
+      .filter((item) => item && (item.driverId === driver.id || item.driverLabel === driver.name))
       .reduce((sum, item) => sum + (item.amount || 0), 0);
 
     const income = tripIncome + directIncome;

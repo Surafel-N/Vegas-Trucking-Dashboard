@@ -45,7 +45,11 @@ const initialFormState = {
   manualDriveLink: ""
 };
 
-export default function ExpenseModule({ expenses, setExpenses, drivers, formatCurrency, onSync, isSyncing, t }) {
+export default function ExpenseModule({ expenses = [], setExpenses, drivers = [], formatCurrency, onSync, isSyncing, t }) {
+  const safeExpenses = expenses || [];
+  const safeDrivers = drivers || [];
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
+
   // Global States
   const [formData, setFormData] = useState(initialFormState);
   const [file, setFile] = useState(null);
@@ -135,7 +139,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
       justificationType,
       createdAt: new Date().toISOString()
     };
-    setExpenses([newExpense, ...expenses]);
+    if (setExpenses) setExpenses([newExpense, ...safeExpenses]);
     setFormData(initialFormState);
     setFile(null);
     setSuccess("Dépense enregistrée.");
@@ -147,18 +151,18 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
   const [filterDriver, setFilterDriver] = useState(ALL_CHAUFFEURS);
 
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
+    return safeExpenses.filter(e => {
       const matchMonth = filterMonth === ALL_MONTHS || (e.date && e.date.startsWith(filterMonth));
       const matchDriver = filterDriver === ALL_CHAUFFEURS || e.driverLabel === filterDriver;
       return matchMonth && matchDriver;
     });
-  }, [expenses, filterMonth, filterDriver]);
+  }, [safeExpenses, filterMonth, filterDriver]);
 
   const months = useMemo(() => {
     const m = new Set();
-    expenses.forEach(e => e.date && m.add(e.date.substring(0, 7)));
+    safeExpenses.forEach(e => e.date && m.add(e.date.substring(0, 7)));
     return Array.from(m).sort().reverse();
-  }, [expenses]);
+  }, [safeExpenses]);
 
   // MISSION 2: Bulk Actions Logic
   const handleToggleSelectAll = () => {
@@ -177,7 +181,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
 
   const handleBulkDelete = () => {
     if (window.confirm(`Supprimer les ${selectedExpenses.length} dépenses sélectionnées ?`)) {
-      setExpenses(expenses.filter(e => !selectedExpenses.includes(e.id)));
+      if (setExpenses) setExpenses(safeExpenses.filter(e => !selectedExpenses.includes(e.id)));
       setSelectedExpenses([]);
       setSuccess("Suppression de masse effectuée.");
       setTimeout(() => setSuccess(null), 3000);
@@ -270,7 +274,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
               </div>
               <select required value={formData.driverLabel} onChange={e => setFormData({ ...formData, driverLabel: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]">
                 <option value="">{t?.driver || "Chauffeur"}...</option>
-                {drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.sdv} - {d.name}</option>)}
+                {safeDrivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.sdv} - {d.name}</option>)}
               </select>
 
               <div className="grid grid-cols-2 gap-4">
@@ -309,7 +313,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
               <h3 className="text-xl font-bold">{t?.archivedHistory || "Historique Archivé"}</h3>
               <div className="flex items-center gap-3">
                 <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_MONTHS}>{t?.allMonths || "Tous les mois"}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_CHAUFFEURS}>{t?.allDrivers || "Tous les chauffeurs"}</option>{drivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
+                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_CHAUFFEURS}>{t?.allDrivers || "Tous les chauffeurs"}</option>{safeDrivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
               </div>
             </div>
 
@@ -351,7 +355,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                         <p className="text-[10px] text-white/60 line-clamp-2 italic">{expense.description}</p>
                       </td>
                       <td className="py-5 border-y border-white/5 text-right font-mono font-black text-white/90">
-                        {formatCurrency(expense.amount)}
+                        {format(expense.amount)}
                       </td>
                       <td className="py-5 border-y border-white/5 text-center">
                         {expense.driveLink ? (
@@ -359,7 +363,7 @@ export default function ExpenseModule({ expenses, setExpenses, drivers, formatCu
                         ) : <FileText className="size-4 opacity-10 mx-auto" />}
                       </td>
                       <td className="py-5 pr-6 rounded-r-[20px] border-y border-r border-white/5 text-right">
-                        <button onClick={() => { if(confirm("Supprimer ?")) setExpenses(expenses.filter(e => e.id !== expense.id)); }} className="p-2 text-white/10 hover:text-red-500 rounded-lg transition-all"><Trash2 className="size-4" /></button>
+                        <button onClick={() => { if(confirm("Supprimer ?") && setExpenses) setExpenses(safeExpenses.filter(e => e.id !== expense.id)); }} className="p-2 text-white/10 hover:text-red-500 rounded-lg transition-all"><Trash2 className="size-4" /></button>
                       </td>
                     </tr>
                   ))}

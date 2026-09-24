@@ -7,34 +7,41 @@ export function DailyClosingModule({
   expenses = [],
   incomes = [],
   closings = [],
-  canWrite,
-  canReopenClosing,
-  onCloseDay,
-  onReopenDay,
+  canWrite = false,
+  canReopenClosing = false,
+  onCloseDay = () => {},
+  onReopenDay = () => {},
   formatCurrency,
 }) {
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [comment, setComment] = useState("");
   const [declared, setDeclared] = useState("");
 
-  const summary = useMemo(() => summarizeFinance({ expenses, incomes, mode: "day", anchorDate: date }), [expenses, incomes, date]);
-  const tripsCount = useMemo(() => (trips || []).filter((trip) => trip.date === date).length, [trips, date]);
+  const safeTrips = trips || [];
+  const safeDrivers = drivers || [];
+  const safeExpenses = expenses || [];
+  const safeIncomes = incomes || [];
+  const safeClosings = closings || [];
+
+  const summary = useMemo(() => summarizeFinance({ expenses: safeExpenses, incomes: safeIncomes, mode: "day", anchorDate: date }), [safeExpenses, safeIncomes, date]);
+  const tripsCount = useMemo(() => safeTrips.filter((trip) => trip.date === date).length, [safeTrips, date]);
 
   const byDriver = useMemo(
     () =>
-      drivers.map((driver) => {
-        const driverIncome = incomes
-          .filter((item) => item.driverId === driver.id && item.date === date)
+      safeDrivers.map((driver) => {
+        const driverIncome = safeIncomes
+          .filter((item) => item && item.driverId === driver.id && item.date === date)
           .reduce((sum, item) => sum + (item.amount || 0), 0);
-        const driverExpense = expenses
-          .filter((item) => item.driverId === driver.id && item.date === date)
+        const driverExpense = safeExpenses
+          .filter((item) => item && item.driverId === driver.id && item.date === date)
           .reduce((sum, item) => sum + (item.amount || 0), 0);
         return { driverId: driver.id, driverName: driver.name, income: driverIncome, expense: driverExpense };
       }),
-    [drivers, incomes, expenses, date],
+    [safeDrivers, safeIncomes, safeExpenses, date],
   );
 
-  const existing = closings.find((item) => item.date === date);
+  const existing = safeClosings.find((item) => item.date === date);
   const declaredAmount = Number(declared || 0);
   const theoretical = summary.totalIncome - summary.totalExpense;
   const gap = declared ? declaredAmount - theoretical : 0;
@@ -76,15 +83,15 @@ export function DailyClosingModule({
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-white/8 bg-black/18 p-4">
             <p className="text-sm text-white/46">Total encaisse</p>
-            <p className="mt-2 text-2xl font-semibold text-[#61d2c0]">{formatCurrency(summary.totalIncome)}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#61d2c0]">{format(summary.totalIncome)}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-black/18 p-4">
             <p className="text-sm text-white/46">Total depense</p>
-            <p className="mt-2 text-2xl font-semibold text-[#ff8f84]">{formatCurrency(summary.totalExpense)}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#ff8f84]">{format(summary.totalExpense)}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-black/18 p-4">
             <p className="text-sm text-white/46">Solde theorique</p>
-            <p className="mt-2 text-2xl font-semibold text-[#9fe3b9]">{formatCurrency(theoretical)}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#9fe3b9]">{format(theoretical)}</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-black/18 p-4">
             <p className="text-sm text-white/46">Trajets du jour</p>
@@ -121,13 +128,13 @@ export function DailyClosingModule({
               </tr>
             </thead>
             <tbody className="text-sm text-white/72">
-              {closings.map((item) => (
+              {safeClosings.map((item) => (
                 <tr key={item.id} className="border-t border-white/6">
                   <td className="px-4 py-3 text-white">{item.date}</td>
-                  <td className="px-4 py-3 text-[#61d2c0]">{formatCurrency(item.totalIncome)}</td>
-                  <td className="px-4 py-3 text-[#ff8f84]">{formatCurrency(item.totalExpense)}</td>
-                  <td className="px-4 py-3 text-[#9fe3b9]">{formatCurrency(item.balance)}</td>
-                  <td className="px-4 py-3">{formatCurrency(item.gap || 0)}</td>
+                  <td className="px-4 py-3 text-[#61d2c0]">{format(item.totalIncome)}</td>
+                  <td className="px-4 py-3 text-[#ff8f84]">{format(item.totalExpense)}</td>
+                  <td className="px-4 py-3 text-[#9fe3b9]">{format(item.balance)}</td>
+                  <td className="px-4 py-3">{format(item.gap || 0)}</td>
                   <td className="px-4 py-3">{item.comment || "-"}</td>
                 </tr>
               ))}

@@ -58,6 +58,7 @@ export function DocumentsIngestionModule({
   description = "Ingestion WhatsApp/PDF/Image, extraction OCR et pre-remplissage encaissement.",
   encaissementOnly = false,
 }) {
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
   const [file, setFile] = useState(null);
   const [source, setSource] = useState("whatsapp");
   const [manualText, setManualText] = useState("");
@@ -255,7 +256,7 @@ export function DocumentsIngestionModule({
                   <p>Type detecte: {doc.parsed.type}</p>
                   <p>Client: {doc.parsed.client || "-"}</p>
                   <p>Date: {doc.parsed.date || "-"}</p>
-                  <p>Montant: {formatCurrency(doc.parsed.amount || 0)}</p>
+                  <p>Montant: {format(doc.parsed.amount || 0)}</p>
                   <p>Reference: {doc.parsed.reference || "-"}</p>
                 </div>
 

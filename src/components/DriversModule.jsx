@@ -1,8 +1,24 @@
 import { BadgeCheck, Car, Phone, UserRound } from "lucide-react";
 import { computeDriverPerformance } from "../utils/businessMetrics";
 
-export function DriversModule({ drivers, trips, expenses, incomes, formatCurrency, t }) {
-  const performance = computeDriverPerformance({ drivers, trips, expenses, incomes });
+export function DriversModule({ 
+  drivers = [], 
+  trips = [], 
+  expenses = [], 
+  incomes = [], 
+  formatCurrency, 
+  t 
+}) {
+  const format = typeof formatCurrency === "function"
+    ? formatCurrency
+    : (val) => Number(val || 0).toLocaleString() + " CFA";
+
+  const performance = computeDriverPerformance({ 
+    drivers: drivers || [], 
+    trips: trips || [], 
+    expenses: expenses || [], 
+    incomes: incomes || [] 
+  });
 
   return (
     <section className="space-y-6">
@@ -32,15 +48,15 @@ export function DriversModule({ drivers, trips, expenses, incomes, formatCurrenc
               </div>
               <div className="rounded-xl border border-white/8 bg-black/20 p-3">
                 <p className="text-xs text-white/48">{t?.revenue || "Recettes"}</p>
-                <p className="mt-1 text-lg font-semibold text-[#61d2c0]">{formatCurrency(driver.income)}</p>
+                <p className="mt-1 text-lg font-semibold text-[#61d2c0]">{format(driver.income)}</p>
               </div>
               <div className="rounded-xl border border-white/8 bg-black/20 p-3">
                 <p className="text-xs text-white/48">{t?.expenses || "Depenses"}</p>
-                <p className="mt-1 text-lg font-semibold text-[#ff8f84]">{formatCurrency(driver.expense)}</p>
+                <p className="mt-1 text-lg font-semibold text-[#ff8f84]">{format(driver.expense)}</p>
               </div>
               <div className="rounded-xl border border-white/8 bg-black/20 p-3">
                 <p className="text-xs text-white/48">{t?.netProfit || "Benefice net"}</p>
-                <p className="mt-1 text-lg font-semibold text-[#9fe3b9]">{formatCurrency(driver.net)}</p>
+                <p className="mt-1 text-lg font-semibold text-[#9fe3b9]">{format(driver.net)}</p>
               </div>
             </div>
           </article>
