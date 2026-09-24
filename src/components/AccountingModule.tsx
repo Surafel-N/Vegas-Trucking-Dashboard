@@ -4,7 +4,8 @@ import {
   CheckCircle2, Clock, AlertTriangle, TrendingUp, Download, 
   ExternalLink, Eye, Trash2, Edit3, Scale, Building2, 
   CreditCard, ArrowUpDown, FileText, Check, X, 
-  DollarSign, Percent, ArrowUpRight, ShieldCheck, RefreshCw
+  DollarSign, Percent, ArrowUpRight, ShieldCheck, RefreshCw,
+  FolderOpen
 } from 'lucide-react';
 
 export interface Invoice {
@@ -22,7 +23,26 @@ export interface Invoice {
   notes?: string;
   attachmentName?: string;
   attachmentData?: string; // Data URL for preview
+  driveLink?: string; // Lien Google Drive de la facture
   createdAt: string;
+}
+
+// Extraction de l'ID d'un fichier Google Drive
+export function getDriveId(link?: string): string | null {
+  if (!link) return null;
+  const matchD = link.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (matchD && matchD[1]) return matchD[1];
+  const matchId = link.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (matchId && matchId[1]) return matchId[1];
+  const fallback = link.match(/[-\w]{25,}/);
+  return fallback ? fallback[0] : null;
+}
+
+// URL d'intégration sécurisée pour iframe Google Drive
+export function getDriveEmbedUrl(link?: string): string | null {
+  const id = getDriveId(link);
+  if (!id) return null;
+  return `https://drive.google.com/file/d/${id}/preview`;
 }
 
 interface AccountingModuleProps {
@@ -49,6 +69,7 @@ export const INITIAL_INVOICES: Invoice[] = [
     paidAmount: 10000000,
     paymentMethod: "Virement bancaire",
     notes: "Acompte de 10M reçu le 20/03. Solde prévu à 30 jours.",
+    driveLink: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
     createdAt: "2026-03-15T10:00:00Z"
   },
   {
@@ -144,7 +165,12 @@ export function AccountingModule({
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [paymentAmountInput, setPaymentAmountInput] = useState<string>("");
   const [paymentMethodInput, setPaymentMethodInput] = useState<string>("Virement bancaire");
-  const [previewDoc, setPreviewDoc] = useState<{ name: string; data: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ 
+    name: string; 
+    data?: string; 
+    driveLink?: string; 
+    isDrive?: boolean; 
+  } | null>(null);
 
   // Formulaire d'ajout / édition
   const [formNumber, setFormNumber] = useState("");
@@ -158,6 +184,7 @@ export function AccountingModule({
   const [formPaid, setFormPaid] = useState("");
   const [formPaymentMethod, setFormPaymentMethod] = useState("Virement bancaire");
   const [formNotes, setFormNotes] = useState("");
+  const [formDriveLink, setFormDriveLink] = useState("");
   const [formFile, setFormFile] = useState<{ name: string; data: string } | null>(null);
 
   const safeInvoices = invoices && invoices.length > 0 ? invoices : INITIAL_INVOICES;
@@ -303,6 +330,7 @@ export function AccountingModule({
       setFormPaid(String(invoiceToEdit.paidAmount || 0));
       setFormPaymentMethod(invoiceToEdit.paymentMethod || "Virement bancaire");
       setFormNotes(invoiceToEdit.notes || "");
+      setFormDriveLink(invoiceToEdit.driveLink || "");
       setFormFile(invoiceToEdit.attachmentData ? { name: invoiceToEdit.attachmentName || "justificatif", data: invoiceToEdit.attachmentData } : null);
     } else {
       setEditingInvoice(null);
@@ -318,6 +346,7 @@ export function AccountingModule({
       setFormPaid("0");
       setFormPaymentMethod("Virement bancaire");
       setFormNotes("");
+      setFormDriveLink("");
       setFormFile(null);
     }
     setIsCreateOpen(true);
@@ -378,6 +407,7 @@ export function AccountingModule({
       paidAmount: pd,
       paymentMethod: formPaymentMethod,
       notes: formNotes.trim(),
+      driveLink: formDriveLink.trim() || undefined,
       attachmentName: formFile?.name,
       attachmentData: formFile?.data,
       createdAt: editingInvoice ? editingInvoice.createdAt : new Date().toISOString()
@@ -447,7 +477,7 @@ export function AccountingModule({
 
   // Export CSV
   function handleExportCSV() {
-    const headers = ["N° Facture", "Client / Donneur d'ordre", "Date", "Echeance", "Periode", "Tonnage (T)", "Taux/T (CFA)", "Total Facture (CFA)", "Montant Paye (CFA)", "Reste a Payer (CFA)", "Statut", "Mode Paiement", "Commentaires"];
+    const headers = ["N° Facture", "Client / Donneur d'ordre", "Date", "Echeance", "Periode", "Tonnage (T)", "Taux/T (CFA)", "Total Facture (CFA)", "Montant Paye (CFA)", "Reste a Payer (CFA)", "Statut", "Mode Paiement", "Lien Google Drive", "Commentaires"];
     const rows = filteredInvoices.map(inv => {
       const rem = Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0));
       const st = getInvoiceStatus(inv);
@@ -465,6 +495,7 @@ export function AccountingModule({
         rem,
         `"${stLabel}"`,
         `"${inv.paymentMethod || ''}"`,
+        `"${inv.driveLink || ''}"`,
         `"${(inv.notes || '').replace(/"/g, '""')}"`
       ];
     });
@@ -781,7 +812,7 @@ export function AccountingModule({
                 <th className="py-4 px-5 text-right">Montant Payé</th>
                 <th className="py-4 px-5 text-right">Reste à Payer</th>
                 <th className="py-4 px-5 text-center">Statut</th>
-                <th className="py-4 px-5 text-center">Pièce Jointe</th>
+                <th className="py-4 px-5 text-center">Facture & Drive</th>
                 <th className="py-4 px-5 text-right">Actions</th>
               </tr>
             </thead>
@@ -879,19 +910,47 @@ export function AccountingModule({
                       )}
                     </td>
 
-                    {/* PIECE JOINTE */}
+                    {/* PIÈCE JOINTE / GOOGLE DRIVE */}
                     <td className="py-4 px-5 text-center">
-                      {inv.attachmentData ? (
-                        <button
-                          onClick={() => setPreviewDoc({ name: inv.attachmentName || inv.invoiceNumber, data: inv.attachmentData! })}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[11px] font-bold border border-white/10 transition-all"
-                          title="Aperçu du justificatif"
-                        >
-                          <Eye className="size-3.5 text-[#4285F4]" /> Aperçu
-                        </button>
-                      ) : (
-                        <span className="text-white/20 text-xs">-</span>
-                      )}
+                      <div className="flex items-center justify-center gap-1.5">
+                        {inv.driveLink ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setPreviewDoc({
+                                  name: `${inv.invoiceNumber} - ${inv.client}`,
+                                  driveLink: inv.driveLink,
+                                  isDrive: true
+                                });
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/25 text-[11px] font-bold transition-all shadow-sm"
+                              title="Aperçu Google Drive de la facture"
+                            >
+                              <FolderOpen className="size-3.5 text-blue-400" />
+                              <span>Drive</span>
+                            </button>
+                            <a
+                              href={inv.driveLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-blue-400 border border-white/10 transition-all"
+                              title="Ouvrir directement dans Google Drive (nouvel onglet)"
+                            >
+                              <ExternalLink className="size-3" />
+                            </a>
+                          </div>
+                        ) : inv.attachmentData ? (
+                          <button
+                            onClick={() => setPreviewDoc({ name: inv.attachmentName || inv.invoiceNumber, data: inv.attachmentData! })}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[11px] font-bold border border-white/10 transition-all"
+                            title="Aperçu du justificatif local"
+                          >
+                            <Eye className="size-3.5 text-[#4285F4]" /> Aperçu
+                          </button>
+                        ) : (
+                          <span className="text-white/20 text-xs">-</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* ACTIONS */}
@@ -1133,29 +1192,73 @@ export function AccountingModule({
                 </div>
               </div>
 
-              {/* FICHIER JUSTIFICATIF */}
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">Pièce Jointe / Justificatif (PDF, Image)</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleFileUpload}
-                    id="invoice-upload-input"
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="invoice-upload-input"
-                    className="cursor-pointer px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white/80 transition-all flex items-center gap-2"
-                  >
-                    <FileText className="size-3.5 text-[#4285F4]" />
-                    {formFile ? "Changer le document" : "Sélectionner un fichier..."}
+              {/* FICHIER JUSTIFICATIF & LIEN GOOGLE DRIVE */}
+              <div className="space-y-4 p-4 rounded-2xl bg-black/30 border border-white/8">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                    <FolderOpen className="size-3.5" /> Justificatif & Facture Numérisée
+                  </span>
+                  <span className="text-[10px] text-white/40">Drive ou Fichier Local</span>
+                </div>
+
+                {/* Lien Google Drive */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">
+                    Lien Google Drive (PDF / Image de la Facture)
                   </label>
-                  {formFile && (
-                    <span className="text-xs text-[#9fe3b9] font-bold truncate max-w-xs flex items-center gap-1">
-                      <Check className="size-3" /> {formFile.name}
-                    </span>
-                  )}
+                  <div className="relative">
+                    <input
+                      type="url"
+                      value={formDriveLink}
+                      onChange={(e) => setFormDriveLink(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/.../view"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#cf5d56] pr-28"
+                    />
+                    {formDriveLink.trim() && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {getDriveId(formDriveLink) ? (
+                          <span className="text-[10px] bg-green-500/15 text-green-400 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 border border-green-500/25">
+                            <Check className="size-2.5" /> Drive Valide
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 border border-amber-500/25">
+                            Lien direct
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[10px] text-white/30">
+                    Collez le lien de partage Google Drive de la facture globale. L'aperçu intégré sera immédiatement accessible.
+                  </p>
+                </div>
+
+                {/* Ou Fichier Local */}
+                <div className="pt-2 border-t border-white/5">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">
+                    Ou importer un fichier local (PDF, Image)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={handleFileUpload}
+                      id="invoice-upload-input"
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="invoice-upload-input"
+                      className="cursor-pointer px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white/80 transition-all flex items-center gap-2"
+                    >
+                      <FileText className="size-3.5 text-[#4285F4]" />
+                      {formFile ? "Changer le document" : "Sélectionner un fichier..."}
+                    </label>
+                    {formFile && (
+                      <span className="text-xs text-[#9fe3b9] font-bold truncate max-w-xs flex items-center gap-1">
+                        <Check className="size-3" /> {formFile.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1270,30 +1373,79 @@ export function AccountingModule({
       {/* MODAL 3: APERÇU DOCUMENT */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="w-full max-w-3xl bg-[#141414] border border-white/10 rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-4xl bg-[#141414] border border-white/10 rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[92vh]">
             <div className="flex items-center justify-between pb-4 border-b border-white/8">
-              <span className="font-bold text-white text-sm flex items-center gap-2">
-                <FileText className="size-4 text-[#4285F4]" /> {previewDoc.name}
-              </span>
-              <button onClick={() => setPreviewDoc(null)} className="p-1.5 text-white/40 hover:text-white">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${previewDoc.isDrive ? "bg-blue-500/15 text-blue-400 border border-blue-500/20" : "bg-[#cf5d56]/15 text-[#cf5d56] border border-[#cf5d56]/20"}`}>
+                  {previewDoc.isDrive ? <FolderOpen className="size-5" /> : <FileText className="size-5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base flex items-center gap-2">
+                    {previewDoc.name}
+                  </h3>
+                  <p className="text-[11px] text-white/40">
+                    {previewDoc.isDrive ? "Visualisation intégrée Google Drive" : "Aperçu du justificatif local"}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setPreviewDoc(null)} 
+                className="p-2 text-white/40 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+              >
                 <X className="size-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/40 rounded-2xl my-4">
-              {previewDoc.data.startsWith("data:image") ? (
-                <img src={previewDoc.data} alt={previewDoc.name} className="max-h-[65vh] object-contain rounded-lg" />
+
+            <div className="flex-1 overflow-hidden p-2 flex items-center justify-center bg-black/50 rounded-2xl my-4 min-h-[520px]">
+              {previewDoc.isDrive && previewDoc.driveLink ? (
+                <iframe
+                  src={getDriveEmbedUrl(previewDoc.driveLink) || previewDoc.driveLink}
+                  title={previewDoc.name}
+                  className="w-full h-[70vh] rounded-xl border border-white/5 bg-[#1a1a1a]"
+                  allow="autoplay; encrypted-media; fullscreen"
+                />
+              ) : previewDoc.data?.startsWith("data:image") ? (
+                <img src={previewDoc.data} alt={previewDoc.name} className="max-h-[70vh] object-contain rounded-lg" />
+              ) : previewDoc.data ? (
+                <iframe src={previewDoc.data} title={previewDoc.name} className="w-full h-[70vh] rounded-lg border border-white/5" />
               ) : (
-                <iframe src={previewDoc.data} title={previewDoc.name} className="w-full h-[65vh] rounded-lg" />
+                <div className="flex flex-col items-center justify-center text-white/30 p-8">
+                  <p>Aperçu indisponible</p>
+                </div>
               )}
             </div>
-            <div className="flex justify-end">
-              <a
-                href={previewDoc.data}
-                download={previewDoc.name}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold"
-              >
-                <Download className="size-3.5" /> Télécharger
-              </a>
+
+            <div className="flex items-center justify-between pt-3 border-t border-white/8">
+              <span className="text-xs text-white/40">
+                {previewDoc.isDrive ? "Lecteur officiel Google Drive" : "Document justificatif numérisé"}
+              </span>
+              <div className="flex items-center gap-2">
+                {previewDoc.isDrive && previewDoc.driveLink && (
+                  <a
+                    href={previewDoc.driveLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-bold border border-blue-500/30 transition-all shadow-sm"
+                  >
+                    <ExternalLink className="size-3.5" /> Ouvrir sur Google Drive
+                  </a>
+                )}
+                {previewDoc.data && (
+                  <a
+                    href={previewDoc.data}
+                    download={previewDoc.name}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all"
+                  >
+                    <Download className="size-3.5" /> Télécharger
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-bold transition-all"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1303,3 +1455,4 @@ export function AccountingModule({
 }
 
 export default AccountingModule;
+
