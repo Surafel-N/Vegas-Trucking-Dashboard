@@ -91,7 +91,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], googleClient
       setIsLoadingImages(false);
     }
   };
-
+const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
   const formatDate = (dateStr: string, options?: Intl.DateTimeFormatOptions) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
