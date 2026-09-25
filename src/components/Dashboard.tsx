@@ -323,7 +323,12 @@ export function Dashboard({
 
       {/* REVENUE TREND & TONNAGE (FULL WIDTH APPLE DESIGN) */}
       <section className="col-span-12">
-          <MiniCharts records={syncFilteredData} t={t} />
+          <MiniCharts 
+            records={syncFilteredData} 
+            formatCurrency={(v) => formatCurrency(v, currency)} 
+            currency={currency} 
+            t={t} 
+          />
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
