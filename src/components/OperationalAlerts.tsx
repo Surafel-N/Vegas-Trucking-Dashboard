@@ -13,7 +13,7 @@ type OperationalAlertsProps = {
 };
 
 export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: OperationalAlertsProps) {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'vidange' | 'financial'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'vidange' | 'financial' | 'transit'>('all');
 
   // Configuration officielle des 3 camions
   const trucksConfig = [
@@ -71,11 +71,11 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
     });
   }, [allTrips, records, oilChanges]);
 
-  // Liste enrichie des alertes
+  // Liste enrichie des alertes ciblées et filtrage des faux positifs
   const { allAlerts, counts } = useMemo(() => {
     const list: {
       id: string;
-      category: 'vidange' | 'financial' | 'fuel' | 'system';
+      category: 'vidange' | 'financial' | 'fuel' | 'transit' | 'system';
       type: 'critical' | 'warning' | 'info';
       title: string;
       desc: string;
@@ -85,7 +85,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
       amount?: number;
     }[] = [];
 
-    // 1. Alertes Vidange générées depuis les jauges
+    // 1. Alertes Vidange réelles générées depuis les jauges certifiées
     truckGauges.forEach(gauge => {
       if (gauge.status === 'urgent') {
         const overdue = Math.abs(gauge.remaining);
@@ -94,8 +94,8 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           category: 'vidange',
           type: 'critical',
           title: `VIDANGE DÉPASSÉE : ${gauge.name} TRUCK ${gauge.truckNum}`,
-          desc: `Dépassement de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${gauge.driven.toLocaleString("fr-FR")} KM depuis la vidange du ${gauge.lastDate} à ${gauge.lastKm.toLocaleString("fr-FR")} KM).`,
-          truck: `${gauge.name} 76`,
+          desc: `Dépassement critique de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${gauge.driven.toLocaleString("fr-FR")} KM depuis la vidange du ${gauge.lastDate} à ${gauge.lastKm.toLocaleString("fr-FR")} KM). Risque mécanique élevé.`,
+          truck: `${gauge.name} ${gauge.truckNum}`,
           truckColor: gauge.color,
           date: gauge.lastDate
         });
@@ -106,59 +106,102 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           type: 'warning',
           title: `VIDANGE IMMINENTE : ${gauge.name} TRUCK ${gauge.truckNum}`,
           desc: `Plus que ${gauge.remaining.toLocaleString("fr-FR")} KM avant révision (${gauge.driven.toLocaleString("fr-FR")} / 10 000 KM roulés).`,
-          truck: `${gauge.name} 76`,
+          truck: `${gauge.name} ${gauge.truckNum}`,
           truckColor: gauge.color,
           date: gauge.lastDate
         });
       }
     });
 
-    // 2. Alertes Marges Négatives (Pertes d'exploitation)
-    const negativeTrips = records.filter(r => (r.total_net_cfa || 0) < 0);
-    negativeTrips.forEach(r => {
+    // 2. Traitement analytique des enregistrements d'exploitation
+    records.forEach(r => {
       const driver = String(r.driverLabel || r.chauffeur || "");
       let color = "#CF5D56";
       if (driver.includes("AMARA")) color = "#3B82F6";
       else if (driver.includes("BRAHIMA")) color = "#10B981";
 
-      list.push({
-        id: `neg-${r.id}`,
-        category: 'financial',
-        type: 'critical',
-        title: `Marge Négative sur Trajet`,
-        desc: `${r.driverLabel || 'Camion'} : Perte sèche de ${Math.abs(r.total_net_cfa).toLocaleString("fr-FR")} CFA (Dépenses supérieures au revenu).`,
-        truck: r.driverLabel,
-        truckColor: color,
-        amount: Math.abs(r.total_net_cfa),
-        date: r.date
-      });
+      const tonnage = Number(r.tonnage) || 0;
+      const gross = Number(r.total_gross_cfa) || 0;
+      const fuel = Number(r.fuel_cost_cfa) || 0;
+      const road = Number(r.road_fees_cfa) || 0;
+      const net = Number(r.total_net_cfa) || 0;
+      const expense = Number(r.total_expense_cfa) || (fuel + road);
+
+      // CAS A : Départ / Transit à vide vers la mine (Point de stationnement -> Site d'extraction)
+      // Carburant ou dépenses engagées SANS revenu et SANS tonnage chargé.
+      // RÈGLE MÉTIER : C'est le moment où les camions se rendent sur le site d'extraction depuis la ville à vide.
+      // C'est un coût d'exploitation normal qui NE DOIT PAS être comptabilisé comme une alerte majeure.
+      if (tonnage === 0 && gross === 0 && expense > 0) {
+        list.push({
+          id: `transit-${r.id}`,
+          category: 'transit',
+          type: 'info',
+          title: `Mise en route vers la mine (Trajet à vide)`,
+          desc: `${r.driverLabel || 'Camion'} : Ralliement du point de stationnement au site d'extraction à vide (${expense.toLocaleString("fr-FR")} CFA de gasoil/route). Coût normal de mise en place opérationnelle.`,
+          truck: r.driverLabel,
+          truckColor: color,
+          amount: expense,
+          date: r.date
+        });
+        return;
+      }
+
+      // CAS B : VRAIE Marge Négative sur Voyage Chargé (Anomalie de rentabilité commerciale)
+      // Le camion a transporté du fret (tonnage > 0), mais les dépenses dépassent la recette facturée
+      if (tonnage > 0 && net < 0) {
+        list.push({
+          id: `neg-${r.id}`,
+          category: 'financial',
+          type: 'critical',
+          title: `Marge Négative sur Voyage Chargé`,
+          desc: `${r.driverLabel || 'Camion'} : Perte de ${Math.abs(net).toLocaleString("fr-FR")} CFA sur voyage chargé de ${tonnage}T (Recette insuffisante face aux frais engagés).`,
+          truck: r.driverLabel,
+          truckColor: color,
+          amount: Math.abs(net),
+          date: r.date
+        });
+      }
+
+      // CAS C : Surconsommation Carburant anormale sur voyage chargé (> 4 200 CFA / Tonne)
+      if (tonnage > 0 && fuel > 0) {
+        const ratioFuelPerTon = fuel / tonnage;
+        if (ratioFuelPerTon > 4200) {
+          list.push({
+            id: `fuel-ratio-${r.id}`,
+            category: 'fuel',
+            type: 'warning',
+            title: `Surconsommation Gasoil (${Math.round(ratioFuelPerTon).toLocaleString("fr-FR")} CFA/T)`,
+            desc: `${r.driverLabel || 'Camion'} : Ratio carburant anormalement élevé (${fuel.toLocaleString("fr-FR")} CFA pour ${tonnage}T transportées).`,
+            truck: r.driverLabel,
+            truckColor: color,
+            amount: fuel,
+            date: r.date
+          });
+        }
+      }
+
+      // CAS D : Frais de Route / Péages inhabituels (> 95 000 CFA)
+      if (road > 95000) {
+        list.push({
+          id: `road-${r.id}`,
+          category: 'financial',
+          type: 'warning',
+          title: `Frais de Route Élevés (${road.toLocaleString("fr-FR")} CFA)`,
+          desc: `${r.driverLabel || 'Camion'} : Dépassement important des frais de route/péages le ${r.date}.`,
+          truck: r.driverLabel,
+          truckColor: color,
+          amount: road,
+          date: r.date
+        });
+      }
     });
 
-    // 3. Alertes Carburant sans Tonnage (Anomalie de chargement)
-    const highFuelMissingTonnage = records.filter(r => (r.fuel_cost_cfa || 0) > 100000 && (r.tonnage || 0) === 0);
-    highFuelMissingTonnage.forEach(r => {
-      const driver = String(r.driverLabel || r.chauffeur || "");
-      let color = "#CF5D56";
-      if (driver.includes("AMARA")) color = "#3B82F6";
-      else if (driver.includes("BRAHIMA")) color = "#10B981";
-
-      list.push({
-        id: `fuel-${r.id}`,
-        category: 'fuel',
-        type: 'warning',
-        title: `Carburant Décaissé Sans Voyage`,
-        desc: `${r.driverLabel || 'Camion'} : ${Number(r.fuel_cost_cfa).toLocaleString("fr-FR")} CFA de gasoil sans chargement associé.`,
-        truck: r.driverLabel,
-        truckColor: color,
-        amount: r.fuel_cost_cfa,
-        date: r.date
-      });
-    });
-
-    // Tri : critiques en premier, puis les plus récentes
+    // Tri : critiques en premier, puis les avertissements, puis par date décroissante
     const sorted = list.sort((a, b) => {
-      if (a.type === 'critical' && b.type !== 'critical') return -1;
-      if (b.type === 'critical' && a.type !== 'critical') return 1;
+      const order = { critical: 0, warning: 1, info: 2 };
+      if (order[a.type] !== order[b.type]) {
+        return order[a.type] - order[b.type];
+      }
       return (b.date || "").localeCompare(a.date || "");
     });
 
@@ -167,6 +210,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
       critical: sorted.filter(a => a.type === 'critical').length,
       warning: sorted.filter(a => a.type === 'warning').length,
       vidange: sorted.filter(a => a.category === 'vidange').length,
+      transit: sorted.filter(a => a.category === 'transit').length,
       financial: sorted.filter(a => a.category === 'financial' || a.category === 'fuel').length
     };
 
@@ -178,6 +222,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
     if (activeFilter === 'critical') return allAlerts.filter(a => a.type === 'critical');
     if (activeFilter === 'warning') return allAlerts.filter(a => a.type === 'warning');
     if (activeFilter === 'vidange') return allAlerts.filter(a => a.category === 'vidange');
+    if (activeFilter === 'transit') return allAlerts.filter(a => a.category === 'transit');
     if (activeFilter === 'financial') return allAlerts.filter(a => a.category === 'financial' || a.category === 'fuel');
     return allAlerts;
   }, [allAlerts, activeFilter]);
@@ -339,6 +384,18 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
         </button>
 
         <button
+          onClick={() => setActiveFilter('transit')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'transit'
+              ? 'bg-[#3B82F6] text-white shadow-lg shadow-[#3B82F6]/20'
+              : 'bg-white/5 text-[#3B82F6] hover:bg-blue-500/10'
+          }`}
+        >
+          <Truck className="size-3" />
+          Transits Mine ({counts.transit})
+        </button>
+
+        <button
           onClick={() => setActiveFilter('financial')}
           className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
             activeFilter === 'financial'
@@ -347,7 +404,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <TrendingDown className="size-3" />
-          Finances & Carburant ({counts.financial})
+          Marge & Carburant ({counts.financial})
         </button>
       </div>
 
@@ -369,6 +426,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           filteredAlerts.map(alert => {
             const isCrit = alert.type === 'critical';
             const isWarn = alert.type === 'warning';
+            const isTransit = alert.category === 'transit';
 
             return (
               <div 
@@ -378,7 +436,9 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                     ? 'border-red-500/25 bg-red-500/[0.04] hover:bg-red-500/[0.08]' 
                     : isWarn 
                       ? 'border-amber-500/25 bg-amber-500/[0.04] hover:bg-amber-500/[0.08]' 
-                      : 'border-blue-500/20 bg-blue-500/[0.03] hover:bg-blue-500/[0.06]'
+                      : isTransit
+                        ? 'border-blue-500/20 bg-blue-500/[0.03] hover:bg-blue-500/[0.06]'
+                        : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04]'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -391,6 +451,8 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                   }`}>
                     {alert.category === 'vidange' ? (
                       <Droplet className="size-4" />
+                    ) : alert.category === 'transit' ? (
+                      <Truck className="size-4" />
                     ) : alert.category === 'fuel' ? (
                       <Fuel className="size-4" />
                     ) : (
@@ -414,9 +476,9 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                           </span>
                         )}
                         <span className={`text-[10px] font-black uppercase tracking-wider ${
-                          isCrit ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-blue-400'
+                          isCrit ? 'text-red-400' : isWarn ? 'text-amber-400' : isTransit ? 'text-blue-400' : 'text-emerald-400'
                         }`}>
-                          {isCrit ? 'Critique' : isWarn ? 'Avertissement' : 'Info'}
+                          {isCrit ? 'Critique' : isWarn ? 'Avertissement' : isTransit ? 'Transit Mine (À vide)' : 'Info'}
                         </span>
                       </div>
 
