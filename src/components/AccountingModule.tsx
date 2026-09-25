@@ -51,11 +51,91 @@ export interface Invoice {
   paidAmount: number;
   paymentMethod?: string;
   notes?: string;
+  attachmentName?: string;
+  attachmentData?: string;
   driveLink?: string;
   createdAt: string;
 }
 
-export const INITIAL_INVOICES: Invoice[] = [];
+// Factures d'exemple basées sur le transport au tonnage
+export const INITIAL_INVOICES: Invoice[] = [
+  {
+    id: "inv-2026-003",
+    invoiceNumber: "FAC-SDV-2026-03",
+    client: "CIMAF Côte d'Ivoire",
+    date: "2026-03-15",
+    dueDate: "2026-04-15",
+    period: "Mars 2026",
+    tonnage: 1120.5,
+    ratePerTon: 15500,
+    totalAmount: 17367750,
+    paidAmount: 10000000,
+    paymentMethod: "Virement bancaire",
+    notes: "Acompte de 10M reçu le 20/03. Solde prévu à 30 jours.",
+    driveLink: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
+    createdAt: "2026-03-15T10:00:00Z"
+  },
+  {
+    id: "inv-2026-002",
+    invoiceNumber: "FAC-SDV-2026-02",
+    client: "SDV Logistique & Transit",
+    date: "2026-02-28",
+    dueDate: "2026-03-31",
+    period: "Février 2026",
+    tonnage: 1340.0,
+    ratePerTon: 15000,
+    totalAmount: 20100000,
+    paidAmount: 20100000,
+    paymentMethod: "Virement bancaire",
+    notes: "Règlement complet reçu par virement BOA.",
+    createdAt: "2026-02-28T14:30:00Z"
+  },
+  {
+    id: "inv-2026-001",
+    invoiceNumber: "FAC-SDV-2026-01",
+    client: "SDV Logistique & Transit",
+    date: "2026-01-31",
+    dueDate: "2026-02-28",
+    period: "Janvier 2026",
+    tonnage: 1425.8,
+    ratePerTon: 15000,
+    totalAmount: 21387000,
+    paidAmount: 21387000,
+    paymentMethod: "Virement bancaire",
+    notes: "Facturation mensuelle globale Janvier. Soldé.",
+    createdAt: "2026-01-31T09:00:00Z"
+  },
+  {
+    id: "inv-2025-012",
+    invoiceNumber: "FAC-SDV-2025-12",
+    client: "SGS Minerais & Vrac",
+    date: "2025-12-30",
+    dueDate: "2026-01-30",
+    period: "Décembre 2025",
+    tonnage: 1280.0,
+    ratePerTon: 14800,
+    totalAmount: 18944000,
+    paidAmount: 18944000,
+    paymentMethod: "Virement bancaire",
+    notes: "Campagne cacao & pondéreux fin 2025. Soldé.",
+    createdAt: "2025-12-30T16:00:00Z"
+  },
+  {
+    id: "inv-2025-011",
+    invoiceNumber: "FAC-SDV-2025-11",
+    client: "CIMAF Côte d'Ivoire",
+    date: "2025-11-30",
+    dueDate: "2025-12-31",
+    period: "Novembre 2025",
+    tonnage: 1190.2,
+    ratePerTon: 15000,
+    totalAmount: 17853000,
+    paidAmount: 15000000,
+    paymentMethod: "Chèque",
+    notes: "Reste un reliquat de 2.85M CFA en attente de validation comptable.",
+    createdAt: "2025-11-30T11:00:00Z"
+  }
+];
 
 interface AccountingModuleProps {
   transactions?: AccountingTransaction[];
@@ -99,22 +179,34 @@ const CATEGORY_STYLES: Record<string, { color: string; bg: string; border: strin
 export function AccountingModule({
   transactions,
   setTransactions,
+  invoices = [],
+  setInvoices,
   onSync,
   isSyncing = false,
   formatCurrency,
+  formatTonnage,
   canWrite = true,
 }: AccountingModuleProps) {
   const formatMoney = typeof formatCurrency === "function" 
     ? formatCurrency 
     : (val: number) => Number(val || 0).toLocaleString("fr-FR") + " CFA";
 
-  // Données de base
+  const formatTon = typeof formatTonnage === "function"
+    ? formatTonnage
+    : (val: number) => Number(val || 0).toLocaleString("fr-FR") + " T";
+
+  // --- ONGLET ACTIF : SPREEDSHEET (GRAND LIVRE) vs FACTURES CLIENTS ---
+  const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices">("spreedsheet");
+
+  // ==========================================
+  // PARTIE 1 : DONNÉES SPREEDSHEET (GRAND LIVRE)
+  // ==========================================
   const allTx = useMemo(() => {
     if (transactions && transactions.length > 0) return transactions;
     return INITIAL_ACCOUNTING_TRANSACTIONS;
   }, [transactions]);
 
-  // --- FILTRES & ÉTATS ---
+  // Filtres Spreedsheet
   const [selectedYear, setSelectedYear] = useState<string>("ALL");
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
   const [selectedType, setSelectedType] = useState<"ALL" | "in" | "out">("ALL");
@@ -124,7 +216,7 @@ export function AccountingModule({
   const [sortField, setSortField] = useState<"date" | "amount" | "category">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // --- MODALS & PREVIEWS ---
+  // Modals Spreedsheet
   const [previewDoc, setPreviewDoc] = useState<{
     title: string;
     date: string;
@@ -142,7 +234,7 @@ export function AccountingModule({
   const [newTxComment, setNewTxComment] = useState<string>("");
   const [newTxDriveLink, setNewTxDriveLink] = useState<string>("");
 
-  // Années disponibles dans le dataset
+  // Années disponibles dans le dataset Spreedsheet
   const availableYears = useMemo(() => {
     const set = new Set<string>();
     allTx.forEach(t => {
@@ -151,7 +243,7 @@ export function AccountingModule({
     return Array.from(set).sort().reverse();
   }, [allTx]);
 
-  // Catégories disponibles avec leurs comptes et montants
+  // Catégories Spreedsheet
   const availableCategories = useMemo(() => {
     const map = new Map<string, { count: number; total: number; type: "in" | "out" }>();
     allTx.forEach(t => {
@@ -165,7 +257,7 @@ export function AccountingModule({
       .sort((a, b) => b.total - a.total);
   }, [allTx]);
 
-  // Filtrage des transactions
+  // Filtrage des transactions Spreedsheet
   const filteredTransactions = useMemo(() => {
     return allTx.filter(t => {
       const yr = t.date ? t.date.slice(0, 4) : "";
@@ -205,7 +297,7 @@ export function AccountingModule({
     });
   }, [allTx, selectedYear, selectedMonth, selectedType, selectedCategory, onlyDriveReceipts, searchQuery, sortField, sortOrder]);
 
-  // KPIs financiers calculés sur le filtrage actif
+  // Métriques Spreedsheet
   const metrics = useMemo(() => {
     let totalIn = 0;
     let totalOut = 0;
@@ -223,7 +315,6 @@ export function AccountingModule({
     const net = totalIn - totalOut;
     const ratio = totalOut > 0 ? (totalIn / totalOut) * 100 : 0;
 
-    // Dernier solde disponible
     const latestWithBalance = filteredTransactions.find(t => t.balance !== undefined && t.balance !== null && t.balance !== 0);
     const balance = latestWithBalance?.balance || 0;
 
@@ -238,18 +329,17 @@ export function AccountingModule({
     };
   }, [filteredTransactions]);
 
-  // Données mensuelles agrégées pour le graphique Recharts
+  // Données mensuelles Recharts
   const monthlyChartData = useMemo(() => {
     const map = new Map<string, { monthKey: string; label: string; in: number; out: number; net: number }>();
     
-    // Regrouper par année-mois
     filteredTransactions.forEach(t => {
       if (!t.date) return;
-      const key = t.date.slice(0, 7); // YYYY-MM
+      const key = t.date.slice(0, 7);
       if (!map.has(key)) {
         const [yr, mo] = key.split("-");
         const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
-        const label = `${monthNames[parseInt(mo, 10) - 1]} ${yr.slice(2)}`;
+        const label = `${monthNames[parseInt(mo, 10) - 1]} ${yr?.slice(2) || ''}`;
         map.set(key, { monthKey: key, label, in: 0, out: 0, net: 0 });
       }
       const entry = map.get(key)!;
@@ -264,7 +354,7 @@ export function AccountingModule({
     return Array.from(map.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
   }, [filteredTransactions]);
 
-  // Export CSV complet
+  // Export CSV Grand Livre Spreedsheet
   const handleExportCSV = () => {
     const headers = ["Date ISO", "Date Brute", "Sens Flux", "Categorie", "Montant (CFA)", "Solde Apres Operation (CFA)", "Libelle / Commentaire", "Lien Google Drive"];
     const rows = filteredTransactions.map(t => [
@@ -282,7 +372,7 @@ export function AccountingModule({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `comptabilite_spreedsheet_${selectedYear}_${Date.now()}.csv`);
+    link.setAttribute("download", `grand_livre_spreedsheet_${selectedYear}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -333,9 +423,155 @@ export function AccountingModule({
     }
   };
 
+  // ==========================================
+  // PARTIE 2 : FACTURES CLIENTS (AU TONNAGE)
+  // ==========================================
+  const safeInvoices = invoices && invoices.length > 0 ? invoices : INITIAL_INVOICES;
+
+  const [invoiceYear, setInvoiceYear] = useState<string>("ALL");
+  const [invoiceStatus, setInvoiceStatus] = useState<string>("ALL");
+  const [invoiceClient, setInvoiceClient] = useState<string>("ALL");
+  const [invoiceSearch, setInvoiceSearch] = useState<string>("");
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+
+  // Formulaire facture
+  const [formNumber, setFormNumber] = useState("");
+  const [formClient, setFormClient] = useState("");
+  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
+  const [formDueDate, setFormDueDate] = useState("");
+  const [formPeriod, setFormPeriod] = useState("");
+  const [formTonnage, setFormTonnage] = useState("");
+  const [formRate, setFormRate] = useState("15000");
+  const [formTotal, setFormTotal] = useState("");
+  const [formPaid, setFormPaid] = useState("0");
+  const [formPaymentMethod, setFormPaymentMethod] = useState("Virement bancaire");
+  const [formNotes, setFormNotes] = useState("");
+  const [formDriveLink, setFormDriveLink] = useState("");
+
+  function getInvoiceStatus(inv: Invoice): "paid" | "partial" | "pending" | "overdue" {
+    const total = inv.totalAmount || 0;
+    const paid = inv.paidAmount || 0;
+    const remaining = total - paid;
+    if (remaining <= 0 && total > 0) return "paid";
+    if (paid > 0 && remaining > 0) return "partial";
+    if (inv.dueDate) {
+      const due = new Date(inv.dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (due < today) return "overdue";
+    }
+    return "pending";
+  }
+
+  const invoiceMetrics = useMemo(() => {
+    let totalBudget = 0;
+    let totalTonnage = 0;
+    let totalPaid = 0;
+    let totalRemaining = 0;
+    let overdueCount = 0;
+
+    safeInvoices.forEach(inv => {
+      const tot = inv.totalAmount || 0;
+      const pd = inv.paidAmount || 0;
+      const rem = Math.max(0, tot - pd);
+      const st = getInvoiceStatus(inv);
+
+      totalBudget += tot;
+      totalTonnage += inv.tonnage || 0;
+      totalPaid += pd;
+      totalRemaining += rem;
+      if (st === "overdue") overdueCount += 1;
+    });
+
+    const recoveryRate = totalBudget > 0 ? (totalPaid / totalBudget) * 100 : 0;
+    return { totalBudget, totalTonnage, totalPaid, totalRemaining, overdueCount, recoveryRate, count: safeInvoices.length };
+  }, [safeInvoices]);
+
+  const filteredInvoices = useMemo(() => {
+    return safeInvoices.filter(inv => {
+      const yr = inv.date ? inv.date.slice(0, 4) : "";
+      const st = getInvoiceStatus(inv);
+
+      if (invoiceYear !== "ALL" && yr !== invoiceYear) return false;
+      if (invoiceStatus !== "ALL" && st !== invoiceStatus) return false;
+      if (invoiceClient !== "ALL" && inv.client !== invoiceClient) return false;
+
+      if (invoiceSearch.trim()) {
+        const q = invoiceSearch.toLowerCase();
+        const matchNum = inv.invoiceNumber?.toLowerCase().includes(q);
+        const matchClient = inv.client?.toLowerCase().includes(q);
+        const matchNotes = inv.notes?.toLowerCase().includes(q);
+        if (!matchNum && !matchClient && !matchNotes) return false;
+      }
+      return true;
+    });
+  }, [safeInvoices, invoiceYear, invoiceStatus, invoiceClient, invoiceSearch]);
+
+  const handleSaveInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canWrite) return;
+
+    const payload: Invoice = {
+      id: editingInvoice ? editingInvoice.id : `inv-${Date.now()}`,
+      invoiceNumber: formNumber.trim() || `FAC-${Date.now()}`,
+      client: formClient.trim() || "Client",
+      date: formDate,
+      dueDate: formDueDate,
+      period: formPeriod.trim(),
+      tonnage: parseFloat(formTonnage) || 0,
+      ratePerTon: parseFloat(formRate) || undefined,
+      totalAmount: parseFloat(formTotal) || 0,
+      paidAmount: parseFloat(formPaid) || 0,
+      paymentMethod: formPaymentMethod,
+      notes: formNotes.trim(),
+      driveLink: formDriveLink.trim() || undefined,
+      createdAt: editingInvoice ? editingInvoice.createdAt : new Date().toISOString()
+    };
+
+    if (setInvoices) {
+      if (editingInvoice) {
+        setInvoices(prev => (prev || []).map(item => item.id === editingInvoice.id ? payload : item));
+      } else {
+        setInvoices(prev => [payload, ...(prev || [])]);
+      }
+    }
+    setIsInvoiceModalOpen(false);
+  };
+
+  const handleExportInvoicesCSV = () => {
+    const headers = ["N° Facture", "Client", "Date", "Echeance", "Periode", "Tonnage (T)", "Total Facture (CFA)", "Paye (CFA)", "Reste a Payer (CFA)", "Statut", "Lien Drive"];
+    const rows = filteredInvoices.map(inv => {
+      const rem = Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0));
+      const st = getInvoiceStatus(inv);
+      return [
+        `"${inv.invoiceNumber}"`,
+        `"${inv.client}"`,
+        `"${inv.date}"`,
+        `"${inv.dueDate || ''}"`,
+        `"${inv.period || ''}"`,
+        inv.tonnage || 0,
+        inv.totalAmount || 0,
+        inv.paidAmount || 0,
+        rem,
+        `"${st}"`,
+        `"${inv.driveLink || ''}"`
+      ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `factures_clients_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-16">
-      {/* HEADER SECTION */}
+      {/* HEADER SECTION & BANNIÈRE SÉLECTEUR DE VUE */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/8 pb-6">
         <div>
           <div className="flex items-center gap-3">
@@ -344,590 +580,759 @@ export function AccountingModule({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">Comptabilité & Grand Livre Flotte</h1>
+                <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">Comptabilité & Trésorerie Flotte</h1>
                 <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
                   <span className="size-1.5 rounded-full bg-[#10B981] animate-ping" />
                   Feuille 'Spreedsheet' Connectée
                 </span>
               </div>
               <p className="text-xs text-white/50 mt-1">
-                Extraction sémantique certifiée de l'historique bancaire et d'exploitation • {allTx.length} écritures analysées
+                Grand livre sémantique de trésorerie ({allTx.length} flux) et facturation clients au tonnage
               </p>
             </div>
           </div>
         </div>
 
+        {/* SWITCHER DE VUES ENTRE GRAND LIVRE SPREEDSHEET ET FACTURES */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+            <button
+              onClick={() => setViewTab("spreedsheet")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                viewTab === "spreedsheet"
+                  ? 'bg-gradient-to-r from-[#10B981] to-[#059669] text-white shadow-lg shadow-[#10B981]/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <FileText className="size-3.5" />
+              <span>Grand Livre Spreedsheet ({allTx.length})</span>
+            </button>
+
+            <button
+              onClick={() => setViewTab("invoices")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                viewTab === "invoices"
+                  ? 'bg-gradient-to-r from-[#CF5D56] to-[#b34842] text-white shadow-lg shadow-[#CF5D56]/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Receipt className="size-3.5" />
+              <span>Factures Clients ({safeInvoices.length})</span>
+            </button>
+          </div>
+
           {onSync && (
             <button
               onClick={onSync}
               disabled={isSyncing}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
-              title="Synchroniser immédiatement avec Google Sheets"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              title="Synchroniser avec Google Sheets"
             >
               <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin text-[#00F2FF]' : ''}`} />
-              <span>{isSyncing ? "Synchronisation..." : "Actualiser Spreedsheet"}</span>
-            </button>
-          )}
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95"
-          >
-            <Download className="size-3.5" /> Exporter Grand Livre (CSV)
-          </button>
-
-          {canWrite && (
-            <button
-              onClick={() => setIsNewTxModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-[#10B981]/20 active:scale-95"
-            >
-              <Plus className="size-4" /> Nouvelle Écriture
+              <span>{isSyncing ? "Synchro..." : "Actualiser"}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 4 TOP KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* CARD 1: TOTAL ENTRÉES RÉELLES */}
-        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#10B981]/10 transition-all"></div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Entrées Réelles</span>
-            <div className="size-8 rounded-xl bg-[#10B981]/10 border border-[#10B981]/25 flex items-center justify-center text-[#10B981]">
-              <ArrowDownRight className="size-4" />
+      {/* ========================================================================= */}
+      {/* VUE 1 : GRAND LIVRE SPREEDSHEET (650 FLUX AVEC ANALYSE SÉMANTIQUE)        */}
+      {/* ========================================================================= */}
+      {viewTab === "spreedsheet" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* 4 TOP KPI CARDS SPREEDSHEET */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* CARD 1: TOTAL ENTRÉES RÉELLES */}
+            <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#10B981]/10 transition-all"></div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Entrées Réelles</span>
+                <div className="size-8 rounded-xl bg-[#10B981]/10 border border-[#10B981]/25 flex items-center justify-center text-[#10B981]">
+                  <ArrowDownRight className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#10B981]">{formatMoney(metrics.totalIn)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>Paiements Clients & Retenues</span>
+                  <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'in').length} encaissements</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#10B981]">{formatMoney(metrics.totalIn)}</p>
-            <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-              <span>Clients, 20% Retenue, Apports</span>
-              <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'in').length} encaissements</span>
-            </div>
-          </div>
-        </div>
 
-        {/* CARD 2: TOTAL DÉPENSES RÉELLES */}
-        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#CF5D56]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#CF5D56]/10 transition-all"></div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Dépenses Réelles</span>
-            <div className="size-8 rounded-xl bg-[#CF5D56]/10 border border-[#CF5D56]/25 flex items-center justify-center text-[#CF5D56]">
-              <ArrowUpRight className="size-4" />
+            {/* CARD 2: TOTAL DÉPENSES RÉELLES */}
+            <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#CF5D56]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#CF5D56]/10 transition-all"></div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Dépenses Réelles</span>
+                <div className="size-8 rounded-xl bg-[#CF5D56]/10 border border-[#CF5D56]/25 flex items-center justify-center text-[#CF5D56]">
+                  <ArrowUpRight className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#CF5D56]">{formatMoney(metrics.totalOut)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>Carburant, Salaires, Pièces</span>
+                  <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'out').length} décaissements</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#CF5D56]">{formatMoney(metrics.totalOut)}</p>
-            <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-              <span>Carburant, Péages, Salaires, Pièces</span>
-              <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'out').length} décaissements</span>
-            </div>
-          </div>
-        </div>
 
-        {/* CARD 3: RÉSULTAT NET DE TRÉSORERIE */}
-        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
-          <div className={`absolute top-0 right-0 w-32 h-32 ${metrics.net >= 0 ? 'bg-[#00F2FF]/5' : 'bg-red-500/5'} rounded-full blur-3xl pointer-events-none`}></div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Flux Net de Trésorerie</span>
-            <div className={`size-8 rounded-xl ${metrics.net >= 0 ? 'bg-[#00F2FF]/10 text-[#00F2FF] border-[#00F2FF]/25' : 'bg-red-500/10 text-red-400 border-red-500/25'} border flex items-center justify-center`}>
-              <TrendingUp className="size-4" />
+            {/* CARD 3: RÉSULTAT NET DE TRÉSORERIE */}
+            <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
+              <div className={`absolute top-0 right-0 w-32 h-32 ${metrics.net >= 0 ? 'bg-[#00F2FF]/5' : 'bg-red-500/5'} rounded-full blur-3xl pointer-events-none`}></div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Flux Net de Trésorerie</span>
+                <div className={`size-8 rounded-xl ${metrics.net >= 0 ? 'bg-[#00F2FF]/10 text-[#00F2FF] border-[#00F2FF]/25' : 'bg-red-500/10 text-red-400 border-red-500/25'} border flex items-center justify-center`}>
+                  <TrendingUp className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className={`text-2xl lg:text-3xl font-black tracking-tight ${metrics.net >= 0 ? 'text-[#00F2FF]' : 'text-red-400'}`}>
+                  {metrics.net >= 0 ? `+${formatMoney(metrics.net)}` : formatMoney(metrics.net)}
+                </p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>Marge de couverture</span>
+                  <span className="font-black text-white/80">{metrics.ratio.toFixed(1)}%</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <p className={`text-2xl lg:text-3xl font-black tracking-tight ${metrics.net >= 0 ? 'text-[#00F2FF]' : 'text-red-400'}`}>
-              {metrics.net >= 0 ? `+${formatMoney(metrics.net)}` : formatMoney(metrics.net)}
-            </p>
-            <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-              <span>Marge de couverture</span>
-              <span className="font-black text-white/80">{metrics.ratio.toFixed(1)}%</span>
-            </div>
-          </div>
-        </div>
 
-        {/* CARD 4: SOLDE DE TRÉSORERIE ACTUEL */}
-        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#F59E0B]/10 transition-all"></div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Dernier Solde (BALANCE)</span>
-            <div className="size-8 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/25 flex items-center justify-center text-[#F59E0B]">
-              <Building2 className="size-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl lg:text-3xl font-black tracking-tight text-white">{formatMoney(metrics.balance)}</p>
-            <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-              <span>Solde en caisse & banque</span>
-              <span className="font-bold text-[#F59E0B] flex items-center gap-1">
-                <Check className="size-3" /> Certifié Spreedsheet
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 2 : VISUAL ANALYTICS & RÉPARTITIONS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* GRAPHIQUE CASHFLOW MENSUEL */}
-        <div className="lg:col-span-8 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 shadow-xl">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-            <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <BarChart2 className="size-4 text-[#00F2FF]" />
-                Évolution Mensuelle des Flux de Trésorerie
-              </h2>
-              <p className="text-xs text-white/40 mt-0.5">Comparatif des encaissements clients vs décaissements opérationnels</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs font-bold">
-              <span className="flex items-center gap-1.5 text-[#10B981]">
-                <span className="size-2 rounded-full bg-[#10B981]"></span> Entrées
-              </span>
-              <span className="flex items-center gap-1.5 text-[#CF5D56]">
-                <span className="size-2 rounded-full bg-[#CF5D56]"></span> Dépenses
-              </span>
+            {/* CARD 4: SOLDE DE TRÉSORERIE ACTUEL */}
+            <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#F59E0B]/10 transition-all"></div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Dernier Solde (BALANCE)</span>
+                <div className="size-8 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/25 flex items-center justify-center text-[#F59E0B]">
+                  <Building2 className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black tracking-tight text-white">{formatMoney(metrics.balance)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>Solde en caisse & banque</span>
+                  <span className="font-bold text-[#F59E0B] flex items-center gap-1">
+                    <Check className="size-3" /> Certifié Spreedsheet
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis 
-                  dataKey="label" 
-                  stroke="rgba(255,255,255,0.4)" 
-                  tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} 
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                />
-                <YAxis 
-                  stroke="rgba(255,255,255,0.4)" 
-                  tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }} 
-                  tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "#181818", 
-                    borderColor: "rgba(255,255,255,0.15)", 
-                    borderRadius: "12px", 
-                    boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-                    fontSize: "12px"
-                  }}
-                  formatter={(val: any, name: any) => [formatMoney(val), name === "in" ? "Entrées (+)" : "Dépenses (-)"]}
-                  labelStyle={{ color: "#fff", fontWeight: "bold", marginBottom: "4px" }}
-                />
-                <Bar dataKey="in" name="in" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Bar dataKey="out" name="out" fill="#CF5D56" radius={[4, 4, 0, 0]} maxBarSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+          {/* VISUAL ANALYTICS & RÉPARTITIONS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* GRAPHIQUE CASHFLOW MENSUEL */}
+            <div className="lg:col-span-8 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                <div>
+                  <h2 className="text-base font-black text-white flex items-center gap-2">
+                    <BarChart2 className="size-4 text-[#00F2FF]" />
+                    Évolution Mensuelle des Flux de Trésorerie
+                  </h2>
+                  <p className="text-xs text-white/40 mt-0.5">Comparatif des encaissements vs décaissements opérationnels</p>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-[#10B981]">
+                    <span className="size-2 rounded-full bg-[#10B981]"></span> Entrées
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#CF5D56]">
+                    <span className="size-2 rounded-full bg-[#CF5D56]"></span> Dépenses
+                  </span>
+                </div>
+              </div>
 
-        {/* TOP DÉPENSES PAR CATÉGORIE */}
-        <div className="lg:col-span-4 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <PieIcon className="size-4 text-[#F59E0B]" />
-                Top Dépenses par Catégorie
-              </h2>
-              <span className="text-[10px] font-bold text-white/40">Cliquez pour filtrer</span>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis 
+                      dataKey="label" 
+                      stroke="rgba(255,255,255,0.4)" 
+                      tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} 
+                      axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    />
+                    <YAxis 
+                      stroke="rgba(255,255,255,0.4)" 
+                      tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }} 
+                      tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                      axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "#181818", 
+                        borderColor: "rgba(255,255,255,0.15)", 
+                        borderRadius: "12px", 
+                        boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                        fontSize: "12px"
+                      }}
+                      formatter={(val: any, name: any) => [formatMoney(val), name === "in" ? "Entrées (+)" : "Dépenses (-)"]}
+                      labelStyle={{ color: "#fff", fontWeight: "bold", marginBottom: "4px" }}
+                    />
+                    <Bar dataKey="in" name="in" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="out" name="out" fill="#CF5D56" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            <div className="space-y-3 overflow-y-auto max-h-[250px] pr-1">
-              {availableCategories
-                .filter(c => c.type === "out")
-                .slice(0, 6)
-                .map((cat, idx) => {
-                  const percent = metrics.totalOut > 0 ? (cat.total / metrics.totalOut) * 100 : 0;
-                  const style = CATEGORY_STYLES[cat.name] || CATEGORY_STYLES["Charges Générales & Divers"];
-                  const isSelected = selectedCategory === cat.name;
+            {/* TOP DÉPENSES PAR CATÉGORIE */}
+            <div className="lg:col-span-4 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-black text-white flex items-center gap-2">
+                    <PieIcon className="size-4 text-[#F59E0B]" />
+                    Top Dépenses par Catégorie
+                  </h2>
+                  <span className="text-[10px] font-bold text-white/40">Cliquez pour filtrer</span>
+                </div>
 
-                  return (
-                    <div 
-                      key={idx}
-                      onClick={() => setSelectedCategory(isSelected ? "ALL" : cat.name)}
-                      className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                        isSelected 
-                          ? 'border-[#00F2FF] bg-[#00F2FF]/10 shadow-lg shadow-[#00F2FF]/5' 
-                          : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-bold text-white/80 truncate max-w-[160px] flex items-center gap-1.5">
-                          <span className="size-2 rounded-full" style={{ backgroundColor: style.color }}></span>
-                          {cat.name}
-                        </span>
-                        <span className="font-black text-white text-[11px]">{formatMoney(cat.total)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 flex-1 bg-white/5 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, percent)}%`, backgroundColor: style.color }}
-                          />
+                <div className="space-y-3 overflow-y-auto max-h-[250px] pr-1">
+                  {availableCategories
+                    .filter(c => c.type === "out")
+                    .slice(0, 6)
+                    .map((cat, idx) => {
+                      const percent = metrics.totalOut > 0 ? (cat.total / metrics.totalOut) * 100 : 0;
+                      const style = CATEGORY_STYLES[cat.name] || CATEGORY_STYLES["Charges Générales & Divers"];
+                      const isSelected = selectedCategory === cat.name;
+
+                      return (
+                        <div 
+                          key={idx}
+                          onClick={() => setSelectedCategory(isSelected ? "ALL" : cat.name)}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'border-[#00F2FF] bg-[#00F2FF]/10 shadow-lg shadow-[#00F2FF]/5' 
+                              : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-bold text-white/80 truncate max-w-[160px] flex items-center gap-1.5">
+                              <span className="size-2 rounded-full" style={{ backgroundColor: style.color }}></span>
+                              {cat.name}
+                            </span>
+                            <span className="font-black text-white text-[11px]">{formatMoney(cat.total)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 bg-white/5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, percent)}%`, backgroundColor: style.color }}
+                              />
+                            </div>
+                            <span className="text-[10px] font-bold text-white/40 min-w-[32px] text-right">{percent.toFixed(0)}%</span>
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold text-white/40 min-w-[32px] text-right">{percent.toFixed(0)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                </div>
+              </div>
+
+              {selectedCategory !== "ALL" && (
+                <button
+                  onClick={() => setSelectedCategory("ALL")}
+                  className="mt-3 w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[11px] font-bold transition-all text-center"
+                >
+                  Réinitialiser le filtre de catégorie
+                </button>
+              )}
             </div>
           </div>
 
-          {selectedCategory !== "ALL" && (
-            <button
-              onClick={() => setSelectedCategory("ALL")}
-              className="mt-3 w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[11px] font-bold transition-all text-center"
-            >
-              Réinitialiser le filtre de catégorie
-            </button>
-          )}
-        </div>
-      </div>
+          {/* BARRE DE FILTRAGE SPREEDSHEET */}
+          <div className="rounded-[24px] border border-white/8 bg-[#141414] p-4 lg:p-5 shadow-lg space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Années */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
+                <button
+                  onClick={() => setSelectedYear("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    selectedYear === "ALL" ? 'bg-[#00F2FF] text-black shadow-md shadow-[#00F2FF]/20' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  Toutes Années
+                </button>
+                {availableYears.map(yr => (
+                  <button
+                    key={yr}
+                    onClick={() => setSelectedYear(yr)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      selectedYear === yr ? 'bg-[#00F2FF] text-black shadow-md shadow-[#00F2FF]/20' : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
 
-      {/* SECTION 3 : BARRE DE FILTRAGE AVANCÉE */}
-      <div className="rounded-[24px] border border-white/8 bg-[#141414] p-4 lg:p-5 shadow-lg space-y-4">
-        {/* LIGNE 1 : SÉLECTEUR ANNÉE & TYPE & RECHERCHE */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Années */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
-            <button
-              onClick={() => setSelectedYear("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                selectedYear === "ALL" ? 'bg-[#00F2FF] text-black shadow-md shadow-[#00F2FF]/20' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Toutes Années
-            </button>
-            {availableYears.map(yr => (
+              {/* Type : Tous / Entrées / Dépenses */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
+                <button
+                  onClick={() => setSelectedType("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    selectedType === "ALL" ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  Tous les Flux
+                </button>
+                <button
+                  onClick={() => setSelectedType("in")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    selectedType === "in" ? 'bg-[#10B981] text-black' : 'text-[#10B981] hover:bg-[#10B981]/10'
+                  }`}
+                >
+                  <span className="size-1.5 rounded-full bg-current"></span>
+                  Entrées Seules
+                </button>
+                <button
+                  onClick={() => setSelectedType("out")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    selectedType === "out" ? 'bg-[#CF5D56] text-white' : 'text-[#CF5D56] hover:bg-[#CF5D56]/10'
+                  }`}
+                >
+                  <span className="size-1.5 rounded-full bg-current"></span>
+                  Dépenses Seules
+                </button>
+              </div>
+
+              {/* Filtre Justificatifs Drive uniquement */}
               <button
-                key={yr}
-                onClick={() => setSelectedYear(yr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  selectedYear === yr ? 'bg-[#00F2FF] text-black shadow-md shadow-[#00F2FF]/20' : 'text-white/60 hover:text-white'
+                onClick={() => setOnlyDriveReceipts(!onlyDriveReceipts)}
+                className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                  onlyDriveReceipts 
+                    ? 'bg-[#3B82F6] text-white border-[#3B82F6] shadow-lg shadow-[#3B82F6]/20' 
+                    : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
                 }`}
               >
-                {yr}
+                <FolderOpen className="size-3.5" />
+                <span>Justificatifs Drive</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px] font-black">
+                  {metrics.driveCount}
+                </span>
               </button>
-            ))}
+            </div>
+
+            {/* Ligne 2 : Mois + Catégories + Recherche */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+              <div className="lg:col-span-3">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
+                >
+                  <option value="ALL">Tous les mois (1 à 12)</option>
+                  <option value="1">Janvier</option>
+                  <option value="2">Février</option>
+                  <option value="3">Mars</option>
+                  <option value="4">Avril</option>
+                  <option value="5">Mai</option>
+                  <option value="6">Juin</option>
+                  <option value="7">Juillet</option>
+                  <option value="8">Août</option>
+                  <option value="9">Septembre</option>
+                  <option value="10">Octobre</option>
+                  <option value="11">Novembre</option>
+                  <option value="12">Décembre</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-4">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
+                >
+                  <option value="ALL">Toutes les catégories ({availableCategories.length})</option>
+                  <optgroup label="Entrées d'argent">
+                    {availableCategories.filter(c => c.type === 'in').map(c => (
+                      <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Dépenses & Charges">
+                    {availableCategories.filter(c => c.type === 'out').map(c => (
+                      <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="lg:col-span-5 relative">
+                <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par mot-clé, date, montant, commentaire..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs font-medium focus:outline-none focus:border-[#00F2FF]"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-white/40 pt-1 border-t border-white/5">
+              <span>{filteredTransactions.length} écriture(s) affichée(s)</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportCSV}
+                  className="text-white/60 hover:text-white font-bold flex items-center gap-1"
+                >
+                  <Download className="size-3" /> Exporter CSV
+                </button>
+                {canWrite && (
+                  <button
+                    onClick={() => setIsNewTxModalOpen(true)}
+                    className="text-[#10B981] hover:underline font-bold flex items-center gap-1"
+                  >
+                    <Plus className="size-3" /> Nouvelle Écriture
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Type : Tous / Entrées / Dépenses */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
-            <button
-              onClick={() => setSelectedType("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                selectedType === "ALL" ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Tous les Flux
-            </button>
-            <button
-              onClick={() => setSelectedType("in")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                selectedType === "in" ? 'bg-[#10B981] text-black' : 'text-[#10B981] hover:bg-[#10B981]/10'
-              }`}
-            >
-              <span className="size-1.5 rounded-full bg-current"></span>
-              Entrées Seules
-            </button>
-            <button
-              onClick={() => setSelectedType("out")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                selectedType === "out" ? 'bg-[#CF5D56] text-white' : 'text-[#CF5D56] hover:bg-[#CF5D56]/10'
-              }`}
-            >
-              <span className="size-1.5 rounded-full bg-current"></span>
-              Dépenses Seules
-            </button>
-          </div>
+          {/* TABLEAU GRAND LIVRE COMPTABLE */}
+          <div className="rounded-[28px] border border-white/8 bg-[#181818] shadow-2xl overflow-hidden">
+            <div className="p-4 lg:p-6 border-b border-white/8 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  <FileText className="size-5 text-[#10B981]" />
+                  Grand Livre des Écritures • Feuille 'Spreedsheet'
+                </h3>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Flux bancaires et opérationnels avec analyse sémantique des commentaires et soldes certifiés
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white/50">Trier:</span>
+                <button
+                  onClick={() => {
+                    if (sortField === "date") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                    else { setSortField("date"); setSortOrder("desc"); }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                    sortField === "date" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
+                  }`}
+                >
+                  Date {sortField === "date" && (sortOrder === "desc" ? "↓" : "↑")}
+                </button>
+                <button
+                  onClick={() => {
+                    if (sortField === "amount") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                    else { setSortField("amount"); setSortOrder("desc"); }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                    sortField === "amount" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
+                  }`}
+                >
+                  Montant {sortField === "amount" && (sortOrder === "desc" ? "↓" : "↑")}
+                </button>
+              </div>
+            </div>
 
-          {/* Filtre Justificatifs Drive uniquement */}
-          <button
-            onClick={() => setOnlyDriveReceipts(!onlyDriveReceipts)}
-            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
-              onlyDriveReceipts 
-                ? 'bg-[#3B82F6] text-white border-[#3B82F6] shadow-lg shadow-[#3B82F6]/20' 
-                : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
-            }`}
-          >
-            <FolderOpen className="size-3.5" />
-            <span>Justificatifs Drive</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px] font-black">
-              {metrics.driveCount}
-            </span>
-          </button>
-        </div>
-
-        {/* LIGNE 2 : MOIS + CATÉGORIES + RECHERCHE TEXTE */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-          {/* Sélection Mois */}
-          <div className="lg:col-span-3">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
-            >
-              <option value="ALL">Tous les mois (1 à 12)</option>
-              <option value="1">Janvier</option>
-              <option value="2">Février</option>
-              <option value="3">Mars</option>
-              <option value="4">Avril</option>
-              <option value="5">Mai</option>
-              <option value="6">Juin</option>
-              <option value="7">Juillet</option>
-              <option value="8">Août</option>
-              <option value="9">Septembre</option>
-              <option value="10">Octobre</option>
-              <option value="11">Novembre</option>
-              <option value="12">Décembre</option>
-            </select>
-          </div>
-
-          {/* Sélection Catégorie */}
-          <div className="lg:col-span-4">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
-            >
-              <option value="ALL">Toutes les catégories ({availableCategories.length})</option>
-              <optgroup label="Entrées d'argent">
-                {availableCategories.filter(c => c.type === 'in').map(c => (
-                  <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
-                ))}
-              </optgroup>
-              <optgroup label="Dépenses & Charges">
-                {availableCategories.filter(c => c.type === 'out').map(c => (
-                  <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          {/* Recherche libre */}
-          <div className="lg:col-span-5 relative">
-            <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-            <input
-              type="text"
-              placeholder="Rechercher par mot-clé, date, montant, commentaire..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs font-medium focus:outline-none focus:border-[#00F2FF]"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Compteur d'écritures affichées */}
-        <div className="flex items-center justify-between text-xs text-white/40 pt-1 border-t border-white/5">
-          <span>{filteredTransactions.length} écriture(s) trouvée(s)</span>
-          {(selectedYear !== "ALL" || selectedMonth !== "ALL" || selectedType !== "ALL" || selectedCategory !== "ALL" || onlyDriveReceipts || searchQuery) && (
-            <button
-              onClick={() => {
-                setSelectedYear("ALL");
-                setSelectedMonth("ALL");
-                setSelectedType("ALL");
-                setSelectedCategory("ALL");
-                setOnlyDriveReceipts(false);
-                setSearchQuery("");
-              }}
-              className="text-[#00F2FF] hover:underline font-bold"
-            >
-              Réinitialiser tous les filtres
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* SECTION 4 : GRAND LIVRE COMPTABLE (TABLEAU) */}
-      <div className="rounded-[28px] border border-white/8 bg-[#181818] shadow-2xl overflow-hidden">
-        <div className="p-4 lg:p-6 border-b border-white/8 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <FileText className="size-5 text-[#10B981]" />
-              Journal Général des Écritures Comptables
-            </h3>
-            <p className="text-xs text-white/40 mt-0.5">
-              Extrait direct de la feuille Spreedsheet avec analyse sémantique et solde certifié
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white/50">Trier par:</span>
-            <button
-              onClick={() => {
-                if (sortField === "date") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                else { setSortField("date"); setSortOrder("desc"); }
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                sortField === "date" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
-              }`}
-            >
-              Date {sortField === "date" && (sortOrder === "desc" ? "↓" : "↑")}
-            </button>
-            <button
-              onClick={() => {
-                if (sortField === "amount") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                else { setSortField("amount"); setSortOrder("desc"); }
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                sortField === "amount" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
-              }`}
-            >
-              Montant {sortField === "amount" && (sortOrder === "desc" ? "↓" : "↑")}
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-white/[0.02] border-b border-white/5 text-[11px] font-black uppercase tracking-wider text-white/40">
-              <tr>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Flux</th>
-                <th className="py-3 px-4">Catégorie</th>
-                <th className="py-3 px-4">Libellé / Commentaire (Spreedsheet)</th>
-                <th className="py-3 px-4 text-right">Montant (CFA)</th>
-                <th className="py-3 px-4 text-right">Solde Caisse</th>
-                <th className="py-3 px-4 text-center">Justificatif</th>
-                {canWrite && <th className="py-3 px-4 text-center">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={canWrite ? 8 : 7} className="py-12 text-center text-white/40 font-bold">
-                    Aucune écriture comptable ne correspond aux critères sélectionnés.
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((tx) => {
-                  const style = CATEGORY_STYLES[tx.category] || CATEGORY_STYLES["Charges Générales & Divers"];
-                  const Icon = style.icon || FileText;
-
-                  return (
-                    <tr 
-                      key={tx.id} 
-                      className="hover:bg-white/[0.02] transition-colors group"
-                    >
-                      {/* Date */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="font-mono font-bold text-white/90">{tx.date}</div>
-                        {tx.rawDate && tx.rawDate !== tx.date && (
-                          <div className="text-[10px] text-white/40 truncate max-w-[130px]" title={tx.rawDate}>
-                            {tx.rawDate}
-                          </div>
-                        )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white/[0.02] border-b border-white/5 text-[11px] font-black uppercase tracking-wider text-white/40">
+                  <tr>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Flux</th>
+                    <th className="py-3 px-4">Catégorie</th>
+                    <th className="py-3 px-4">Libellé / Commentaire (Spreedsheet)</th>
+                    <th className="py-3 px-4 text-right">Montant (CFA)</th>
+                    <th className="py-3 px-4 text-right">Solde Caisse</th>
+                    <th className="py-3 px-4 text-center">Justificatif</th>
+                    {canWrite && <th className="py-3 px-4 text-center">Action</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {filteredTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={canWrite ? 8 : 7} className="py-12 text-center text-white/40 font-bold">
+                        Aucune écriture comptable ne correspond aux critères sélectionnés.
                       </td>
+                    </tr>
+                  ) : (
+                    filteredTransactions.map((tx) => {
+                      const style = CATEGORY_STYLES[tx.category] || CATEGORY_STYLES["Charges Générales & Divers"];
+                      const Icon = style.icon || FileText;
 
-                      {/* Sens / Type */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {tx.type === "in" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
-                            <ArrowDownRight className="size-3" /> ENTRÉE
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#CF5D56]/15 text-[#CF5D56] border border-[#CF5D56]/30">
-                            <ArrowUpRight className="size-3" /> DÉPENSE
-                          </span>
-                        )}
-                      </td>
+                      return (
+                        <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors group">
+                          {/* Date */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="font-mono font-bold text-white/90">{tx.date}</div>
+                            {tx.rawDate && tx.rawDate !== tx.date && (
+                              <div className="text-[10px] text-white/40 truncate max-w-[130px]" title={tx.rawDate}>
+                                {tx.rawDate}
+                              </div>
+                            )}
+                          </td>
 
-                      {/* Catégorie */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span 
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border"
-                          style={{ 
-                            color: style.color, 
-                            backgroundColor: style.bg, 
-                            borderColor: style.border 
-                          }}
-                        >
-                          <Icon className="size-3" />
-                          <span>{tx.category}</span>
-                        </span>
-                      </td>
+                          {/* Sens */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {tx.type === "in" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
+                                <ArrowDownRight className="size-3" /> ENTRÉE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#CF5D56]/15 text-[#CF5D56] border border-[#CF5D56]/30">
+                                <ArrowUpRight className="size-3" /> DÉPENSE
+                              </span>
+                            )}
+                          </td>
 
-                      {/* Commentaire / Libellé */}
-                      <td className="py-3 px-4">
-                        <div className="text-white/80 font-medium max-w-[340px] truncate" title={tx.comment}>
-                          {tx.comment || <span className="text-white/20 italic">Sans commentaire</span>}
-                        </div>
-                      </td>
-
-                      {/* Montant CFA */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <span className={`font-mono font-black text-sm ${tx.type === 'in' ? 'text-[#10B981]' : 'text-[#CF5D56]'}`}>
-                          {tx.type === 'in' ? `+${formatMoney(tx.amount)}` : `-${formatMoney(tx.amount)}`}
-                        </span>
-                      </td>
-
-                      {/* Solde Trésorerie */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {tx.balance ? (
-                          <span className="font-mono text-white/50 text-xs">
-                            {formatMoney(tx.balance)}
-                          </span>
-                        ) : (
-                          <span className="text-white/20">-</span>
-                        )}
-                      </td>
-
-                      {/* Justificatif Drive */}
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        {tx.driveLink ? (
-                          <button
-                            onClick={() => setPreviewDoc({
-                              title: tx.comment || tx.category,
-                              date: tx.date,
-                              amount: tx.amount,
-                              category: tx.category,
-                              comment: tx.comment,
-                              driveLink: tx.driveLink!
-                            })}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] border border-[#3B82F6]/30 text-[11px] font-bold transition-all shadow-sm active:scale-95"
-                            title="Ouvrir le justificatif Google Drive"
-                          >
-                            <Eye className="size-3" />
-                            <span>Voir Justificatif</span>
-                          </button>
-                        ) : (
-                          <span className="text-white/20 text-[11px]">-</span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      {canWrite && (
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          {tx.id.startsWith("manual-") ? (
-                            <button
-                              onClick={() => handleDeleteTx(tx.id)}
-                              className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all"
-                              title="Supprimer cette écriture"
+                          {/* Catégorie */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span 
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border"
+                              style={{ 
+                                color: style.color, 
+                                backgroundColor: style.bg, 
+                                borderColor: style.border 
+                              }}
                             >
-                              <Trash2 className="size-3.5" />
+                              <Icon className="size-3" />
+                              <span>{tx.category}</span>
+                            </span>
+                          </td>
+
+                          {/* Commentaire */}
+                          <td className="py-3 px-4">
+                            <div className="text-white/80 font-medium max-w-[340px] truncate" title={tx.comment}>
+                              {tx.comment || <span className="text-white/20 italic">Sans commentaire</span>}
+                            </div>
+                          </td>
+
+                          {/* Montant */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <span className={`font-mono font-black text-sm ${tx.type === 'in' ? 'text-[#10B981]' : 'text-[#CF5D56]'}`}>
+                              {tx.type === 'in' ? `+${formatMoney(tx.amount)}` : `-${formatMoney(tx.amount)}`}
+                            </span>
+                          </td>
+
+                          {/* Solde */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            {tx.balance ? (
+                              <span className="font-mono text-white/50 text-xs">
+                                {formatMoney(tx.balance)}
+                              </span>
+                            ) : (
+                              <span className="text-white/20">-</span>
+                            )}
+                          </td>
+
+                          {/* Justificatif Drive */}
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            {tx.driveLink ? (
+                              <button
+                                onClick={() => setPreviewDoc({
+                                  title: tx.comment || tx.category,
+                                  date: tx.date,
+                                  amount: tx.amount,
+                                  category: tx.category,
+                                  comment: tx.comment,
+                                  driveLink: tx.driveLink!
+                                })}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] border border-[#3B82F6]/30 text-[11px] font-bold transition-all shadow-sm active:scale-95"
+                                title="Voir la facture ou le reçu Drive"
+                              >
+                                <Eye className="size-3" />
+                                <span>Voir Justificatif</span>
+                              </button>
+                            ) : (
+                              <span className="text-white/20 text-[11px]">-</span>
+                            )}
+                          </td>
+
+                          {/* Action */}
+                          {canWrite && (
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              {tx.id.startsWith("manual-") ? (
+                                <button
+                                  onClick={() => handleDeleteTx(tx.id)}
+                                  className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all mx-auto"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              ) : (
+                                <span className="text-white/20 text-[10px]" title="Synchronisé depuis Google Sheets">Spreedsheet</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VUE 2 : FACTURES CLIENTS (AU TONNAGE GLOBAL)                               */}
+      {/* ========================================================================= */}
+      {viewTab === "invoices" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* 4 CARDS KPIS FACTURATION */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Budget Total Facturé</span>
+              <p className="text-2xl lg:text-3xl font-black text-white mt-2">{formatMoney(invoiceMetrics.totalBudget)}</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">{formatTon(invoiceMetrics.totalTonnage)} transportées</p>
+            </div>
+
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Réellement Payé</span>
+              <p className="text-2xl lg:text-3xl font-black text-[#10B981] mt-2">{formatMoney(invoiceMetrics.totalPaid)}</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">{invoiceMetrics.recoveryRate.toFixed(1)}% d'encaissement</p>
+            </div>
+
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Reste à Payer (Créance)</span>
+              <p className="text-2xl lg:text-3xl font-black text-[#CF5D56] mt-2">{formatMoney(invoiceMetrics.totalRemaining)}</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">Reliquats clients en attente</p>
+            </div>
+
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Factures en Retard</span>
+              <p className={`text-2xl lg:text-3xl font-black mt-2 ${invoiceMetrics.overdueCount > 0 ? 'text-[#EF4444]' : 'text-white'}`}>
+                {invoiceMetrics.overdueCount}
+              </p>
+              <p className="text-xs text-white/50 mt-1 font-bold">Échéance dépassée</p>
+            </div>
+          </div>
+
+          {/* BARRE DE RECHERCHE ET ACTIONS FACTURES */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-[#141414] border border-white/8">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Rechercher facture..."
+                  value={invoiceSearch}
+                  onChange={(e) => setInvoiceSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none"
+                />
+              </div>
+              <select
+                value={invoiceStatus}
+                onChange={(e) => setInvoiceStatus(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold"
+              >
+                <option value="ALL">Tous statuts</option>
+                <option value="paid">Payées</option>
+                <option value="partial">Partielles</option>
+                <option value="pending">En attente</option>
+                <option value="overdue">En retard</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportInvoicesCSV}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold"
+              >
+                <Download className="size-3.5" /> Exporter CSV
+              </button>
+              {canWrite && (
+                <button
+                  onClick={() => {
+                    setEditingInvoice(null);
+                    setFormNumber(`FAC-${Date.now().toString().slice(-4)}`);
+                    setFormClient("CIMAF");
+                    setFormTonnage("1000");
+                    setFormRate("15000");
+                    setFormTotal("15000000");
+                    setFormPaid("0");
+                    setIsInvoiceModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF5D56] text-white text-xs font-black uppercase"
+                >
+                  <Plus className="size-3.5" /> Nouvelle Facture
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* TABLEAU DES FACTURES CLIENTS */}
+          <div className="rounded-[28px] border border-white/8 bg-[#181818] shadow-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white/[0.02] border-b border-white/5 text-[11px] font-black uppercase tracking-wider text-white/40">
+                  <tr>
+                    <th className="py-3 px-4">N° Facture</th>
+                    <th className="py-3 px-4">Client</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Échéance</th>
+                    <th className="py-3 px-4 text-right">Tonnage</th>
+                    <th className="py-3 px-4 text-right">Total Facturé</th>
+                    <th className="py-3 px-4 text-right">Payé</th>
+                    <th className="py-3 px-4 text-right">Reste à Payer</th>
+                    <th className="py-3 px-4 text-center">Statut</th>
+                    <th className="py-3 px-4 text-center">Justificatif</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {filteredInvoices.map((inv) => {
+                    const status = getInvoiceStatus(inv);
+                    const remaining = Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0));
+
+                    return (
+                      <tr key={inv.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-white">{inv.invoiceNumber}</td>
+                        <td className="py-3 px-4 font-bold text-white/90">{inv.client}</td>
+                        <td className="py-3 px-4 text-white/60">{inv.date}</td>
+                        <td className="py-3 px-4 text-white/60">{inv.dueDate || '-'}</td>
+                        <td className="py-3 px-4 text-right font-bold text-white/80">{formatTon(inv.tonnage)}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-white">{formatMoney(inv.totalAmount)}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-[#10B981]">{formatMoney(inv.paidAmount)}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-[#CF5D56]">{formatMoney(remaining)}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            status === "paid" ? 'bg-[#10B981]/20 text-[#10B981]' :
+                            status === "partial" ? 'bg-[#00F2FF]/20 text-[#00F2FF]' :
+                            status === "overdue" ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white/60'
+                          }`}>
+                            {status === "paid" ? "Payée" : status === "partial" ? "Partielle" : status === "overdue" ? "En retard" : "En attente"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {inv.driveLink ? (
+                            <button
+                              onClick={() => setPreviewDoc({
+                                title: inv.invoiceNumber,
+                                date: inv.date,
+                                amount: inv.totalAmount,
+                                category: "Facture Client",
+                                comment: inv.notes || inv.client,
+                                driveLink: inv.driveLink!
+                              })}
+                              className="px-2 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] font-bold text-[10px]"
+                            >
+                              Aperçu
                             </button>
                           ) : (
-                            <span className="text-white/20 text-[10px]" title="Synchronisé depuis Google Sheets">Spreedsheet</span>
+                            <span className="text-white/20">-</span>
                           )}
                         </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* MODAL : VISUALISEUR JUSTIFICATIF GOOGLE DRIVE */}
       {previewDoc && (
@@ -937,7 +1342,7 @@ export function AccountingModule({
               <div>
                 <h3 className="text-base font-black text-white flex items-center gap-2">
                   <FolderOpen className="size-4 text-[#3B82F6]" />
-                  Justificatif de Dépense • {previewDoc.category}
+                  Justificatif • {previewDoc.category}
                 </h3>
                 <p className="text-xs text-white/50 mt-0.5">
                   Date : {previewDoc.date} • Montant : <span className="font-bold text-white">{formatMoney(previewDoc.amount)}</span>
@@ -961,7 +1366,6 @@ export function AccountingModule({
               </div>
             </div>
 
-            {/* Corps du document ou avertissement dossier */}
             <div className="flex-1 min-h-[420px] rounded-2xl bg-black/50 border border-white/5 overflow-hidden flex items-center justify-center relative">
               {getDriveEmbedUrl(previewDoc.driveLink) ? (
                 <iframe
@@ -978,7 +1382,7 @@ export function AccountingModule({
                   <div>
                     <h4 className="text-base font-black text-white">Dossier Google Drive</h4>
                     <p className="text-xs text-white/50 mt-1">
-                      Ce justificatif est un dossier contenant plusieurs pièces (factures, reçus, bons de commande). Les dossiers ne peuvent pas être intégrés directement dans un cadre sécurisé.
+                      Ce justificatif est un dossier contenant des pièces comptables (factures, reçus, bons). Cliquez ci-dessous pour le consulter directement.
                     </p>
                   </div>
                   <a
@@ -1002,14 +1406,14 @@ export function AccountingModule({
         </div>
       )}
 
-      {/* MODAL : NOUVELLE ÉCRITURE MANUELLE */}
+      {/* MODAL : NOUVELLE ÉCRITURE GRAND LIVRE */}
       {isNewTxModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg rounded-[28px] border border-white/10 bg-[#181818] p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h3 className="text-lg font-black text-white flex items-center gap-2">
                 <Plus className="size-5 text-[#10B981]" />
-                Ajouter une Écriture Comptable
+                Ajouter une Écriture au Grand Livre
               </h3>
               <button
                 onClick={() => setIsNewTxModalOpen(false)}
@@ -1020,7 +1424,6 @@ export function AccountingModule({
             </div>
 
             <form onSubmit={handleCreateTx} className="space-y-4">
-              {/* Type d'opération */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
                   Type de Flux
@@ -1047,7 +1450,6 @@ export function AccountingModule({
                 </div>
               </div>
 
-              {/* Date */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
                   Date de l'opération
@@ -1061,7 +1463,6 @@ export function AccountingModule({
                 />
               </div>
 
-              {/* Catégorie */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
                   Catégorie Comptable
@@ -1100,7 +1501,6 @@ export function AccountingModule({
                 </select>
               </div>
 
-              {/* Montant */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
                   Montant en CFA
@@ -1115,24 +1515,22 @@ export function AccountingModule({
                 />
               </div>
 
-              {/* Commentaire */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
                   Description / Commentaire
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Ex: Paiement facture révision camion ou acompte client..."
+                  placeholder="Ex: Facture révision ou encaissement..."
                   value={newTxComment}
                   onChange={(e) => setNewTxComment(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-[#00F2FF]"
                 />
               </div>
 
-              {/* Lien Google Drive */}
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Lien Justificatif Google Drive (Optionnel)
+                  Lien Google Drive (Optionnel)
                 </label>
                 <input
                   type="url"
@@ -1155,8 +1553,80 @@ export function AccountingModule({
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-[#10B981]/25"
                 >
-                  Enregistrer l'Écriture
+                  Enregistrer
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL : NOUVELLE FACTURE CLIENT */}
+      {isInvoiceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg rounded-[28px] border border-white/10 bg-[#181818] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/8 pb-3">
+              <h3 className="text-base font-black text-white">Ajouter une Facture Client</h3>
+              <button onClick={() => setIsInvoiceModalOpen(false)} className="text-white/40 hover:text-white">
+                <X className="size-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveInvoice} className="space-y-3 text-xs">
+              <div>
+                <label className="text-white/40 font-bold block mb-1">N° Facture</label>
+                <input value={formNumber} onChange={(e) => setFormNumber(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+              </div>
+              <div>
+                <label className="text-white/40 font-bold block mb-1">Client</label>
+                <input value={formClient} onChange={(e) => setFormClient(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Date</label>
+                  <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Échéance</label>
+                  <input type="date" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Tonnage (T)</label>
+                  <input type="number" value={formTonnage} onChange={(e) => {
+                    setFormTonnage(e.target.value);
+                    const t = parseFloat(e.target.value) || 0;
+                    const r = parseFloat(formRate) || 0;
+                    setFormTotal(String(Math.round(t * r)));
+                  }} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Taux/Tonne (CFA)</label>
+                  <input type="number" value={formRate} onChange={(e) => {
+                    setFormRate(e.target.value);
+                    const r = parseFloat(e.target.value) || 0;
+                    const t = parseFloat(formTonnage) || 0;
+                    setFormTotal(String(Math.round(t * r)));
+                  }} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Total Facturé (CFA)</label>
+                  <input type="number" value={formTotal} onChange={(e) => setFormTotal(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+                <div>
+                  <label className="text-white/40 font-bold block mb-1">Montant Déjà Payé (CFA)</label>
+                  <input type="number" value={formPaid} onChange={(e) => setFormPaid(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+                </div>
+              </div>
+              <div>
+                <label className="text-white/40 font-bold block mb-1">Lien Google Drive</label>
+                <input type="url" value={formDriveLink} onChange={(e) => setFormDriveLink(e.target.value)} placeholder="https://drive.google.com/..." className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsInvoiceModalOpen(false)} className="px-4 py-1.5 rounded-xl border border-white/10 text-white/60">Annuler</button>
+                <button type="submit" className="px-4 py-1.5 rounded-xl bg-[#CF5D56] text-white font-bold">Enregistrer</button>
               </div>
             </form>
           </div>
