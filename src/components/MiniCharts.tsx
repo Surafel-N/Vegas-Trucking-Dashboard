@@ -24,12 +24,14 @@ import {
   ArrowUpRight,
   Filter
 } from 'lucide-react';
+import { type Language } from '../utils/i18n';
 
 export type MiniChartsProps = {
   records: any[];
   formatCurrency?: (val: number, curr?: string) => string;
   currency?: string;
   t?: any;
+  language?: Language;
 };
 
 // --- CONFIGURATION OFFICIELLE DES CHAUFFEURS ---
@@ -84,7 +86,8 @@ export function MiniCharts({
   records = [], 
   formatCurrency, 
   currency = "CFA",
-  t 
+  t,
+  language = 'FR'
 }: MiniChartsProps) {
   // États de sélection pour Performance Analytique
   const [metric, setMetric] = useState<"net" | "gross" | "tonnage">("net");
@@ -95,7 +98,7 @@ export function MiniCharts({
   const [evolutionChartType, setEvolutionChartType] = useState<"bar" | "line">("bar");
   const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>("ALL");
 
-  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+  const locale = (language === 'EN' || t?.months?.[0] === "January") ? "en-US" : "fr-FR";
 
   // Formatage monétaire rapide
   const formatMoney = (val: number) => {
@@ -382,14 +385,14 @@ export function MiniCharts({
         return {
           key: k,
           label: v.label,
-          periodTitle: `Cumul au ${v.periodTitle}`,
+          periodTitle: (language === 'EN' ? `Cumulative as of ` : `Cumul au `) + v.periodTitle,
           AMARA: Math.round(amaraRunning),
           BRAHIMA: Math.round(brahimaRunning),
           SORO: Math.round(soroRunning),
           total: Math.round(amaraRunning + brahimaRunning + soroRunning)
         };
       });
-  }, [records, metric, evolutionGranularity, locale]);
+  }, [records, metric, evolutionGranularity, locale, language]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 w-full h-full">
@@ -407,14 +410,14 @@ export function MiniCharts({
               </div>
               <div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                  {t?.fleetVolume || "Volume Flotte"}
+                  {t?.fleetVolume || (language === 'EN' ? "Fleet Volume" : "Volume Flotte")}
                 </h4>
-                <p className="text-[10px] text-white/40">Tonnage réel par véhicule</p>
+                <p className="text-[10px] text-white/40">{language === 'EN' ? "Actual cargo by vehicle" : "Tonnage réel par véhicule"}</p>
               </div>
             </div>
 
             <div className="text-right">
-              <span className="text-[9px] font-black uppercase text-white/40 block leading-tight">Total Flotte</span>
+              <span className="text-[9px] font-black uppercase text-white/40 block leading-tight">{language === 'EN' ? "Total Fleet" : "Total Flotte"}</span>
               <span className="text-sm font-black font-mono text-cyan-400">
                 {volumeData.totalTonnage.toLocaleString(locale)} <span className="text-[10px] text-white/40 font-sans">T</span>
               </span>
@@ -449,19 +452,19 @@ export function MiniCharts({
                           <span className="font-black text-white">{d.name}</span>
                         </div>
                         <div className="flex justify-between items-center text-white/70">
-                          <span>Tonnage :</span>
+                          <span>{language === 'EN' ? "Tonnage:" : "Tonnage :"}</span>
                           <span className="font-mono font-black text-white">{d.tonnage} T</span>
                         </div>
                         <div className="flex justify-between items-center text-white/70">
-                          <span>Part flotte :</span>
+                          <span>{language === 'EN' ? "Fleet share:" : "Part flotte :"}</span>
                           <span className="font-mono font-bold text-cyan-400">{d.share.toFixed(1)}%</span>
                         </div>
                         <div className="flex justify-between items-center text-white/70">
-                          <span>Voyages :</span>
+                          <span>{language === 'EN' ? "Trips:" : "Voyages :"}</span>
                           <span className="font-mono text-white/90">{d.tripsCount}</span>
                         </div>
                         <div className="flex justify-between items-center text-white/70">
-                          <span>Moyenne/voyage :</span>
+                          <span>{language === 'EN' ? "Average/trip:" : "Moyenne/voyage :"}</span>
                           <span className="font-mono text-white/90">{d.avgTonnage} T</span>
                         </div>
                       </div>
@@ -492,8 +495,8 @@ export function MiniCharts({
         <div className="space-y-3 pt-3 border-t border-white/5">
           <div>
             <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-              <span>Répartition de Charge</span>
-              <span>100% Flotte</span>
+              <span>{language === 'EN' ? "Load Distribution" : "Répartition de Charge"}</span>
+              <span>{language === 'EN' ? "100% Fleet" : "100% Flotte"}</span>
             </div>
             <div className="h-2.5 w-full bg-black/40 rounded-full overflow-hidden flex p-0.5 border border-white/5 gap-0.5">
               {volumeData.list.map(d => (
@@ -519,7 +522,7 @@ export function MiniCharts({
                 </div>
                 <div>
                   <span className="text-xs font-mono font-black text-white">{d.tonnage}T</span>
-                  <p className="text-[9px] font-bold text-white/40">{d.share.toFixed(0)}% • {d.tripsCount} v.</p>
+                  <p className="text-[9px] font-bold text-white/40">{d.share.toFixed(0)}% • {d.tripsCount} {language === 'EN' ? "tr." : "v."}</p>
                 </div>
               </div>
             ))}
@@ -544,14 +547,14 @@ export function MiniCharts({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-black text-white tracking-tight uppercase">
-                    {t?.analyticalPerformance || "Performance Analytique"}
+                    {t?.analyticalPerformance || (language === 'EN' ? "Analytical Performance" : "Performance Analytique")}
                   </h3>
                   <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-white/60 border border-white/10">
-                    Par Chauffeur
+                    {language === 'EN' ? "By Driver" : "Par Chauffeur"}
                   </span>
                 </div>
                 <p className="text-[10px] text-white/40 mt-0.5">
-                  Comparaison financière et rentabilité avec codes couleurs dédiés
+                  {language === 'EN' ? "Financial comparison and profitability with dedicated color codes" : "Comparaison financière et rentabilité avec codes couleurs dédiés"}
                 </p>
               </div>
             </div>
@@ -569,7 +572,7 @@ export function MiniCharts({
                       : "text-white/50 hover:text-white"
                   }`}
                 >
-                  Bénéfice Net
+                  {language === 'EN' ? "Net Profit" : "Bénéfice Net"}
                 </button>
                 <button
                   onClick={() => setMetric("gross")}
@@ -579,7 +582,7 @@ export function MiniCharts({
                       : "text-white/50 hover:text-white"
                   }`}
                 >
-                  C.A. Brut
+                  {language === 'EN' ? "Gross Revenue" : "C.A. Brut"}
                 </button>
                 <button
                   onClick={() => setMetric("tonnage")}
@@ -589,7 +592,7 @@ export function MiniCharts({
                       : "text-white/50 hover:text-white"
                   }`}
                 >
-                  Tonnage
+                  {language === 'EN' ? "Tonnage" : "Tonnage"}
                 </button>
               </div>
 
@@ -602,10 +605,10 @@ export function MiniCharts({
                       ? "bg-white/15 text-white" 
                       : "text-white/40 hover:text-white"
                   }`}
-                  title="Vue Comparatif par Chauffeur"
+                  title={language === 'EN' ? "Comparison View by Driver" : "Vue Comparatif par Chauffeur"}
                 >
                   <BarChart3 className="size-3" />
-                  <span>Comparatif</span>
+                  <span>{language === 'EN' ? "Comparison" : "Comparatif"}</span>
                 </button>
                 <button
                   onClick={() => setViewMode("timeline")}
@@ -614,10 +617,10 @@ export function MiniCharts({
                       ? "bg-white/15 text-white" 
                       : "text-white/40 hover:text-white"
                   }`}
-                  title="Vue Évolution Temporelle"
+                  title={language === 'EN' ? "Timeline View" : "Vue Évolution Temporelle"}
                 >
                   <TrendingUp className="size-3" />
-                  <span>Évolution</span>
+                  <span>{language === 'EN' ? "Evolution" : "Évolution"}</span>
                 </button>
               </div>
 
@@ -629,7 +632,7 @@ export function MiniCharts({
           {viewMode === "timeline" && (
             <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-2xl bg-black/40 border border-white/5 mb-3 animate-in fade-in">
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">Fréquence :</span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">{language === 'EN' ? "Frequency:" : "Fréquence :"}</span>
                 <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/5">
                   <button
                     onClick={() => setEvolutionGranularity("month")}
@@ -637,7 +640,7 @@ export function MiniCharts({
                       evolutionGranularity === "month" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    Par Mois
+                    {language === 'EN' ? "Monthly" : "Par Mois"}
                   </button>
                   <button
                     onClick={() => setEvolutionGranularity("week")}
@@ -645,7 +648,7 @@ export function MiniCharts({
                       evolutionGranularity === "week" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    Par Semaine
+                    {language === 'EN' ? "Weekly" : "Par Semaine"}
                   </button>
                   <button
                     onClick={() => setEvolutionGranularity("day")}
@@ -653,7 +656,7 @@ export function MiniCharts({
                       evolutionGranularity === "day" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    Par Date
+                    {language === 'EN' ? "By Date" : "Par Date"}
                   </button>
                   <button
                     onClick={() => setEvolutionGranularity("cumulative")}
@@ -661,13 +664,13 @@ export function MiniCharts({
                       evolutionGranularity === "cumulative" ? "bg-cyan-500/20 text-cyan-300" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    Cumulatif
+                    {language === 'EN' ? "Cumulative" : "Cumulatif"}
                   </button>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">Format :</span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">{language === 'EN' ? "Format:" : "Format :"}</span>
                 <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/5">
                   <button
                     onClick={() => setEvolutionChartType("bar")}
@@ -675,7 +678,7 @@ export function MiniCharts({
                       evolutionChartType === "bar" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    <BarChart3 className="size-2.5" /> Barres
+                    <BarChart3 className="size-2.5" /> {language === 'EN' ? "Bars" : "Barres"}
                   </button>
                   <button
                     onClick={() => setEvolutionChartType("line")}
@@ -683,7 +686,7 @@ export function MiniCharts({
                       evolutionChartType === "line" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
                     }`}
                   >
-                    <TrendingUp className="size-2.5" /> Courbes
+                    <TrendingUp className="size-2.5" /> {language === 'EN' ? "Lines" : "Courbes"}
                   </button>
                 </div>
               </div>
@@ -726,23 +729,23 @@ export function MiniCharts({
                           </div>
                           <div className="space-y-1">
                             <div className="flex justify-between items-center text-white/70">
-                              <span>Chiffre d'Affaires :</span>
+                              <span>{language === 'EN' ? "Revenue:" : "Chiffre d'Affaires :"}</span>
                               <span className="font-mono font-bold text-white">{formatMoney(d.gross)}</span>
                             </div>
                             <div className="flex justify-between items-center text-white/70">
-                              <span>Dépenses Totales :</span>
+                              <span>{language === 'EN' ? "Total Expenses:" : "Dépenses Totales :"}</span>
                               <span className="font-mono text-red-400">-{formatMoney(d.expenses)}</span>
                             </div>
                             <div className="flex justify-between items-center text-white/90 pt-1 border-t border-white/5 font-black">
-                              <span>Bénéfice Net :</span>
+                              <span>{language === 'EN' ? "Net Profit:" : "Bénéfice Net :"}</span>
                               <span className="font-mono text-emerald-400">{formatMoney(d.net)}</span>
                             </div>
                             <div className="flex justify-between items-center text-white/60">
-                              <span>Marge Nette :</span>
+                              <span>{language === 'EN' ? "Net Margin:" : "Marge Nette :"}</span>
                               <span className="font-mono text-cyan-400 font-bold">{d.margin}%</span>
                             </div>
                             <div className="flex justify-between items-center text-white/60">
-                              <span>Volume Tonnage :</span>
+                              <span>{language === 'EN' ? "Tonnage Volume:" : "Volume Tonnage :"}</span>
                               <span className="font-mono text-white/90">{d.tonnage} T</span>
                             </div>
                           </div>
@@ -972,7 +975,7 @@ export function MiniCharts({
                         )}
                       </div>
                       <p className="text-[10px] font-mono text-white/50">
-                        {d.margin}% marge • {d.tonnage}T
+                        {d.margin}% {language === 'EN' ? "margin" : "marge"} • {d.tonnage}T
                       </p>
                     </div>
                   </div>
@@ -982,7 +985,11 @@ export function MiniCharts({
                       {metric === "tonnage" ? `${d.tonnage} T` : formatCompact(metric === "gross" ? d.gross : d.net)}
                     </span>
                     <span className="text-[9px] font-bold text-white/40 uppercase">
-                      {metric === "tonnage" ? "Transporté" : metric === "gross" ? "C.A." : "Bénéfice"}
+                      {metric === "tonnage" 
+                        ? (language === 'EN' ? "Transported" : "Transporté") 
+                        : metric === "gross" 
+                        ? (language === 'EN' ? "Revenue" : "C.A.") 
+                        : (language === 'EN' ? "Profit" : "Bénéfice")}
                     </span>
                   </div>
                 </button>
@@ -1003,10 +1010,10 @@ export function MiniCharts({
                   onClick={() => setSelectedDriverFilter("ALL")}
                   className="text-cyan-400 hover:underline font-bold text-[10px]"
                 >
-                  Afficher tous les chauffeurs
+                  {language === 'EN' ? "Show all drivers" : "Afficher tous les chauffeurs"}
                 </button>
               ) : (
-                <span>Cliquez sur une carte pour isoler un chauffeur</span>
+                <span>{language === 'EN' ? "Click on a card to isolate a driver" : "Cliquez sur une carte pour isoler un chauffeur"}</span>
               )}
             </div>
           )}

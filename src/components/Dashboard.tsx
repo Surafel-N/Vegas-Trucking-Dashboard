@@ -48,6 +48,7 @@ import {
 } from "../lib/dashboard";
 import type { DashboardSummary } from "../utils/types";
 import { FilterBar } from "./FilterBar";
+import type { Language } from "../utils/i18n";
 
 type DashboardProps = {
   formatCurrency: (value: number, curr?: string) => string;
@@ -67,6 +68,7 @@ type DashboardProps = {
   googleClientId?: string;
   currency?: string;
   t: any;
+  language?: Language;
   allRecords: any[];
 };
 
@@ -88,6 +90,7 @@ export function Dashboard({
   googleClientId,
   currency = "CFA",
   t,
+  language = "FR",
   allRecords = []
 }: DashboardProps) {
 
@@ -206,7 +209,7 @@ export function Dashboard({
 
       {filterProps && (
          <div className="panel-enter rounded-2xl border border-white/5 bg-[#1c1c1e] p-1.5 shadow-xl">
-            <FilterBar {...filterProps} t={t} />
+            <FilterBar {...filterProps} t={t} language={language} />
          </div>
       )}
 
@@ -221,7 +224,7 @@ export function Dashboard({
                {isGpsExpanded ? <><Minimize className="size-3" /> {t?.reduce || "Réduire"}</> : <><Maximize className="size-3" /> {t?.focusMode || "Focus Mode"}</>}
              </button>
          </div>
-         <FleetTrackerWidget records={allTrips} t={t} />
+         <FleetTrackerWidget records={allTrips} t={t} language={language} />
       </section>
 
       {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
@@ -234,6 +237,7 @@ export function Dashboard({
           onUpdateOilChange={handleUpdateOilChange} 
           canEdit={!!setOilChanges} 
           t={t} 
+          language={language}
         />
       </section>
 
@@ -256,6 +260,7 @@ export function Dashboard({
   selectedDates={selectedDates}
   onSelection={handleSelectionFromCalendar}
   t={t}
+  language={language}
   currency={currency}
 />
             </div>
@@ -288,8 +293,9 @@ export function Dashboard({
                   maintenanceRecords={filteredMaintenance}
                   allMaintenanceRecords={maintenanceRecords}
                   formatCurrency={(v) => formatCurrency(v, currency)} 
-                  currency={currency}
+                  currency={currency} 
                   t={t} 
+                  language={language}
                   records={syncFilteredData} 
                   allTrips={allTrips}
                 />
@@ -299,12 +305,12 @@ export function Dashboard({
 
         {/* ACTIVE TRENDS MODULE */}
         <section className="mb-4">
-          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} />
+          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} language={language} />
         </section>
 
         {/* FINANCIAL TRENDS MODULE */}
         <section className="mb-4">
-          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} />
+          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} language={language} />
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">          <div className="md:col-span-3 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col">
@@ -328,7 +334,7 @@ export function Dashboard({
                 })}
               </div>
           </div>
-          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} t={t} /></div>
+          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} t={t} language={language} /></div>
       </section>
 
       {/* REVENUE TREND & TONNAGE (FULL WIDTH APPLE DESIGN) */}
@@ -338,6 +344,7 @@ export function Dashboard({
             formatCurrency={(v) => formatCurrency(v, currency)} 
             currency={currency} 
             t={t} 
+            language={language}
           />
       </section>
 
@@ -347,8 +354,9 @@ export function Dashboard({
             expenseRecords={syncFilteredData.filter(t => t.tripType === "Google Sheets" || t.category === "Dépense Opérationnelle")} 
             googleClientId={googleClientId}
             t={t}
+            language={language}
           />
-          <OperationalAlerts records={syncFilteredData} allTrips={allTrips} oilChanges={oilChanges} t={t} />
+          <OperationalAlerts records={syncFilteredData} allTrips={allTrips} oilChanges={oilChanges} t={t} language={language} />
       </div>
 
     </div>

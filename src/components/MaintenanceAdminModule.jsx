@@ -5,6 +5,7 @@ import {
   FolderOpen, Eye, FileText, RotateCcw
 } from 'lucide-react';
 import { ALL_CHAUFFEURS } from '../lib/dashboard';
+import { translateComment } from '../utils/i18n';
 
 
 // Helper extraction Google Drive
@@ -38,7 +39,8 @@ export function MaintenanceAdminModule({
   setOilChanges, 
   onSync, 
   isSyncing,
-  t // Ajout des traductions
+  t, // Ajout des traductions
+  language = 'FR'
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -339,12 +341,20 @@ export function MaintenanceAdminModule({
       <section className="panel-enter rounded-[30px] border border-blue-500/20 bg-[#111] p-6 shadow-xl relative overflow-hidden">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400"><FolderOpen className="size-5" /></div>
-          <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">Explorer un dossier Drive (IA)</h3>
+          <h3 className="text-sm font-black uppercase tracking-widest text-blue-400">
+            {language === 'EN' ? "Explore Drive Folder (AI)" : "Explorer un dossier Drive (IA)"}
+          </h3>
         </div>
         <div className="flex gap-3">
-          <input type="url" placeholder="Lien dossier Google Drive..." value={driveUrl} onChange={(e) => setDriveUrl(e.target.value)} className="flex-1 h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-blue-500/50" />
+          <input 
+            type="url" 
+            placeholder={language === 'EN' ? "Google Drive folder link..." : "Lien dossier Google Drive..."} 
+            value={driveUrl} 
+            onChange={(e) => setDriveUrl(e.target.value)} 
+            className="flex-1 h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-blue-500/50" 
+          />
           <button onClick={handleDriveFolderAnalysis} disabled={isAnalyzing || !driveUrl} className="bg-blue-500 hover:bg-blue-600 disabled:opacity-30 text-white px-6 rounded-2xl text-sm font-black transition-all flex items-center gap-2">
-            {isAnalyzing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Explorer
+            {isAnalyzing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} {language === 'EN' ? "Explore" : "Explorer"}
           </button>
         </div>
 
@@ -352,11 +362,13 @@ export function MaintenanceAdminModule({
           <div key={item.id} className="mt-8 bg-blue-500/5 border border-blue-500/20 rounded-[24px] p-5 animate-in slide-in-from-top-4 duration-500">
             <div className="flex flex-col lg:flex-row gap-6">
               <div className="w-full lg:w-48 shrink-0">
-                <p className="text-[9px] font-bold text-white/30 uppercase mb-2">Facture identifiée</p>
+                <p className="text-[9px] font-bold text-white/30 uppercase mb-2">
+                  {language === 'EN' ? "Identified Invoice" : "Facture identifiée"}
+                </p>
                 {item.isPdf ? (
                   <div className="aspect-[3/4] w-full rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-3 text-white/40">
                     <FileText className="size-12" />
-                    <span className="text-[10px] font-bold uppercase">Document PDF</span>
+                    <span className="text-[10px] font-bold uppercase">{language === 'EN' ? "PDF Document" : "Document PDF"}</span>
                   </div>
                 ) : (
                   <img src={item.invoiceUrl} className="aspect-[3/4] w-full rounded-2xl object-cover border border-white/10 shadow-2xl" alt="Invoice" />
@@ -382,7 +394,9 @@ export function MaintenanceAdminModule({
               </div>
               <div className="flex flex-row lg:flex-col gap-2 justify-end">
                 <button onClick={() => setPendingAI(pendingAI.filter(p => p.id !== item.id))} className="p-3 text-white/20 hover:text-red-500 rounded-2xl transition-all"><X className="size-5" /></button>
-                <button onClick={() => approveAI(item.id)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl text-sm font-black hover:scale-105 transition-all flex items-center gap-2"><CheckCircle2 className="size-4" /> Valider</button>
+                <button onClick={() => approveAI(item.id)} className="bg-blue-500 text-white px-6 py-3 rounded-2xl text-sm font-black hover:scale-105 transition-all flex items-center gap-2">
+                  <CheckCircle2 className="size-4" /> {language === 'EN' ? "Validate" : "Valider"}
+                </button>
               </div>
             </div>
           </div>
@@ -393,8 +407,11 @@ export function MaintenanceAdminModule({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Total Dépenses ({activeTab === 'maintenance' ? 'Atelier' : 'Dépenses'})</p>
-            <p className="text-xl font-black text-orange-400 mt-1">{totalCost.toLocaleString("fr-FR")} CFA</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
+              {language === 'EN' ? "Total Expenses (" : "Total Dépenses ("}
+              {activeTab === 'maintenance' ? (language === 'EN' ? 'Workshop' : 'Atelier') : (language === 'EN' ? 'Expenses' : 'Dépenses')})
+            </p>
+            <p className="text-xl font-black text-orange-400 mt-1">{totalCost.toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA</p>
           </div>
           <div className="size-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
             <Wrench className="size-5" />
@@ -402,7 +419,9 @@ export function MaintenanceAdminModule({
         </div>
         <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Lignes Affichées</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
+              {language === 'EN' ? "Displayed Rows" : "Lignes Affichées"}
+            </p>
             <p className="text-xl font-black text-white mt-1">{filteredRecords.length} <span className="text-xs text-white/30 font-normal">/ {baseRecords.length}</span></p>
           </div>
           <div className="size-10 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
@@ -411,8 +430,10 @@ export function MaintenanceAdminModule({
         </div>
         <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Filtre Actif</p>
-            <p className="text-sm font-black text-emerald-400 mt-1">{selectedTruck === 'ALL' ? 'Tous les camions' : selectedTruck}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
+              {language === 'EN' ? "Active Filter" : "Filtre Actif"}
+            </p>
+            <p className="text-sm font-black text-emerald-400 mt-1">{selectedTruck === 'ALL' ? (language === 'EN' ? 'All trucks' : 'Tous les camions') : selectedTruck}</p>
           </div>
           <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
             <Truck className="size-5" />
@@ -429,7 +450,7 @@ export function MaintenanceAdminModule({
               onClick={() => setSelectedTruck('ALL')}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${selectedTruck === 'ALL' ? 'bg-white text-black shadow-md' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'}`}
             >
-              Tous ({baseRecords.length})
+              {language === 'EN' ? "All (" : "Tous ("}{baseRecords.length})
             </button>
             <button
               onClick={() => setSelectedTruck('76')}
@@ -455,7 +476,7 @@ export function MaintenanceAdminModule({
           <div className="relative w-full md:w-64">
             <input
               type="text"
-              placeholder="Rechercher pièce, date, CFA..."
+              placeholder={language === 'EN' ? "Search part, date, CFA..." : "Rechercher pièce, date, CFA..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-9 bg-black/40 border border-white/10 rounded-xl pl-8 pr-3 text-xs text-white placeholder:text-white/20 outline-none focus:border-orange-500/50"
@@ -474,31 +495,31 @@ export function MaintenanceAdminModule({
             onClick={() => setCategoryFilter('ALL')}
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'ALL' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'hover:bg-white/5'}`}
           >
-            Toutes
+            {language === 'EN' ? "All" : "Toutes"}
           </button>
           <button
             onClick={() => setCategoryFilter('vidange')}
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'vidange' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'hover:bg-white/5'}`}
           >
-            🛢️ Vidanges & Huiles
+            {language === 'EN' ? "🛢️ Oil & Lubrication" : "🛢️ Vidanges & Huiles"}
           </button>
           <button
             onClick={() => setCategoryFilter('mecanique')}
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'mecanique' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' : 'hover:bg-white/5'}`}
           >
-            ⚙️ Pièces & Réparations
+            {language === 'EN' ? "⚙️ Parts & Repairs" : "⚙️ Pièces & Réparations"}
           </button>
           <button
             onClick={() => setCategoryFilter('pneu')}
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'pneu' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/40' : 'hover:bg-white/5'}`}
           >
-            🛞 Pneus & Roues
+            {language === 'EN' ? "🛞 Tires & Wheels" : "🛞 Pneus & Roues"}
           </button>
           <button
             onClick={() => setCategoryFilter('drive')}
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'drive' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-white/5'}`}
           >
-            📁 Justificatifs Drive
+            {language === 'EN' ? "📁 Drive Receipts" : "📁 Justificatifs Drive"}
           </button>
         </div>
       </div>
@@ -507,27 +528,27 @@ export function MaintenanceAdminModule({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-white/[0.01]">
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.date || "Date"}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? (t?.vehicle || 'Véhicule') : (t?.driver || 'Chauffeur')}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.comments || "Description"}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.amount || "Coût"}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">Preuves / Photos</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.date || (language === 'EN' ? "Date" : "Date")}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? (t?.vehicle || (language === 'EN' ? 'Vehicle' : 'Véhicule')) : (t?.driver || (language === 'EN' ? 'Driver' : 'Chauffeur'))}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.comments || (language === 'EN' ? "Description" : "Description")}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.amount || (language === 'EN' ? "Cost" : "Coût")}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{language === 'EN' ? "Proofs / Photos" : "Preuves / Photos"}</th>
+              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest text-right">{language === 'EN' ? "Actions" : "Actions"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {displayRecords.sort((a,b) => b.date.localeCompare(a.date)).map(row => {
               const rowDate = new Date(row.date);
               const formattedDate = !isNaN(rowDate.getTime()) 
-                ? rowDate.toLocaleDateString(t?.months?.[0] === "January" ? "en-US" : "fr-FR")
+                ? rowDate.toLocaleDateString(language === 'EN' ? "en-US" : "fr-FR")
                 : row.date;
 
               return (
               <tr key={row.id} className="hover:bg-white/[0.02] transition-colors group">
                 <td className="px-6 py-4 text-xs font-bold text-white/70">{formattedDate}</td>
                 <td className="px-6 py-4 text-xs font-black text-orange-500">{row.vehicle || row.driverLabel}</td>
-                <td className="px-6 py-4 text-xs text-white/50">{row.description}</td>
-                <td className="px-6 py-4 text-xs font-black text-white">{(row.cost || row.amount || 0).toLocaleString()} CFA</td>
+                <td className="px-6 py-4 text-xs text-white/50">{translateComment(row.description, language)}</td>
+                <td className="px-6 py-4 text-xs font-black text-white">{(row.cost || row.amount || 0).toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     {(row.imageUrl || row.driveLink) && (
@@ -535,10 +556,10 @@ export function MaintenanceAdminModule({
                         type="button"
                         onClick={() => setPreviewDoc(row)}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-all text-[11px] font-bold"
-                        title="Aperçu direct du justificatif"
+                        title={language === 'EN' ? "Direct receipt preview" : "Aperçu direct du justificatif"}
                       >
                         <Eye className="size-3.5" />
-                        <span>Preuve</span>
+                        <span>{language === 'EN' ? "Proof" : "Preuve"}</span>
                       </button>
                     )}
                     {row.workPhotos?.length > 0 && (
@@ -556,7 +577,7 @@ export function MaintenanceAdminModule({
                       </div>
                     )}
                     {row.source === "Google Sheets" && (
-                      <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5" title="Synchronisé de GSheets">
+                      <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5" title={language === 'EN' ? "Synced from GSheets" : "Synchronisé de GSheets"}>
                         <Sparkles className="size-4" />
                       </div>
                     )}
@@ -576,21 +597,23 @@ export function MaintenanceAdminModule({
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <section className="w-full max-w-xl panel-enter rounded-[40px] border border-white/10 bg-[#181818] p-8 shadow-2xl relative">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black text-white flex items-center gap-3"><Wrench className="size-5 text-orange-500" /> Saisie Manuelle</h3>
+              <h3 className="text-xl font-black text-white flex items-center gap-3"><Wrench className="size-5 text-orange-500" /> {language === 'EN' ? "Manual Entry" : "Saisie Manuelle"}</h3>
               <button onClick={() => setIsAdding(false)} className="p-2 bg-white/5 rounded-full text-white/40 hover:text-white"><X className="size-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white focus:border-orange-500/50" />
                 <select required value={formData.vehicle} onChange={e => setFormData({...formData, vehicle: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white focus:border-orange-500/50">
-                  <option value="">Choisir...</option>
+                  <option value="">{language === 'EN' ? "Select..." : "Choisir..."}</option>
                   {vehicleOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </div>
-              <input type="text" required placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
-              <input type="number" required placeholder="Coût (CFA)" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50 font-bold" />
-              <input type="url" placeholder="Lien photo" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
-              <button type="submit" className="w-full bg-white text-black hover:bg-orange-500 hover:text-white h-14 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3"><Save className="size-5" /> Enregistrer</button>
+              <input type="text" required placeholder={language === 'EN' ? "Description" : "Description"} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
+              <input type="number" required placeholder={language === 'EN' ? "Cost (CFA)" : "Coût (CFA)"} value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50 font-bold" />
+              <input type="url" placeholder={language === 'EN' ? "Photo URL" : "Lien photo"} value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="w-full h-12 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm text-white outline-none focus:border-orange-500/50" />
+              <button type="submit" className="w-full bg-white text-black hover:bg-orange-500 hover:text-white h-14 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3">
+                <Save className="size-5" /> {language === 'EN' ? "Save" : "Enregistrer"}
+              </button>
             </form>
           </section>
         </div>
@@ -606,8 +629,8 @@ export function MaintenanceAdminModule({
                   <Eye className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">{previewDoc.description || 'Justificatif Atelier & Finances'}</h3>
-                  <p className="text-[10px] text-white/40 font-bold uppercase">{previewDoc.vehicle || previewDoc.driverLabel} • {previewDoc.date} • {Number(previewDoc.cost || previewDoc.amount || 0).toLocaleString()} CFA</p>
+                  <h3 className="text-sm font-black text-white">{translateComment(previewDoc.description, language) || (language === 'EN' ? 'Workshop & Finance Receipt' : 'Justificatif Atelier & Finances')}</h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase">{previewDoc.vehicle || previewDoc.driverLabel} • {previewDoc.date} • {Number(previewDoc.cost || previewDoc.amount || 0).toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -618,7 +641,7 @@ export function MaintenanceAdminModule({
                     rel="noreferrer"
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
                   >
-                    <ExternalLink className="size-3.5" /> Ouvrir Drive
+                    <ExternalLink className="size-3.5" /> {language === 'EN' ? "Open Drive" : "Ouvrir Drive"}
                   </a>
                 )}
                 <button
@@ -647,8 +670,12 @@ export function MaintenanceAdminModule({
                 <div className="text-center p-8 space-y-4">
                   <FolderOpen className="size-16 text-blue-400 mx-auto" />
                   <div>
-                    <p className="text-sm font-bold text-white">Dossier Google Drive</p>
-                    <p className="text-xs text-white/40 max-w-md mx-auto mt-1">Ce lien correspond à un dossier de photos ou de documents multiples.</p>
+                    <p className="text-sm font-bold text-white">{language === 'EN' ? "Google Drive Folder" : "Dossier Google Drive"}</p>
+                    <p className="text-xs text-white/40 max-w-md mx-auto mt-1">
+                      {language === 'EN' 
+                        ? "This link corresponds to a folder of photos or multiple documents." 
+                        : "Ce lien correspond à un dossier de photos ou de documents multiples."}
+                    </p>
                   </div>
                   <a
                     href={previewDoc.driveLink}
@@ -656,11 +683,11 @@ export function MaintenanceAdminModule({
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-blue-500/20"
                   >
-                    <ExternalLink className="size-4" /> Explorer le dossier sur Drive
+                    <ExternalLink className="size-4" /> {language === 'EN' ? "Explore folder on Drive" : "Explorer le dossier sur Drive"}
                   </a>
                 </div>
               ) : (
-                <p className="text-sm text-white/40 font-bold">Aucun aperçu disponible.</p>
+                <p className="text-sm text-white/40 font-bold">{language === 'EN' ? "No preview available." : "Aucun aperçu disponible."}</p>
               )}
             </div>
           </div>

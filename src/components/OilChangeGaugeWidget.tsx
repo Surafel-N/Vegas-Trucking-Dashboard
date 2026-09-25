@@ -4,6 +4,7 @@ import {
   RotateCcw, Truck, Calendar, Plus, X, Check, ShieldAlert,
   ChevronRight, Gauge, Info
 } from 'lucide-react';
+import type { Language } from '../utils/i18n';
 
 export interface OilChangeInfo {
   mileage: number;
@@ -18,6 +19,7 @@ export interface OilChangeGaugeWidgetProps {
   onUpdateOilChange?: (truckLabel: string, mileage: number, date: string, comment?: string) => void;
   canEdit?: boolean;
   t?: any;
+  language?: Language;
 }
 
 const FLEET_DEFINITIONS = [
@@ -61,8 +63,12 @@ export function OilChangeGaugeWidget({
   oilChanges = {},
   onUpdateOilChange,
   canEdit = true,
-  t
+  t,
+  language = 'FR'
 }: OilChangeGaugeWidgetProps) {
+  const isEn = language === 'EN';
+  const locale = isEn ? 'en-US' : 'fr-FR';
+
   const [modalTruck, setModalTruck] = useState<typeof FLEET_DEFINITIONS[0] | null>(null);
   const [modalMileage, setModalMileage] = useState<string>("");
   const [modalDate, setModalDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -144,7 +150,7 @@ export function OilChangeGaugeWidget({
     setModalTruck(truck);
     setModalMileage(String(currentKm));
     setModalDate(new Date().toISOString().slice(0, 10));
-    setModalNotes("Vidange complète (Huile 15W40 + Filtre à huile et gazole)");
+    setModalNotes(isEn ? "Full service (15W40 Oil + Fuel and oil filters)" : "Vidange complète (Huile 15W40 + Filtre à huile et gazole)");
   }
 
   function handleSaveService(e: React.FormEvent) {
@@ -169,15 +175,21 @@ export function OilChangeGaugeWidget({
             </div>
             <div>
               <h4 className="text-xs font-black uppercase tracking-wider text-red-400">
-                Alerte Vidange Dépassée ({overdueCount} camion{overdueCount > 1 ? "s" : ""})
+                {isEn 
+                  ? `Oil Change Overdue Alert (${overdueCount} truck${overdueCount > 1 ? "s" : ""})`
+                  : `Alerte Vidange Dépassée (${overdueCount} camion${overdueCount > 1 ? "s" : ""})`
+                }
               </h4>
               <p className="text-[11px] text-white/70 mt-0.5 font-medium">
-                Le seuil recommandé de 10 000 KM a été franchi. Les dernières vidanges datent d'avril 2026.
+                {isEn
+                  ? "The recommended 10,000 KM threshold has been exceeded. Last recorded services date from April 2026."
+                  : "Le seuil recommandé de 10 000 KM a été franchi. Les dernières vidanges datent d'avril 2026."
+                }
               </p>
             </div>
           </div>
           <span className="hidden sm:inline-block text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30">
-            Action requise
+            {isEn ? "Action required" : "Action requise"}
           </span>
         </div>
       )}
@@ -190,10 +202,10 @@ export function OilChangeGaugeWidget({
           </div>
           <div>
             <h3 className="text-xs font-black uppercase tracking-widest text-white">
-              Suivi Odomètre & Jauge de Vidange
+              {t?.odometerTracking || (isEn ? "Odometer & Oil Change Gauge Tracking" : "Suivi Odomètre & Jauge de Vidange")}
             </h3>
             <p className="text-[10px] text-white/40">
-              Intervalle recommandé constructeur : 10 000 KM • Basé sur le Spreadsheet SDV
+              {t?.manufacturerInterval || (isEn ? "Manufacturer recommended interval: 10,000 KM • Based on SDV Spreadsheet" : "Intervalle recommandé constructeur : 10 000 KM • Basé sur le Spreadsheet SDV")}
             </p>
           </div>
         </div>
@@ -234,17 +246,17 @@ export function OilChangeGaugeWidget({
                   {/* Badge Statut Vidange */}
                   {truck.isOverdue && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse">
-                      <AlertTriangle className="size-3" /> Dépassé
+                      <AlertTriangle className="size-3" /> {isEn ? "Overdue" : "Dépassé"}
                     </span>
                   )}
                   {truck.isWarning && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                      <Clock className="size-3" /> À prévoir
+                      <Clock className="size-3" /> {isEn ? "Upcoming" : "À prévoir"}
                     </span>
                   )}
                   {truck.isOk && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                      <CheckCircle2 className="size-3" /> Conforme
+                      <CheckCircle2 className="size-3" /> {isEn ? "Compliant" : "Conforme"}
                     </span>
                   )}
                 </div>
@@ -252,11 +264,11 @@ export function OilChangeGaugeWidget({
                 {/* Kilométrage Actuel */}
                 <div className="p-3.5 rounded-2xl bg-black/40 border border-white/5 mb-4">
                   <span className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-1">
-                    Kilométrage Actuel (Odomètre)
+                    {t?.currentOdometer || (isEn ? "Current Mileage (Odometer)" : "Kilométrage Actuel (Odomètre)")}
                   </span>
                   <div className="flex items-baseline justify-between">
                     <span className="text-2xl font-black font-mono text-white tracking-tight">
-                      {truck.currentKm.toLocaleString("fr-FR")}
+                      {truck.currentKm.toLocaleString(locale)}
                     </span>
                     <span className="text-xs font-bold text-white/30 font-mono">KM</span>
                   </div>
@@ -267,12 +279,12 @@ export function OilChangeGaugeWidget({
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[10px] font-bold text-white/50 flex items-center gap-1">
                       <Wrench className="size-3 text-orange-400" />
-                      Roulé depuis vidange :
+                      {isEn ? "Driven since service:" : "Roulé depuis vidange :"}
                     </span>
                     <span className={`font-mono font-black ${
                       truck.isOverdue ? "text-red-400" : truck.isWarning ? "text-amber-400" : "text-emerald-400"
                     }`}>
-                      {truck.kmSinceService.toLocaleString("fr-FR")} KM
+                      {truck.kmSinceService.toLocaleString(locale)} KM
                     </span>
                   </div>
 
@@ -292,14 +304,14 @@ export function OilChangeGaugeWidget({
 
                   {/* Statut sous la jauge */}
                   <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="text-white/30">Réf. 10 000 KM</span>
+                    <span className="text-white/30">{isEn ? "Ref. 10,000 KM" : "Réf. 10 000 KM"}</span>
                     {truck.isOverdue ? (
                       <span className="text-red-400 font-mono font-black">
-                        +{Math.abs(truck.remainingKm).toLocaleString("fr-FR")} KM de retard
+                        +{Math.abs(truck.remainingKm).toLocaleString(locale)} {isEn ? "KM overdue" : "KM de retard"}
                       </span>
                     ) : (
                       <span className="text-emerald-400 font-mono">
-                        Reste {truck.remainingKm.toLocaleString("fr-FR")} KM
+                        {isEn ? `${truck.remainingKm.toLocaleString(locale)} KM left` : `Reste ${truck.remainingKm.toLocaleString(locale)} KM`}
                       </span>
                     )}
                   </div>
@@ -308,15 +320,15 @@ export function OilChangeGaugeWidget({
                 {/* Historique Dernière Vidange */}
                 <div className="pt-3 border-t border-white/5 space-y-1.5 text-[11px]">
                   <div className="flex items-center justify-between text-white/50">
-                    <span>Dernière vidange :</span>
+                    <span>{isEn ? "Last service:" : "Dernière vidange :"}</span>
                     <span className="font-bold text-white/80 font-mono">
-                      {new Date(truck.lastServiceDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                      {new Date(truck.lastServiceDate).toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-white/50">
-                    <span>Au compteur :</span>
+                    <span>{isEn ? "At odometer:" : "Au compteur :"}</span>
                     <span className="font-mono text-white/80 font-bold">
-                      {truck.lastServiceKm.toLocaleString("fr-FR")} KM
+                      {truck.lastServiceKm.toLocaleString(locale)} KM
                     </span>
                   </div>
                 </div>
@@ -329,7 +341,7 @@ export function OilChangeGaugeWidget({
                   className="mt-4 w-full py-2.5 rounded-xl bg-white/5 hover:bg-orange-500/20 text-white/70 hover:text-orange-300 border border-white/10 hover:border-orange-500/30 text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 group"
                 >
                   <Wrench className="size-3.5 text-orange-400 group-hover:rotate-45 transition-transform" />
-                  <span>Enregistrer Vidange</span>
+                  <span>{isEn ? "Record Oil Service" : "Enregistrer Vidange"}</span>
                 </button>
               )}
             </div>
@@ -347,7 +359,7 @@ export function OilChangeGaugeWidget({
                   {modalTruck.unit}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Enregistrer une Vidange</h3>
+                  <h3 className="text-base font-bold text-white">{isEn ? "Record an Oil Service" : "Enregistrer une Vidange"}</h3>
                   <p className="text-xs text-white/40">{modalTruck.label} • {modalTruck.plate}</p>
                 </div>
               </div>
@@ -359,7 +371,7 @@ export function OilChangeGaugeWidget({
             <form onSubmit={handleSaveService} className="mt-5 space-y-4">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Date de la Vidange *
+                  {isEn ? "Service Date *" : "Date de la Vidange *"}
                 </label>
                 <input
                   type="date"
@@ -372,7 +384,7 @@ export function OilChangeGaugeWidget({
 
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Kilométrage Compteur au Service (KM) *
+                  {isEn ? "Odometer Reading at Service (KM) *" : "Kilométrage Compteur au Service (KM) *"}
                 </label>
                 <input
                   type="number"
@@ -383,19 +395,22 @@ export function OilChangeGaugeWidget({
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono font-bold outline-none focus:border-orange-500"
                 />
                 <p className="mt-1 text-[10px] text-white/30">
-                  Dernier service enregistré à {modalTruck.defaultServiceKm.toLocaleString("fr-FR")} KM.
+                  {isEn 
+                    ? `Last recorded service at ${modalTruck.defaultServiceKm.toLocaleString("en-US")} KM.`
+                    : `Dernier service enregistré à ${modalTruck.defaultServiceKm.toLocaleString("fr-FR")} KM.`
+                  }
                 </p>
               </div>
 
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Travaux Réalisés & Notes
+                  {isEn ? "Completed Work & Notes" : "Travaux Réalisés & Notes"}
                 </label>
                 <textarea
                   rows={2}
                   value={modalNotes}
                   onChange={(e) => setModalNotes(e.target.value)}
-                  placeholder="Huile 15W40, filtre gazole, filtre à air..."
+                  placeholder={isEn ? "15W40 Oil, fuel filter, air filter..." : "Huile 15W40, filtre gazole, filtre à air..."}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-orange-500"
                 />
               </div>
@@ -406,13 +421,13 @@ export function OilChangeGaugeWidget({
                   onClick={() => setModalTruck(null)}
                   className="px-4 py-2 rounded-xl border border-white/10 text-white/50 text-xs font-bold"
                 >
-                  Annuler
+                  {t?.cancel || (isEn ? "Cancel" : "Annuler")}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
                 >
-                  <Check className="size-3.5" /> Valider la Vidange
+                  <Check className="size-3.5" /> {isEn ? "Validate Oil Service" : "Valider la Vidange"}
                 </button>
               </div>
             </form>

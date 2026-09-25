@@ -5,6 +5,7 @@ import {
   CheckCircle2, ArrowUpRight, ChevronRight, Eye 
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { type Language, translateComment } from "../utils/i18n";
 
 type MiniRepair = {
   id: string;
@@ -28,6 +29,7 @@ type MaintenanceLogProps = {
   expenseRecords?: any[];
   googleClientId?: string;
   t?: any;
+  language?: Language;
 };
 
 // Extraction de l'ID Google Drive
@@ -51,7 +53,7 @@ function getDriveEmbedUrl(link?: string): string | null {
   return `https://drive.google.com/file/d/${id}/preview`;
 }
 
-export function MaintenanceLog({ records = [], expenseRecords = [], t }: MaintenanceLogProps) {
+export function MaintenanceLog({ records = [], expenseRecords = [], t, language = 'FR' }: MaintenanceLogProps) {
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'maintenance' | 'expenses'>('maintenance');
   const [selectedTruck, setSelectedTruck] = useState<string>('ALL');
@@ -119,7 +121,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
     return { totalCost, count: filteredList.length, avgCost, driveCount };
   }, [filteredList]);
 
-  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+  const locale = (language === 'EN' || t?.months?.[0] === "January") ? "en-US" : "fr-FR";
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -138,17 +140,22 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
     if (upper.includes("SORO") || upper.includes("52")) {
       return { label: "SORO TRUCK 52", color: "#CF5D56", bg: "rgba(207, 93, 86, 0.12)", border: "rgba(207, 93, 86, 0.25)" };
     }
-    return { label: "Flotte Générale", color: "#F59E0B", bg: "rgba(245, 158, 11, 0.12)", border: "rgba(245, 158, 11, 0.25)" };
+    return { 
+      label: language === 'EN' ? "General Fleet" : "Flotte Générale", 
+      color: "#F59E0B", 
+      bg: "rgba(245, 158, 11, 0.12)", 
+      border: "rgba(245, 158, 11, 0.25)" 
+    };
   };
 
   // Détection du tag d'intervention
   const getRepairBadge = (desc?: string) => {
     const d = String(desc || "").toLowerCase();
-    if (/vidange|oil change/i.test(d)) return { label: "Vidange Moteur", icon: Droplet, color: "#00F2FF" };
-    if (/tire|pneu/i.test(d)) return { label: "Pneus & Train", icon: Layers, color: "#EC4899" };
-    if (/brake|frein|drum/i.test(d)) return { label: "Système Freinage", icon: Wrench, color: "#F59E0B" };
-    if (/pump|pompe|cable|hose|tuyau/i.test(d)) return { label: "Pièce & Hydraulique", icon: Wrench, color: "#A855F7" };
-    return { label: "Intervention Atelier", icon: Wrench, color: "#3B82F6" };
+    if (/vidange|oil change/i.test(d)) return { label: language === 'EN' ? "Engine Oil Change" : "Vidange Moteur", icon: Droplet, color: "#00F2FF" };
+    if (/tire|pneu/i.test(d)) return { label: language === 'EN' ? "Tires & Running Gear" : "Pneus & Train", icon: Layers, color: "#EC4899" };
+    if (/brake|frein|drum/i.test(d)) return { label: language === 'EN' ? "Braking System" : "Système Freinage", icon: Wrench, color: "#F59E0B" };
+    if (/pump|pompe|cable|hose|tuyau/i.test(d)) return { label: language === 'EN' ? "Parts & Hydraulics" : "Pièce & Hydraulique", icon: Wrench, color: "#A855F7" };
+    return { label: language === 'EN' ? "Workshop Service" : "Intervention Atelier", icon: Wrench, color: "#3B82F6" };
   };
 
   return (
@@ -164,13 +171,13 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-black uppercase tracking-tight">{t?.workshopFinances || "Atelier & Finances Flotte"}</h3>
+              <h3 className="text-base font-black uppercase tracking-tight">{t?.workshopFinances || (language === 'EN' ? "Workshop & Fleet Finances" : "Atelier & Finances Flotte")}</h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-500/15 text-orange-400 border border-orange-500/30">
-                {stats.count} Interventions
+                {stats.count} {language === 'EN' ? "Interventions" : "Interventions"}
               </span>
             </div>
             <p className="text-[11px] text-white/40 font-medium mt-0.5">
-              Historique des réparations, pièces mécaniques et dépenses d'exploitation
+              {language === 'EN' ? "History of repairs, mechanical parts, and operating expenses" : "Historique des réparations, pièces mécaniques et dépenses d'exploitation"}
             </p>
           </div>
         </div>
@@ -178,8 +185,10 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
         {/* Total financier de la sélection active */}
         <div className="flex items-center gap-3 bg-white/[0.03] border border-white/8 px-4 py-2 rounded-2xl">
           <div>
-            <span className="text-[9px] font-black uppercase tracking-wider text-white/40 block">Total Dépenses Atelier</span>
-            <span className="text-lg font-black text-[#9fe3b9] font-mono leading-none">{stats.totalCost.toLocaleString("fr-FR")} CFA</span>
+            <span className="text-[9px] font-black uppercase tracking-wider text-white/40 block">
+              {language === 'EN' ? "Total Workshop Expenses" : "Total Dépenses Atelier"}
+            </span>
+            <span className="text-lg font-black text-[#9fe3b9] font-mono leading-none">{stats.totalCost.toLocaleString(locale)} CFA</span>
           </div>
         </div>
       </div>
@@ -198,7 +207,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
               }`}
             >
               <Wrench className="size-3" />
-              <span>Interventions Atelier</span>
+              <span>{language === 'EN' ? "Workshop Interventions" : "Interventions Atelier"}</span>
             </button>
             <button
               onClick={() => setActiveTab('expenses')}
@@ -209,7 +218,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
               }`}
             >
               <Banknote className="size-3" />
-              <span>Toutes Dépenses</span>
+              <span>{language === 'EN' ? "All Expenses" : "Toutes Dépenses"}</span>
             </button>
           </div>
 
@@ -221,7 +230,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 selectedTruck === 'ALL' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'
               }`}
             >
-              Tous Camions
+              {language === 'EN' ? "All Trucks" : "Tous Camions"}
             </button>
             {trucksConfig.map(t => (
               <button
@@ -247,7 +256,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
             <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
             <input
               type="text"
-              placeholder="Rechercher par mot-clé (pneu, vidange, frein, Shell...)"
+              placeholder={language === 'EN' ? "Search by keyword (tire, oil, brake, Shell...)" : "Rechercher par mot-clé (pneu, vidange, frein, Shell...)"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-7 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs font-medium focus:outline-none focus:border-orange-500"
@@ -266,7 +275,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 selectedCategory === 'ALL' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/40 hover:text-white'
               }`}
             >
-              Tout
+              {language === 'EN' ? "All" : "Tout"}
             </button>
             <button
               onClick={() => setSelectedCategory(selectedCategory === 'vidange' ? 'ALL' : 'vidange')}
@@ -274,7 +283,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 selectedCategory === 'vidange' ? 'bg-[#00F2FF] text-black font-black' : 'bg-white/5 text-[#00F2FF]'
               }`}
             >
-              <Droplet className="size-3" /> Vidanges
+              <Droplet className="size-3" /> {language === 'EN' ? "Oil Changes" : "Vidanges"}
             </button>
             <button
               onClick={() => setSelectedCategory(selectedCategory === 'pneu' ? 'ALL' : 'pneu')}
@@ -282,7 +291,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 selectedCategory === 'pneu' ? 'bg-[#EC4899] text-white font-black' : 'bg-white/5 text-[#EC4899]'
               }`}
             >
-              <Layers className="size-3" /> Pneus
+              <Layers className="size-3" /> {language === 'EN' ? "Tires" : "Pneus"}
             </button>
             <button
               onClick={() => setSelectedCategory(selectedCategory === 'mecanique' ? 'ALL' : 'mecanique')}
@@ -290,7 +299,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 selectedCategory === 'mecanique' ? 'bg-orange-500 text-white font-black' : 'bg-white/5 text-orange-400'
               }`}
             >
-              <Wrench className="size-3" /> Mécanique
+              <Wrench className="size-3" /> {language === 'EN' ? "Mechanics" : "Mécanique"}
             </button>
             <button
               onClick={() => setOnlyDrive(!onlyDrive)}
@@ -298,7 +307,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 onlyDrive ? 'bg-[#3B82F6] text-white font-black' : 'bg-white/5 text-[#3B82F6]'
               }`}
             >
-              <FolderOpen className="size-3" /> Justificatifs ({stats.driveCount})
+              <FolderOpen className="size-3" /> {language === 'EN' ? "Receipts" : "Justificatifs"} ({stats.driveCount})
             </button>
           </div>
         </div>
@@ -309,8 +318,8 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
         {filteredList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12 text-white/30">
             <Wrench className="size-10 mb-2 opacity-30" />
-            <p className="text-xs font-black uppercase tracking-wider">Aucune opération trouvée</p>
-            <p className="text-[11px] text-white/20 mt-0.5">Essayez de réinitialiser vos filtres ou votre recherche</p>
+            <p className="text-xs font-black uppercase tracking-wider">{language === 'EN' ? "No operations found" : "Aucune opération trouvée"}</p>
+            <p className="text-[11px] text-white/20 mt-0.5">{language === 'EN' ? "Try resetting your filters or search query" : "Essayez de réinitialiser vos filtres ou votre recherche"}</p>
           </div>
         ) : (
           filteredList.map((item) => {
@@ -366,7 +375,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                     </div>
 
                     <h4 className="text-xs font-bold text-white/90 truncate max-w-[280px] sm:max-w-md group-hover:text-white">
-                      {item.description || "Intervention atelier"}
+                      {translateComment(item.description, language) || (language === 'EN' ? "Workshop service" : "Intervention atelier")}
                     </h4>
                   </div>
                 </div>
@@ -374,11 +383,11 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <span className="text-sm font-black text-[#9fe3b9] font-mono block">
-                      {cost.toLocaleString("fr-FR")} CFA
+                      {cost.toLocaleString(locale)} CFA
                     </span>
                     {item.driveLink && (
                       <span className="text-[9px] font-bold text-[#3B82F6] flex items-center gap-0.5 justify-end">
-                        <FolderOpen className="size-2.5" /> Justificatif
+                        <FolderOpen className="size-2.5" /> {language === 'EN' ? "Receipt" : "Justificatif"}
                       </span>
                     )}
                   </div>
@@ -404,9 +413,9 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                   <Wrench className="size-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white">Détail de l'Intervention Atelier</h3>
+                  <h3 className="text-lg font-black text-white">{language === 'EN' ? "Workshop Service Details" : "Détail de l'Intervention Atelier"}</h3>
                   <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">
-                    {selectedRecord.vehicle || selectedRecord.driverLabel || "Camion Flotte"}
+                    {selectedRecord.vehicle || selectedRecord.driverLabel || (language === 'EN' ? "Fleet Truck" : "Camion Flotte")}
                   </p>
                 </div>
               </div>
@@ -422,7 +431,9 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
             {/* Cartouches Infos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Date de l'opération</span>
+                <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">
+                  {language === 'EN' ? "Operation Date" : "Date de l'opération"}
+                </span>
                 <p className="text-sm font-bold text-white flex items-center gap-2">
                   <Calendar className="size-4 text-orange-400" />
                   {formatDate(selectedRecord.date)}
@@ -430,19 +441,23 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
               </div>
 
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Montant Décaissé</span>
+                <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">
+                  {language === 'EN' ? "Disbursed Amount" : "Montant Décaissé"}
+                </span>
                 <p className="text-lg font-black text-[#9fe3b9] font-mono flex items-center gap-2">
                   <Banknote className="size-5 text-[#9fe3b9]" />
-                  {Number(selectedRecord.cost || selectedRecord.amount || 0).toLocaleString("fr-FR")} CFA
+                  {Number(selectedRecord.cost || selectedRecord.amount || 0).toLocaleString(locale)} CFA
                 </p>
               </div>
             </div>
 
             {/* Description complète */}
             <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Libellé / Travaux Effectués</span>
+              <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">
+                {language === 'EN' ? "Work Description / Parts" : "Libellé / Travaux Effectués"}
+              </span>
               <p className="text-sm text-white/90 leading-relaxed font-medium">
-                "{selectedRecord.description || "Aucune description enregistrée"}"
+                "{translateComment(selectedRecord.description, language) || (language === 'EN' ? "No description recorded" : "Aucune description enregistrée")}"
               </p>
             </div>
 
@@ -452,7 +467,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-white/60 flex items-center gap-1.5">
                     <FolderOpen className="size-4 text-[#3B82F6]" />
-                    Pièce Justificative Associée
+                    {language === 'EN' ? "Attached Receipt" : "Pièce Justificative Associée"}
                   </span>
                   <a
                     href={selectedRecord.driveLink}
@@ -460,7 +475,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                     rel="noopener noreferrer"
                     className="text-[#3B82F6] hover:underline font-bold flex items-center gap-1"
                   >
-                    Ouvrir dans Drive <ExternalLink className="size-3" />
+                    {language === 'EN' ? "Open in Drive" : "Ouvrir dans Drive"} <ExternalLink className="size-3" />
                   </a>
                 </div>
 
@@ -478,7 +493,9 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                         <FolderOpen className="size-6" />
                       </div>
                       <p className="text-xs text-white/60 max-w-sm">
-                        Ce justificatif est un dossier contenant des photos d'atelier et factures. Cliquez ci-dessous pour le consulter directement.
+                        {language === 'EN' 
+                          ? "This receipt is a folder containing workshop photos and invoices. Click below to view directly." 
+                          : "Ce justificatif est un dossier contenant des photos d'atelier et factures. Cliquez ci-dessous pour le consulter directement."}
                       </p>
                       <a
                         href={selectedRecord.driveLink}
@@ -486,7 +503,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#3B82F6] hover:bg-[#2563eb] text-white text-xs font-black uppercase tracking-wider"
                       >
-                        <ExternalLink className="size-3.5" /> Ouvrir le dossier complet
+                        <ExternalLink className="size-3.5" /> {language === 'EN' ? "Open full folder" : "Ouvrir le dossier complet"}
                       </a>
                     </div>
                   )}
@@ -494,7 +511,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
               </div>
             ) : (
               <div className="p-4 rounded-2xl bg-white/[0.01] border border-dashed border-white/5 text-center text-xs text-white/30 italic">
-                Aucun lien de justificatif Google Drive rattaché à cette intervention
+                {language === 'EN' ? "No Google Drive receipt link attached to this intervention" : "Aucun lien de justificatif Google Drive rattaché à cette intervention"}
               </div>
             )}
 
@@ -503,7 +520,7 @@ export function MaintenanceLog({ records = [], expenseRecords = [], t }: Mainten
                 onClick={() => setSelectedRecord(null)}
                 className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all"
               >
-                Fermer
+                {language === 'EN' ? "Close" : "Fermer"}
               </button>
             </div>
           </div>

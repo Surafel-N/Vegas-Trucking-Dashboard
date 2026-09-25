@@ -22,6 +22,7 @@ import {
   Settings2
 } from 'lucide-react';
 import { ALL_CHAUFFEURS, ALL_MONTHS } from '../lib/dashboard';
+import { translateComment, translateCategory } from '../utils/i18n';
 
 const CATEGORIES = {
   "Entretien": ["Pneus", "Vidange", "Freins", "Moteur", "Carrosserie"],
@@ -45,10 +46,12 @@ const initialFormState = {
   manualDriveLink: ""
 };
 
-export default function ExpenseModule({ expenses = [], setExpenses, drivers = [], formatCurrency, onSync, isSyncing, t }) {
+export default function ExpenseModule({ expenses = [], setExpenses, drivers = [], formatCurrency, onSync, isSyncing, t, language = 'FR' }) {
+  const isEn = language === 'EN';
+  const locale = isEn ? 'en-US' : 'fr-FR';
   const safeExpenses = expenses || [];
   const safeDrivers = drivers || [];
-  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString(locale) + " CFA";
 
   // Global States
   const [formData, setFormData] = useState(initialFormState);
@@ -203,7 +206,7 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
             <div className="size-8 bg-[#cf5d56] rounded-full flex items-center justify-center text-white font-black text-xs">
               {selectedExpenses.length}
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Éléments sélectionnés</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/60">{isEn ? "Items selected" : "Éléments sélectionnés"}</p>
           </div>
           
           <div className="flex items-center gap-4">
@@ -211,13 +214,13 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
               onClick={handleBulkEdit}
               className="flex items-center gap-2 px-4 py-2 hover:bg-white/5 rounded-xl text-[10px] font-bold uppercase transition-all text-blue-400"
             >
-              <Settings2 className="size-4" /> Modifier
+              <Settings2 className="size-4" /> {isEn ? "Edit" : "Modifier"}
             </button>
             <button 
               onClick={handleBulkDelete}
               className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase transition-all border border-red-500/20"
             >
-              <Trash2 className="size-4" /> Supprimer la sélection
+              <Trash2 className="size-4" /> {isEn ? "Delete selection" : "Supprimer la sélection"}
             </button>
             <button 
               onClick={() => setSelectedExpenses([])}
@@ -285,7 +288,7 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
                   className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56]"
                 >
                   <option value="">{t?.category || "Catégorie"}...</option>
-                  {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{translateCategory(cat, language)}</option>)}
                 </select>
 
                 <select 
@@ -296,12 +299,12 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
                   className="bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-[#cf5d56] disabled:opacity-30"
                 >
                   <option value="">{t?.subCategory || "Sous-catégorie"}...</option>
-                  {formData.category && CATEGORIES[formData.category].map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                  {formData.category && CATEGORIES[formData.category].map(sub => <option key={sub} value={sub}>{translateCategory(sub, language)}</option>)}
                 </select>
               </div>
 
-              <textarea placeholder="Description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-sm outline-none focus:border-[#cf5d56] min-h-[80px]" />
-              <button type="submit" className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-4 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest">{t?.validate || "Valider"}</button>
+              <textarea placeholder={isEn ? "Description..." : "Description..."} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-sm outline-none focus:border-[#cf5d56] min-h-[80px]" />
+              <button type="submit" className="w-full bg-white text-black hover:bg-[#cf5d56] hover:text-white font-black py-4 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-widest">{t?.validate || (isEn ? "Validate" : "Valider")}</button>
             </form>
           </div>
         </div>
@@ -310,10 +313,10 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl min-h-[600px] flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-              <h3 className="text-xl font-bold">{t?.archivedHistory || "Historique Archivé"}</h3>
+              <h3 className="text-xl font-bold">{t?.archivedHistory || (isEn ? "Archived History" : "Historique Archivé")}</h3>
               <div className="flex items-center gap-3">
-                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_MONTHS}>{t?.allMonths || "Tous les mois"}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
-                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_CHAUFFEURS}>{t?.allDrivers || "Tous les chauffeurs"}</option>{safeDrivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
+                <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_MONTHS}>{t?.allMonths || (isEn ? "All Months" : "Tous les mois")}</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs outline-none"><option value={ALL_CHAUFFEURS}>{t?.allDrivers || (isEn ? "All Drivers" : "Tous les chauffeurs")}</option>{safeDrivers.map(d => <option key={d.id} value={`${d.sdv} (${d.name})`}>{d.name}</option>)}</select>
               </div>
             </div>
 
@@ -326,11 +329,11 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
                         {selectedExpenses.length === filteredExpenses.length && filteredExpenses.length > 0 ? <CheckSquare className="size-4 text-[#cf5d56]" /> : <Square className="size-4" />}
                       </button>
                     </th>
-                    <th className="pb-4">{t?.identification || "Identification"}</th>
-                    <th className="pb-4">{t?.comments || "Description"}</th>
-                    <th className="pb-4 text-right">{t?.amount || "Montant"}</th>
+                    <th className="pb-4">{t?.identification || (isEn ? "Identification" : "Identification")}</th>
+                    <th className="pb-4">{t?.comments || (isEn ? "Description" : "Description")}</th>
+                    <th className="pb-4 text-right">{t?.amount || (isEn ? "Amount" : "Montant")}</th>
                     <th className="pb-4 text-center">G.E.D</th>
-                    <th className="pb-4 pr-6 text-right">{t?.actions || "Action"}</th>
+                    <th className="pb-4 pr-6 text-right">{t?.actions || (isEn ? "Action" : "Action")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -345,14 +348,14 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
                         <div className="flex flex-col">
                           <span className="text-sm font-black">{expense.date}</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-bold text-[#cf5d56] uppercase bg-[#cf5d56]/10 px-1.5 py-0.5 rounded-md">{expense.category}</span>
-                            <span className="text-[10px] font-bold text-white/30 uppercase">{expense.subCategory}</span>
+                            <span className="text-[10px] font-bold text-[#cf5d56] uppercase bg-[#cf5d56]/10 px-1.5 py-0.5 rounded-md">{translateCategory(expense.category, language)}</span>
+                            <span className="text-[10px] font-bold text-white/30 uppercase">{translateCategory(expense.subCategory, language)}</span>
                           </div>
                           <span className="text-[10px] font-bold text-white/20 uppercase mt-0.5">{expense.driverLabel}</span>
                         </div>
                       </td>
                       <td className="py-5 border-y border-white/5 max-w-[200px]">
-                        <p className="text-[10px] text-white/60 line-clamp-2 italic">{expense.description}</p>
+                        <p className="text-[10px] text-white/60 line-clamp-2 italic">{translateComment(expense.description, language)}</p>
                       </td>
                       <td className="py-5 border-y border-white/5 text-right font-mono font-black text-white/90">
                         {format(expense.amount)}

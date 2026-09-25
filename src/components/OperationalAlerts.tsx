@@ -4,15 +4,18 @@ import {
   Truck, ShieldCheck, Filter, Wrench 
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { Language, translateComment } from "../utils/i18n";
 
 type OperationalAlertsProps = {
   records: any[];
   allTrips?: any[];
   oilChanges?: any;
   t?: any;
+  language?: Language;
 };
 
-export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: OperationalAlertsProps) {
+export function OperationalAlerts({ records, allTrips = [], oilChanges, t, language = "FR" }: OperationalAlertsProps) {
+  const isEn = language === "EN";
   const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'vidange' | 'financial' | 'transit'>('all');
 
   // Configuration officielle des 3 camions
@@ -93,8 +96,12 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           id: `vidange-urgent-${gauge.key}`,
           category: 'vidange',
           type: 'critical',
-          title: `VIDANGE DÉPASSÉE : ${gauge.name} TRUCK ${gauge.truckNum}`,
-          desc: `Dépassement critique de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${gauge.driven.toLocaleString("fr-FR")} KM depuis la vidange du ${gauge.lastDate} à ${gauge.lastKm.toLocaleString("fr-FR")} KM). Risque mécanique élevé.`,
+          title: isEn 
+            ? `OVERDUE OIL SERVICE : ${gauge.name} TRUCK ${gauge.truckNum}`
+            : `VIDANGE DÉPASSÉE : ${gauge.name} TRUCK ${gauge.truckNum}`,
+          desc: isEn
+            ? `Critical excess of +${overdue.toLocaleString("en-US")} KM (${gauge.driven.toLocaleString("en-US")} KM driven since oil service on ${gauge.lastDate} at ${gauge.lastKm.toLocaleString("en-US")} KM). High mechanical risk.`
+            : `Dépassement critique de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${gauge.driven.toLocaleString("fr-FR")} KM depuis la vidange du ${gauge.lastDate} à ${gauge.lastKm.toLocaleString("fr-FR")} KM). Risque mécanique élevé.`,
           truck: `${gauge.name} ${gauge.truckNum}`,
           truckColor: gauge.color,
           date: gauge.lastDate
@@ -104,8 +111,12 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           id: `vidange-warn-${gauge.key}`,
           category: 'vidange',
           type: 'warning',
-          title: `VIDANGE IMMINENTE : ${gauge.name} TRUCK ${gauge.truckNum}`,
-          desc: `Plus que ${gauge.remaining.toLocaleString("fr-FR")} KM avant révision (${gauge.driven.toLocaleString("fr-FR")} / 10 000 KM roulés).`,
+          title: isEn
+            ? `IMMINENT OIL SERVICE : ${gauge.name} TRUCK ${gauge.truckNum}`
+            : `VIDANGE IMMINENTE : ${gauge.name} TRUCK ${gauge.truckNum}`,
+          desc: isEn
+            ? `Only ${gauge.remaining.toLocaleString("en-US")} KM remaining before service (${gauge.driven.toLocaleString("en-US")} / 10,000 KM driven).`
+            : `Plus que ${gauge.remaining.toLocaleString("fr-FR")} KM avant révision (${gauge.driven.toLocaleString("fr-FR")} / 10 000 KM roulés).`,
           truck: `${gauge.name} ${gauge.truckNum}`,
           truckColor: gauge.color,
           date: gauge.lastDate
@@ -128,16 +139,15 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
       const expense = Number(r.total_expense_cfa) || (fuel + road);
 
       // CAS A : Départ / Transit à vide vers la mine (Point de stationnement -> Site d'extraction)
-      // Carburant ou dépenses engagées SANS revenu et SANS tonnage chargé.
-      // RÈGLE MÉTIER : C'est le moment où les camions se rendent sur le site d'extraction depuis la ville à vide.
-      // C'est un coût d'exploitation normal qui NE DOIT PAS être comptabilisé comme une alerte majeure.
       if (tonnage === 0 && gross === 0 && expense > 0) {
         list.push({
           id: `transit-${r.id}`,
           category: 'transit',
           type: 'info',
-          title: `Mise en route vers la mine (Trajet à vide)`,
-          desc: `${r.driverLabel || 'Camion'} : Ralliement du point de stationnement au site d'extraction à vide (${expense.toLocaleString("fr-FR")} CFA de gasoil/route). Coût normal de mise en place opérationnelle.`,
+          title: isEn ? `Deployment towards mine (Empty transit)` : `Mise en route vers la mine (Trajet à vide)`,
+          desc: isEn
+            ? `${r.driverLabel || 'Truck'} : Relocation from parking station to extraction site empty (${expense.toLocaleString("en-US")} CFA fuel/road). Normal operational setup cost.`
+            : `${r.driverLabel || 'Camion'} : Ralliement du point de stationnement au site d'extraction à vide (${expense.toLocaleString("fr-FR")} CFA de gasoil/route). Coût normal de mise en place opérationnelle.`,
           truck: r.driverLabel,
           truckColor: color,
           amount: expense,
@@ -147,14 +157,15 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
       }
 
       // CAS B : VRAIE Marge Négative sur Voyage Chargé (Anomalie de rentabilité commerciale)
-      // Le camion a transporté du fret (tonnage > 0), mais les dépenses dépassent la recette facturée
       if (tonnage > 0 && net < 0) {
         list.push({
           id: `neg-${r.id}`,
           category: 'financial',
           type: 'critical',
-          title: `Marge Négative sur Voyage Chargé`,
-          desc: `${r.driverLabel || 'Camion'} : Perte de ${Math.abs(net).toLocaleString("fr-FR")} CFA sur voyage chargé de ${tonnage}T (Recette insuffisante face aux frais engagés).`,
+          title: isEn ? `Negative Margin on Loaded Trip` : `Marge Négative sur Voyage Chargé`,
+          desc: isEn
+            ? `${r.driverLabel || 'Truck'} : Loss of ${Math.abs(net).toLocaleString("en-US")} CFA on loaded trip of ${tonnage}T (Revenue insufficient for expenses incurred).`
+            : `${r.driverLabel || 'Camion'} : Perte de ${Math.abs(net).toLocaleString("fr-FR")} CFA sur voyage chargé de ${tonnage}T (Recette insuffisante face aux frais engagés).`,
           truck: r.driverLabel,
           truckColor: color,
           amount: Math.abs(net),
@@ -170,8 +181,12 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
             id: `fuel-ratio-${r.id}`,
             category: 'fuel',
             type: 'warning',
-            title: `Surconsommation Gasoil (${Math.round(ratioFuelPerTon).toLocaleString("fr-FR")} CFA/T)`,
-            desc: `${r.driverLabel || 'Camion'} : Ratio carburant anormalement élevé (${fuel.toLocaleString("fr-FR")} CFA pour ${tonnage}T transportées).`,
+            title: isEn 
+              ? `Fuel Overconsumption (${Math.round(ratioFuelPerTon).toLocaleString("en-US")} CFA/T)`
+              : `Surconsommation Gasoil (${Math.round(ratioFuelPerTon).toLocaleString("fr-FR")} CFA/T)`,
+            desc: isEn
+              ? `${r.driverLabel || 'Truck'} : Abnormally high fuel ratio (${fuel.toLocaleString("en-US")} CFA for ${tonnage}T carried).`
+              : `${r.driverLabel || 'Camion'} : Ratio carburant anormalement élevé (${fuel.toLocaleString("fr-FR")} CFA pour ${tonnage}T transportées).`,
             truck: r.driverLabel,
             truckColor: color,
             amount: fuel,
@@ -186,8 +201,12 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           id: `road-${r.id}`,
           category: 'financial',
           type: 'warning',
-          title: `Frais de Route Élevés (${road.toLocaleString("fr-FR")} CFA)`,
-          desc: `${r.driverLabel || 'Camion'} : Dépassement important des frais de route/péages le ${r.date}.`,
+          title: isEn
+            ? `High Road Fees (${road.toLocaleString("en-US")} CFA)`
+            : `Frais de Route Élevés (${road.toLocaleString("fr-FR")} CFA)`,
+          desc: isEn
+            ? `${r.driverLabel || 'Truck'} : Significant excess in road fees/tolls on ${r.date}.`
+            : `${r.driverLabel || 'Camion'} : Dépassement important des frais de route/péages le ${r.date}.`,
           truck: r.driverLabel,
           truckColor: color,
           amount: road,
@@ -248,19 +267,23 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-black uppercase tracking-tight">{t?.fleetAlerts || "Alertes Flotte & Maintenance"}</h3>
+              <h3 className="text-base font-black uppercase tracking-tight">
+                {t?.fleetAlerts || (isEn ? "Fleet & Maintenance Alerts" : "Alertes Flotte & Maintenance")}
+              </h3>
               {counts.critical > 0 ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                  {counts.critical} Critique(s)
+                  {isEn ? `${counts.critical} Critical` : `${counts.critical} Critique(s)`}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30">
-                  Système Optimal
+                  {isEn ? "Optimal System" : "Système Optimal"}
                 </span>
               )}
             </div>
             <p className="text-[11px] text-white/40 font-medium mt-0.5">
-              Surveillance continue des vidanges (10 000 KM), des marges nettes et du carburant
+              {isEn 
+                ? "Continuous monitoring of oil services (10,000 KM), net margins and fuel" 
+                : "Surveillance continue des vidanges (10 000 KM), des marges nettes et du carburant"}
             </p>
           </div>
         </div>
@@ -271,9 +294,11 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
         <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-white/40">
           <span className="flex items-center gap-1.5">
             <Gauge className="size-3.5 text-[#00F2FF]" />
-            Suivi des Vidanges Moteurs (Intervalle 10 000 KM)
+            {isEn ? "Engine Oil Service Tracking (10,000 KM Interval)" : "Suivi des Vidanges Moteurs (Intervalle 10 000 KM)"}
           </span>
-          <span className="text-white/30 text-[10px]">Odomètre certifié</span>
+          <span className="text-white/30 text-[10px]">
+            {isEn ? "Certified odometer" : "Odomètre certifié"}
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -305,8 +330,8 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                         : 'bg-[#10B981]/20 text-[#10B981]'
                   }`}>
                     {isOverdue 
-                      ? `+${Math.abs(truck.remaining).toLocaleString("fr-FR")} KM` 
-                      : `${truck.remaining.toLocaleString("fr-FR")} KM restants`}
+                      ? `+${Math.abs(truck.remaining).toLocaleString(isEn ? "en-US" : "fr-FR")} KM` 
+                      : `${truck.remaining.toLocaleString(isEn ? "en-US" : "fr-FR")} KM ${isEn ? "remaining" : "restants"}`}
                   </span>
                 </div>
 
@@ -325,8 +350,8 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                 </div>
 
                 <div className="flex items-center justify-between text-[9px] text-white/40">
-                  <span>{truck.driven.toLocaleString("fr-FR")} / 10 000 KM</span>
-                  <span className="font-mono text-white/60">{truck.currentKm.toLocaleString("fr-FR")} KM act.</span>
+                  <span>{truck.driven.toLocaleString(isEn ? "en-US" : "fr-FR")} / 10 000 KM</span>
+                  <span className="font-mono text-white/60">{truck.currentKm.toLocaleString(isEn ? "en-US" : "fr-FR")} KM {isEn ? "curr." : "act."}</span>
                 </div>
               </div>
             );
@@ -344,7 +369,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
               : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
           }`}
         >
-          Toutes ({counts.all})
+          {isEn ? `All (${counts.all})` : `Toutes (${counts.all})`}
         </button>
 
         <button
@@ -356,7 +381,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <span className="size-1.5 rounded-full bg-current"></span>
-          Critiques ({counts.critical})
+          {isEn ? `Critical (${counts.critical})` : `Critiques (${counts.critical})`}
         </button>
 
         <button
@@ -368,7 +393,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <span className="size-1.5 rounded-full bg-current"></span>
-          Avertissements ({counts.warning})
+          {isEn ? `Warnings (${counts.warning})` : `Avertissements (${counts.warning})`}
         </button>
 
         <button
@@ -380,7 +405,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <Droplet className="size-3" />
-          Vidanges ({counts.vidange})
+          {isEn ? `Oil Services (${counts.vidange})` : `Vidanges (${counts.vidange})`}
         </button>
 
         <button
@@ -392,7 +417,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <Truck className="size-3" />
-          Transits Mine ({counts.transit})
+          {isEn ? `Mine Transits (${counts.transit})` : `Transits Mine (${counts.transit})`}
         </button>
 
         <button
@@ -404,7 +429,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
           }`}
         >
           <TrendingDown className="size-3" />
-          Marge & Carburant ({counts.financial})
+          {isEn ? `Margin & Fuel (${counts.financial})` : `Marge & Carburant (${counts.financial})`}
         </button>
       </div>
 
@@ -416,10 +441,12 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
               <CheckCircle2 className="size-6" />
             </div>
             <p className="text-xs font-black uppercase text-white/80 tracking-wide">
-              {activeFilter === 'all' ? "Flotte 100% Opérationnelle" : "Aucune alerte dans cette catégorie"}
+              {activeFilter === 'all' 
+                ? (isEn ? "Fleet 100% Operational" : "Flotte 100% Opérationnelle") 
+                : (isEn ? "No alerts in this category" : "Aucune alerte dans cette catégorie")}
             </p>
             <p className="text-[11px] text-white/40 mt-0.5">
-              Toutes les métriques et vidanges sont sous contrôle
+              {isEn ? "All metrics and oil services are under control" : "Toutes les métriques et vidanges sont sous contrôle"}
             </p>
           </div>
         ) : (
@@ -478,7 +505,13 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: Ope
                         <span className={`text-[10px] font-black uppercase tracking-wider ${
                           isCrit ? 'text-red-400' : isWarn ? 'text-amber-400' : isTransit ? 'text-blue-400' : 'text-emerald-400'
                         }`}>
-                          {isCrit ? 'Critique' : isWarn ? 'Avertissement' : isTransit ? 'Transit Mine (À vide)' : 'Info'}
+                          {isCrit 
+                            ? (isEn ? "Critical" : "Critique") 
+                            : isWarn 
+                              ? (isEn ? "Warning" : "Avertissement") 
+                              : isTransit 
+                                ? (isEn ? "Mine Transit (Empty)" : "Transit Mine (À vide)") 
+                                : "Info"}
                         </span>
                       </div>
 

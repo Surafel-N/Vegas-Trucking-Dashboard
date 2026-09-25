@@ -31,6 +31,7 @@ import {
   ChevronUp,
   DollarSign
 } from 'lucide-react';
+import { type Language } from '../utils/i18n';
 
 // --- PALETTE DE COULEURS HARMONISÉE & CONTRASTÉE ---
 export const QUANTUM_PALETTE = {
@@ -67,10 +68,11 @@ type QuantumProps = {
   t?: any;
   records?: any[];
   allTrips?: any[];
+  language?: Language;
 };
 
 // Helper pour calculer le numéro de semaine ISO
-function getWeekInfo(dateStr: string) {
+function getWeekInfo(dateStr: string, lang: Language = 'FR') {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return null;
   const target = new Date(d.valueOf());
@@ -95,7 +97,7 @@ function getWeekInfo(dateStr: string) {
     year: d.getFullYear(),
     week,
     key: `${d.getFullYear()}-W${String(week).padStart(2, '0')}`,
-    label: `Semaine ${week} (${startStr} - ${endStr})`
+    label: `${lang === 'EN' ? 'Week' : 'Semaine'} ${week} (${startStr} - ${endStr})`
   };
 }
 
@@ -108,7 +110,8 @@ export function QuantumExpenseAnalysis({
   currency = "CFA",
   t, 
   records = [],
-  allTrips = []
+  allTrips = [],
+  language = 'FR'
 }: QuantumProps) {
   // Mode de vue : "driver" (par camion) par défaut ou "nature" (par type de coût)
   const [perspective, setPerspective] = useState<"driver" | "nature">("driver");
@@ -128,7 +131,7 @@ export function QuantumExpenseAnalysis({
 
   const formatMoney = (val: number) => {
     if (formatCurrency) return formatCurrency(val, currency);
-    return `${new Intl.NumberFormat('fr-FR').format(Math.round(val))} ${currency}`;
+    return `${new Intl.NumberFormat(language === 'EN' ? 'en-US' : 'fr-FR').format(Math.round(val))} ${currency}`;
   };
 
   const formatCompact = (val: number) => {
@@ -162,10 +165,10 @@ export function QuantumExpenseAnalysis({
       yearsSet.add(y);
 
       const mKey = `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const mLabel = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      const mLabel = d.toLocaleDateString(language === 'EN' ? 'en-US' : 'fr-FR', { month: 'long', year: 'numeric' });
       monthsMap.set(mKey, mLabel);
 
-      const wInfo = getWeekInfo(r.date);
+      const wInfo = getWeekInfo(r.date, language);
       if (wInfo) {
         weeksMap.set(wInfo.key, wInfo.label);
       }
@@ -179,7 +182,7 @@ export function QuantumExpenseAnalysis({
     const days = Array.from(daysSet).sort().reverse();
 
     return { years, months, weeks, days };
-  }, [sourceTrips]);
+  }, [sourceTrips, language]);
 
   // Initialisation par défaut des sélecteurs si non renseignés
   useMemo(() => {
@@ -200,30 +203,38 @@ export function QuantumExpenseAnalysis({
       return { 
         scopedTrips: data, 
         scopedMaintenance: maintenanceRecords,
-        periodLabel: "Période active du tableau de bord"
+        periodLabel: language === 'EN' ? "Active dashboard period" : "Période active du tableau de bord"
       };
     }
 
     if (timeScale === "year") {
       const trips = sourceTrips.filter(r => r.date && r.date.startsWith(selectedYear));
       const maint = sourceMaintenance.filter(r => r.date && r.date.startsWith(selectedYear));
-      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: `Année ${selectedYear}` };
+      return { 
+        scopedTrips: trips, 
+        scopedMaintenance: maint, 
+        periodLabel: language === 'EN' ? `Year ${selectedYear}` : `Année ${selectedYear}` 
+      };
     }
 
     if (timeScale === "month") {
       const trips = sourceTrips.filter(r => r.date && r.date.startsWith(selectedMonth));
       const maint = sourceMaintenance.filter(r => r.date && r.date.startsWith(selectedMonth));
       const label = timePeriods.months.find(m => m.key === selectedMonth)?.label || selectedMonth;
-      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: `Mois de ${label}` };
+      return { 
+        scopedTrips: trips, 
+        scopedMaintenance: maint, 
+        periodLabel: language === 'EN' ? `Month of ${label}` : `Mois de ${label}` 
+      };
     }
 
     if (timeScale === "week") {
       const trips = sourceTrips.filter(r => {
-        const w = getWeekInfo(r.date);
+        const w = getWeekInfo(r.date, language);
         return w && w.key === selectedWeek;
       });
       const maint = sourceMaintenance.filter(r => {
-        const w = getWeekInfo(r.date);
+        const w = getWeekInfo(r.date, language);
         return w && w.key === selectedWeek;
       });
       const label = timePeriods.weeks.find(w => w.key === selectedWeek)?.label || selectedWeek;
@@ -233,12 +244,16 @@ export function QuantumExpenseAnalysis({
     if (timeScale === "day") {
       const trips = sourceTrips.filter(r => r.date === selectedDay);
       const maint = sourceMaintenance.filter(r => r.date === selectedDay);
-      const dayFormatted = selectedDay ? new Date(selectedDay).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : "";
+      const dayFormatted = selectedDay ? new Date(selectedDay).toLocaleDateString(language === 'EN' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : "";
       return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: dayFormatted };
     }
 
-    return { scopedTrips: data, scopedMaintenance: maintenanceRecords, periodLabel: "Global" };
-  }, [timeScale, selectedYear, selectedMonth, selectedWeek, selectedDay, sourceTrips, sourceMaintenance, data, maintenanceRecords, timePeriods]);
+    return { 
+      scopedTrips: data, 
+      scopedMaintenance: maintenanceRecords, 
+      periodLabel: language === 'EN' ? "Global" : "Global" 
+    };
+  }, [timeScale, selectedYear, selectedMonth, selectedWeek, selectedDay, sourceTrips, sourceMaintenance, data, maintenanceRecords, timePeriods, language]);
 
   // Navigation jour précédent / jour suivant
   const handleDayStep = (delta: number) => {
@@ -404,12 +419,54 @@ export function QuantumExpenseAnalysis({
     const totalExtras = detailedTrucks.reduce((s, t) => s + t.subDetails.extras, 0);
 
     const donutNature = [
-      { id: "fuel", name: "Gasoil", value: totalFleetFuel, color: QUANTUM_PALETTE.fuel.color, icon: Fuel, desc: "Carburant moteur" },
-      { id: "maintenance", name: "Maintenance", value: totalFleetMaintenance, color: QUANTUM_PALETTE.maintenance.color, icon: Wrench, desc: "Atelier, révisions & pièces" },
-      { id: "road", name: "Péages & Autoroute", value: totalTolls, color: QUANTUM_PALETTE.road.color, icon: Anchor, desc: "Droits de passage & pesée" },
-      { id: "police", name: "Contrôles Police", value: totalPolice, color: QUANTUM_PALETTE.police.color, icon: ShieldCheck, desc: "Escortes & contrôles" },
-      { id: "food", name: "Repas & Route", value: totalMeals, color: QUANTUM_PALETTE.food.color, icon: Utensils, desc: "Indemnités de mission" },
-      { id: "extra", name: "Divers & Extras", value: totalExtras, color: QUANTUM_PALETTE.extra.color, icon: PlusCircle, desc: "Dépannages & imprévus" }
+      { 
+        id: "fuel", 
+        name: language === 'EN' ? "Diesel Fuel" : "Gasoil", 
+        value: totalFleetFuel, 
+        color: QUANTUM_PALETTE.fuel.color, 
+        icon: Fuel, 
+        desc: language === 'EN' ? "Engine fuel" : "Carburant moteur" 
+      },
+      { 
+        id: "maintenance", 
+        name: language === 'EN' ? "Maintenance" : "Maintenance", 
+        value: totalFleetMaintenance, 
+        color: QUANTUM_PALETTE.maintenance.color, 
+        icon: Wrench, 
+        desc: language === 'EN' ? "Workshop, services & parts" : "Atelier, révisions & pièces" 
+      },
+      { 
+        id: "road", 
+        name: language === 'EN' ? "Tolls & Highway" : "Péages & Autoroute", 
+        value: totalTolls, 
+        color: QUANTUM_PALETTE.road.color, 
+        icon: Anchor, 
+        desc: language === 'EN' ? "Right of way & weighing" : "Droits de passage & pesée" 
+      },
+      { 
+        id: "police", 
+        name: language === 'EN' ? "Police Checks" : "Contrôles Police", 
+        value: totalPolice, 
+        color: QUANTUM_PALETTE.police.color, 
+        icon: ShieldCheck, 
+        desc: language === 'EN' ? "Escorts & checkpoints" : "Escortes & contrôles" 
+      },
+      { 
+        id: "food", 
+        name: language === 'EN' ? "Meals & Road Per Diem" : "Repas & Route", 
+        value: totalMeals, 
+        color: QUANTUM_PALETTE.food.color, 
+        icon: Utensils, 
+        desc: language === 'EN' ? "Mission allowances" : "Indemnités de mission" 
+      },
+      { 
+        id: "extra", 
+        name: language === 'EN' ? "Misc & Extras" : "Divers & Extras", 
+        value: totalExtras, 
+        color: QUANTUM_PALETTE.extra.color, 
+        icon: PlusCircle, 
+        desc: language === 'EN' ? "Repairs & unexpected" : "Dépannages & imprévus" 
+      }
     ]
       .filter(item => item.value > 0)
       .map(item => ({
@@ -430,7 +487,7 @@ export function QuantumExpenseAnalysis({
       donutDrivers,
       donutNature
     };
-  }, [scopedTrips, scopedMaintenance]);
+  }, [scopedTrips, scopedMaintenance, language]);
 
   // Données de l'anneau actif selon la perspective choisie
   const activeDonutData = perspective === "driver" ? financialModel.donutDrivers : financialModel.donutNature;
@@ -456,7 +513,7 @@ export function QuantumExpenseAnalysis({
               }`}
             >
               <Truck className="size-3.5" />
-              <span>Par Camion (Détail)</span>
+              <span>{language === 'EN' ? "By Truck (Details)" : "Par Camion (Détail)"}</span>
             </button>
             <button
               onClick={() => { setPerspective("nature"); setActiveIndex(null); }}
@@ -467,7 +524,7 @@ export function QuantumExpenseAnalysis({
               }`}
             >
               <Layers className="size-3.5" />
-              <span>Par Nature</span>
+              <span>{language === 'EN' ? "By Nature" : "Par Nature"}</span>
             </button>
           </div>
           
@@ -487,7 +544,7 @@ export function QuantumExpenseAnalysis({
                 timeScale === "global" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
               }`}
             >
-              Global
+              {language === 'EN' ? "Global" : "Global"}
             </button>
             <button
               onClick={() => setTimeScale("year")}
@@ -495,7 +552,7 @@ export function QuantumExpenseAnalysis({
                 timeScale === "year" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
               }`}
             >
-              Par An
+              {language === 'EN' ? "By Year" : "Par An"}
             </button>
             <button
               onClick={() => setTimeScale("month")}
@@ -503,7 +560,7 @@ export function QuantumExpenseAnalysis({
                 timeScale === "month" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
               }`}
             >
-              Par Mois
+              {language === 'EN' ? "By Month" : "Par Mois"}
             </button>
             <button
               onClick={() => setTimeScale("week")}
@@ -511,7 +568,7 @@ export function QuantumExpenseAnalysis({
                 timeScale === "week" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
               }`}
             >
-              Par Semaine
+              {language === 'EN' ? "By Week" : "Par Semaine"}
             </button>
             <button
               onClick={() => setTimeScale("day")}
@@ -519,7 +576,7 @@ export function QuantumExpenseAnalysis({
                 timeScale === "day" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
               }`}
             >
-              Par Jour
+              {language === 'EN' ? "By Day" : "Par Jour"}
             </button>
           </div>
 
@@ -531,7 +588,7 @@ export function QuantumExpenseAnalysis({
               className="bg-black/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none font-bold cursor-pointer"
             >
               {timePeriods.years.map(y => (
-                <option key={y} value={y}>Année {y}</option>
+                <option key={y} value={y}>{language === 'EN' ? `Year ${y}` : `Année ${y}`}</option>
               ))}
             </select>
           )}
@@ -565,7 +622,7 @@ export function QuantumExpenseAnalysis({
               <button
                 onClick={() => handleDayStep(-1)}
                 className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                title="Jour précédent"
+                title={language === 'EN' ? "Previous day" : "Jour précédent"}
               >
                 <ChevronLeft className="size-3.5" />
               </button>
@@ -576,14 +633,14 @@ export function QuantumExpenseAnalysis({
               >
                 {timePeriods.days.map(d => (
                   <option key={d} value={d}>
-                    {new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {new Date(d).toLocaleDateString(language === 'EN' ? 'en-US' : 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </option>
                 ))}
               </select>
               <button
                 onClick={() => handleDayStep(1)}
                 className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                title="Jour suivant"
+                title={language === 'EN' ? "Next day" : "Jour suivant"}
               >
                 <ChevronRight className="size-3.5" />
               </button>
@@ -655,19 +712,21 @@ export function QuantumExpenseAnalysis({
                     className="inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full font-mono"
                     style={{ backgroundColor: `${hoveredSlice.color}25`, color: hoveredSlice.color }}
                   >
-                    {hoveredSlice.percent.toFixed(1)}% des coûts
+                    {hoveredSlice.percent.toFixed(1)}% {language === 'EN' ? "of costs" : "des coûts"}
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
                   <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] mb-1">
-                    {perspective === "driver" ? "Coûts Flotte Totaux" : "Dépenses Totales"}
+                    {perspective === "driver" 
+                      ? (language === 'EN' ? "Total Fleet Costs" : "Coûts Flotte Totaux") 
+                      : (language === 'EN' ? "Total Expenses" : "Dépenses Totales")}
                   </p>
                   <span className="text-xl font-black font-mono text-white tracking-tight drop-shadow-lg">
                     {formatMoney(financialModel.totalFleetExpenses)}
                   </span>
                   <span className="inline-block mt-1 text-[8px] font-bold text-white/40 uppercase tracking-widest">
-                    {activeDonutData.length} entités actives
+                    {activeDonutData.length} {language === 'EN' ? "active entities" : "entités actives"}
                   </span>
                 </div>
               )}
@@ -679,40 +738,52 @@ export function QuantumExpenseAnalysis({
         <div className="xl:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
           
           <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/8 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">C.A. Global</span>
+            <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">
+              {language === 'EN' ? "Global Revenue" : "C.A. Global"}
+            </span>
             <p className="text-lg font-black font-mono text-white mt-2">
               {formatMoney(financialModel.totalFleetCA)}
             </p>
-            <span className="text-[9px] text-white/30 font-medium mt-1">Revenu total généré</span>
+            <span className="text-[9px] text-white/30 font-medium mt-1">
+              {language === 'EN' ? "Total revenue generated" : "Revenu total généré"}
+            </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-cyan-500/[0.04] border border-cyan-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">Total Gasoil</span>
+            <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">
+              {language === 'EN' ? "Total Fuel" : "Total Gasoil"}
+            </span>
             <p className="text-lg font-black font-mono text-cyan-300 mt-2">
               {formatMoney(financialModel.totalFleetFuel)}
             </p>
             <span className="text-[9px] text-cyan-400/50 font-medium mt-1">
-              {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% du C.A.
+              {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% {language === 'EN' ? "of Revenue" : "du C.A."}
             </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">Total Maintenance</span>
+            <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">
+              {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
+            </span>
             <p className="text-lg font-black font-mono text-amber-300 mt-2">
               {formatMoney(financialModel.totalFleetMaintenance)}
             </p>
-            <span className="text-[9px] text-amber-400/50 font-medium mt-1">Réparations & pièces</span>
+            <span className="text-[9px] text-amber-400/50 font-medium mt-1">
+              {language === 'EN' ? "Repairs & parts" : "Réparations & pièces"}
+            </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">Bénéfice Net Flotte</span>
+            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">
+              {language === 'EN' ? "Fleet Net Profit" : "Bénéfice Net Flotte"}
+            </span>
             <p className={`text-lg font-black font-mono mt-2 ${
               financialModel.totalFleetNet >= 0 ? "text-[#30D158]" : "text-red-400"
             }`}>
               {formatMoney(financialModel.totalFleetNet)}
             </p>
             <span className="text-[9px] text-emerald-400/60 font-bold mt-1">
-              Marge Nette : {financialModel.totalFleetMargin.toFixed(1)}%
+              {language === 'EN' ? "Net Margin: " : "Marge Nette : "}{financialModel.totalFleetMargin.toFixed(1)}%
             </span>
           </div>
 
@@ -729,11 +800,11 @@ export function QuantumExpenseAnalysis({
             <div className="flex items-center gap-2">
               <Truck className="size-4 text-white/50" />
               <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                Détail Financier par Camion
+                {language === 'EN' ? "Financial Breakdown by Truck" : "Détail Financier par Camion"}
               </h4>
             </div>
             <span className="text-[10px] text-white/40">
-              Cliquez sur une carte pour voir les sous-détails des frais de route
+              {language === 'EN' ? "Click on a card to see road expense sub-details" : "Cliquez sur une carte pour voir les sous-détails des frais de route"}
             </span>
           </div>
 
@@ -773,7 +844,7 @@ export function QuantumExpenseAnalysis({
                         truck.margin >= 0 ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" :
                         "bg-red-500/20 text-red-400 border border-red-500/30"
                       }`}>
-                        {truck.margin.toFixed(1)}% Marge
+                        {truck.margin.toFixed(1)}% {language === 'EN' ? "Margin" : "Marge"}
                       </span>
                     </div>
 
@@ -786,7 +857,9 @@ export function QuantumExpenseAnalysis({
                           <div className="size-6 rounded-lg bg-white/10 flex items-center justify-center text-white">
                             <DollarSign className="size-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold text-white/70">Chiffre d'Affaires</span>
+                          <span className="text-[11px] font-bold text-white/70">
+                            {language === 'EN' ? "Revenue" : "Chiffre d'Affaires"}
+                          </span>
                         </div>
                         <span className="font-mono font-black text-sm text-white">
                           {formatMoney(truck.ca)}
@@ -799,7 +872,9 @@ export function QuantumExpenseAnalysis({
                           <div className="size-6 rounded-lg bg-cyan-500/15 flex items-center justify-center text-cyan-400">
                             <Fuel className="size-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold text-cyan-300">Total Carburant</span>
+                          <span className="text-[11px] font-bold text-cyan-300">
+                            {language === 'EN' ? "Total Fuel" : "Total Carburant"}
+                          </span>
                         </div>
                         <span className="font-mono font-black text-sm text-cyan-300">
                           {formatMoney(truck.fuel)}
@@ -810,15 +885,19 @@ export function QuantumExpenseAnalysis({
                       <div 
                         onClick={() => setExpandedTruck(isExpanded ? null : truck.key)}
                         className="p-2.5 rounded-xl bg-purple-500/[0.04] border border-purple-500/15 flex items-center justify-between cursor-pointer hover:bg-purple-500/10 transition-colors"
-                        title="Cliquez pour afficher le sous-détail"
+                        title={language === 'EN' ? "Click to view sub-details" : "Cliquez pour afficher le sous-détail"}
                       >
                         <div className="flex items-center gap-2">
                           <div className="size-6 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400">
                             <Route className="size-3.5" />
                           </div>
                           <div>
-                            <span className="text-[11px] font-bold text-purple-300 block leading-tight">Total Frais de Route</span>
-                            <span className="text-[8px] text-purple-400/60 uppercase">Péages, Police, Repas, Extras</span>
+                            <span className="text-[11px] font-bold text-purple-300 block leading-tight">
+                              {language === 'EN' ? "Total Road Expenses" : "Total Frais de Route"}
+                            </span>
+                            <span className="text-[8px] text-purple-400/60 uppercase">
+                              {language === 'EN' ? "Tolls, Police, Meals, Extras" : "Péages, Police, Repas, Extras"}
+                            </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -833,19 +912,19 @@ export function QuantumExpenseAnalysis({
                       {isExpanded && (
                         <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5 text-xs animate-in fade-in">
                           <div className="flex justify-between items-center text-white/60">
-                            <span className="flex items-center gap-1.5"><Anchor className="size-3 text-purple-400" /> Péages & Ponts :</span>
+                            <span className="flex items-center gap-1.5"><Anchor className="size-3 text-purple-400" /> {language === 'EN' ? "Tolls & Bridges:" : "Péages & Ponts :"}</span>
                             <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.tolls)}</span>
                           </div>
                           <div className="flex justify-between items-center text-white/60">
-                            <span className="flex items-center gap-1.5"><ShieldCheck className="size-3 text-pink-400" /> Police & Contrôles :</span>
+                            <span className="flex items-center gap-1.5"><ShieldCheck className="size-3 text-pink-400" /> {language === 'EN' ? "Police & Checks:" : "Police & Contrôles :"}</span>
                             <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.police)}</span>
                           </div>
                           <div className="flex justify-between items-center text-white/60">
-                            <span className="flex items-center gap-1.5"><Utensils className="size-3 text-emerald-400" /> Repas & Frais :</span>
+                            <span className="flex items-center gap-1.5"><Utensils className="size-3 text-emerald-400" /> {language === 'EN' ? "Meals & Expenses:" : "Repas & Frais :"}</span>
                             <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.meals)}</span>
                           </div>
                           <div className="flex justify-between items-center text-white/60">
-                            <span className="flex items-center gap-1.5"><PlusCircle className="size-3 text-orange-400" /> Extras & Divers :</span>
+                            <span className="flex items-center gap-1.5"><PlusCircle className="size-3 text-orange-400" /> {language === 'EN' ? "Extras & Misc:" : "Extras & Divers :"}</span>
                             <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.extras)}</span>
                           </div>
                         </div>
@@ -858,9 +937,13 @@ export function QuantumExpenseAnalysis({
                             <Wrench className="size-3.5" />
                           </div>
                           <div>
-                            <span className="text-[11px] font-bold text-amber-300 block leading-tight">Total Maintenance</span>
+                            <span className="text-[11px] font-bold text-amber-300 block leading-tight">
+                              {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
+                            </span>
                             <span className="text-[8px] text-amber-400/60 uppercase">
-                              {truck.directMaintenance > 0 ? "Spécifique + Atelier" : "Part atelier"}
+                              {truck.directMaintenance > 0 
+                                ? (language === 'EN' ? "Specific + Workshop" : "Spécifique + Atelier") 
+                                : (language === 'EN' ? "Workshop share" : "Part atelier")}
                             </span>
                           </div>
                         </div>
@@ -873,9 +956,11 @@ export function QuantumExpenseAnalysis({
                       <div className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between mt-2">
                         <div>
                           <span className="text-[9px] font-black uppercase tracking-wider text-white/40 block leading-tight">
-                            Bénéfice Net
+                            {language === 'EN' ? "Net Profit" : "Bénéfice Net"}
                           </span>
-                          <span className="text-[8px] text-white/30">C.A. - Tous coûts</span>
+                          <span className="text-[8px] text-white/30">
+                            {language === 'EN' ? "Revenue - All costs" : "C.A. - Tous coûts"}
+                          </span>
                         </div>
                         <span className={`font-mono font-black text-base ${
                           truck.net >= 0 ? "text-[#30D158]" : "text-red-400"
@@ -889,8 +974,8 @@ export function QuantumExpenseAnalysis({
 
                   {/* Volume & Rotations du camion */}
                   <div className="pt-3 border-t border-white/5 mt-4 flex items-center justify-between text-[10px] text-white/40 font-mono">
-                    <span>{truck.tonnage} Tonnes transportées</span>
-                    <span>{truck.tripsCount} voyages</span>
+                    <span>{truck.tonnage} {language === 'EN' ? "Tons transported" : "Tonnes transportées"}</span>
+                    <span>{truck.tripsCount} {language === 'EN' ? "trips" : "voyages"}</span>
                   </div>
                 </div>
               );
@@ -906,10 +991,10 @@ export function QuantumExpenseAnalysis({
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h4 className="text-xs font-black uppercase tracking-wider text-white">
-              Répartition par Nature de Frais
+              {language === 'EN' ? "Breakdown by Nature of Expenses" : "Répartition par Nature de Frais"}
             </h4>
             <span className="text-[10px] text-white/40">
-              Total : {formatMoney(financialModel.totalFleetExpenses)}
+              {language === 'EN' ? "Total: " : "Total : "}{formatMoney(financialModel.totalFleetExpenses)}
             </span>
           </div>
 
@@ -944,7 +1029,9 @@ export function QuantumExpenseAnalysis({
 
                   <div className="space-y-1">
                     <div className="flex justify-between items-baseline text-xs">
-                      <span className="text-[9px] font-bold text-white/40 uppercase">Montant</span>
+                      <span className="text-[9px] font-bold text-white/40 uppercase">
+                        {language === 'EN' ? "Amount" : "Montant"}
+                      </span>
                       <span className="font-mono font-black text-white">{formatMoney(item.value)}</span>
                     </div>
                     <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">

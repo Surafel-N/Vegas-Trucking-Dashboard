@@ -81,6 +81,7 @@ import AITicketValidationModule from "./components/AITicketValidationModule";
 import AccountingModule, { INITIAL_INVOICES } from "./components/AccountingModule";
 import { parseSpreadsheetAccounting } from "./utils/accountingParser";
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from "./utils/accountingInitialData";
+import { TRANSLATIONS, translateCategory, translateComment } from "./utils/i18n";
 
 const APP_STORAGE_KEYS = {
   auth: "sdv_auth_session_v1",
@@ -98,7 +99,8 @@ const APP_STORAGE_KEYS = {
   pending_ai_tickets: "sdv_pending_ai_tickets_v1",
   maintenance: "sdv_maintenance_v1",
   oil_changes: "sdv_oil_changes_v1",
-  accounting_transactions: "sdv_accounting_transactions_v2"
+  accounting_transactions: "sdv_accounting_transactions_v2",
+  language: "sdv_language_pref_v1"
 };
 
 // Données initiales certifiées de dernière vidange (extraites des commentaires Spreedsheet)
@@ -171,400 +173,13 @@ export default function App() {
   const [isSyncingMaintenance, setIsSyncingMaintenance] = useState(false);
   const [isSyncingTickets, setIsSyncingTickets] = useState(false);
   const [currency, setCurrency] = useState("CFA");
-  const [language, setLanguage] = useState("FR");
+  const [language, setLanguage] = useState(() => loadJson(APP_STORAGE_KEYS.language, "FR"));
 
-  const translations = {
-    FR: {
-      dashboard: "Tableau de Bord",
-      drivers: "Chauffeurs",
-      trips: "Trajets",
-      comptabilite: "Comptabilité",
-      expenses: "Dépenses",
-      income: "Encaissements",
-      validation: "Validation IA",
-      closing: "Clôture jour",
-      reports: "Rapports",
-      audit: "Audit Log",
-      maintenance: "Maintenance",
-      quickEntry: "Saisie Rapide",
-      import: "Importation",
-      settings: "Réglages",
-      search: "Rechercher...",
-      syncSheets: "Sync Sheets",
-      iaSync: "IA Sync",
-      fleet: "FLOTTE 2026",
-      fuel: "Gasoil",
-      logistics: "Logistique",
-      analyticalRecap: "Récapitulatif Analytique",
-      mileageTracking: "Suivi Kilométrage",
-      totalExpenses: "Total Dépenses",
-      netMarginRev: "Marge Net / Revenu",
-      workshopFinances: "Atelier & Finances",
-      iaDriveExplorer: "Gestion IA & Drive Explorer",
-      oilChangeTracking: "Suivi des Vidanges (Intervalle 10,000 KM)",
-      lastService: "Dernier Service",
-      save: "Enregistrer",
-      syncing: "Synchronisation...",
-      manualEntry: "Saisie manuelle",
-      exploreDriveIA: "Explorer un dossier Drive (IA)",
-      explore: "Explorer",
-      oilChangeUpdated: "Vidange mise à jour",
-      confirmDelete: "Supprimer cet enregistrement ?",
-      tolls: "Péages",
-      police: "Police",
-      meals: "Repas",
-      extras: "Extras",
-      volume: "Volume",
-      netProfit: "Profit Net",
-      revenue: "Revenus",
-      activeDriversMatrix: "Matrice Chauffeurs Actifs",
-      allDrivers: "Tous les chauffeurs",
-      allMonths: "Tous les mois",
-      allYears: "Toutes les années",
-      allDestinations: "Toutes les destinations",
-      date: "Date",
-      driver: "Chauffeur",
-      destination: "Destination",
-      tonnage: "Tonnage",
-      status: "Statut",
-      actions: "Actions",
-      months: ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"],
-      daysShort: ["L", "M", "M", "J", "V", "S", "D"],
-      active: "Actif",
-      inactive: "Inactif",
-      noVehicle: "Aucun véhicule",
-      detailedDriversList: "Liste détaillée des chauffeurs",
-      phone: "Téléphone",
-      license: "Permis",
-      vehicle: "Véhicule",
-      addManualTrip: "Ajouter un trajet manuel",
-      start: "Départ",
-      distance: "Distance",
-      add: "Ajouter",
-      logbook: "Journal de Bord & Comptabilité Dynamique",
-      smartColumns: "Colonnes intelligentes actives",
-      totalExp: "Total Exp",
-      brut: "Brut (CA)",
-      net: "Net (Profit)",
-      comments: "Commentaires",
-      cloudExpenses: "Dépenses Cloud",
-      gedArchiving: "G.E.D & Archivage Numérique",
-      syncMaintenance: "Sync Maintenance",
-      syncingInProgress: "Sync en cours...",
-      elementsSelected: "Éléments sélectionnés",
-      deleteSelection: "Supprimer la sélection",
-      expenseEntry: "Saisie Dépense",
-      amount: "Montant",
-      category: "Catégorie",
-      subCategory: "Sous-catégorie",
-      validate: "Valider",
-      archivedHistory: "Historique Archivé",
-      identification: "Identification",
-      dataInventoryManager: "Data & Inventory Manager",
-      manageHistory: "Gérez tout l'historique et ajoutez des trajets au Dashboard.",
-      sourcesAll: "Sources (Toutes)",
-      excelOnly: "Fichiers Excel uniquement",
-      dashboardOnly: "Dashboard uniquement",
-      monthsAll: "Mois (Tous)",
-      driverAll: "Chauffeur (Tous)",
-      newTrip: "NOUVEAU TRAJET",
-      departure: "Départ",
-      arrival: "Arrivée",
-      tonnageUnit: "Tonnage (T)",
-      revenueCFA: "Recette (CFA)",
-      routeToll: "Route/Péage",
-      bonusExtra: "Bonus/Extra",
-      tripsSelected: "trajet(s) sélectionné(s)",
-      addToDashboard: "Ajouter au Dashboard",
-      removeFromDashboard: "Supprimer du Dashboard",
-      itinerary: "Itinéraire",
-      noDataFound: "Aucune donnée trouvée.",
-      editing: "En édition",
-      administrationCMS: "Administration CMS",
-      businessRulesLabel: "Règles Métier",
-      uiCustomization: "Personnalisation UI",
-      massiveImport: "Importation Massive",
-      advanced: "Avancé",
-      manageDataConfig: "Gère les données et la configuration dynamique du site.",
-      voyageThreshold: "Seuil tonnage pour 2 voyages",
-      targetMargin: "Objectif Marge Bénéficiaire (%)",
-      instantApply: "Les modifications s'appliquent instantanément au Dashboard.",
-      dragDropWidgets: "Drag & Drop Widgets (Ordre & Visibilité)",
-      dragToReorder: "Fais glisser les cartes pour réorganiser l'ordre d'affichage sur le Dashboard.",
-      sidebarCustomization: "Personnalisation du Menu Latéral (Navigation)",
-      toggleSections: "Active ou désactive les sections visibles dans le menu de navigation principal.",
-      dangerZone: "Zone de Danger",
-      irreversibleActions: "Ces actions sont irréversibles. Elles supprimeront toutes les données locales stockées dans votre navigateur.",
-      purgeRangeLabel: "Purge par plage",
-      purgeMaintenanceLabel: "Purge Maintenances",
-      purgeTripsOnly: "PURGER UNIQUEMENT LES TRAJETS (2026)",
-      resetAllData: "RÉINITIALISER TOUTES LES DONNÉES",
-      technicalSupport: "Support Technique",
-      activeTrends: "Tendances Activité",
-      financialTrends: "Tendances Financières",
-      operationalAlerts: "Alertes Opérationnelles",
-      fleetStatus: "État de la Flotte",
-      profitability: "Rentabilité",
-      activeDays: "Jours Actifs",
-      tripsCount: "Nombre de Trajets",
-      totalLoadedMonth: "Total Chargé",
-      monthlyVolume: "Volume global période",
-      maxMonthlyLoad: "Charge Max",
-      loadRecord: "Record de chargement",
-      averageLoad: "Chargement Moyen",
-      tripEfficiency: "Efficacité par voyage",
-      numberOfTrips: "Nombre de Voyages",
-      daysWithLoading: "Jours avec chargement",
-      totalRevenue: "Total Revenus",
-      grossRevenue: "Chiffre d'affaires brut",
-      totalOpCosts: "Coûts opérationnels totaux",
-      resultAfterFees: "Résultat après frais",
-      profitMargin: "Marge Bénéficiaire",
-      profitabilityOnRev: "Rentabilité sur CA",
-      profitableTrips: "Voyages Profitables",
-      fleetSummary: "Résumé Flotte",
-      opMargin: "Marge Opérationnelle",
-      currentFocus: "Focus Actuel",
-      monthSelection: "Sélection Mois",
-      annualView: "Vue Annuelle",
-      days: "Jours",
-      fleet: "Flotte",
-      voyages: "voyages",
-      totalTripsCount: "voyages total",
-      fluxHistory: "Historique Flux",
-      maintenanceShort: "Maint.",
-      noRecords: "Aucun relevé",
-      folder: "Dossier",
-      intervention: "Intervention",
-      expense: "Dépense",
-      savedDetails: "Détails enregistrés",
-      openDrive: "Ouvrir sur Google Drive",
-      photoGallery: "Galerie Photos",
-      noPhotosFound: "Aucune photo trouvée",
-      fleetAlerts: "Alertes Flotte",
-      activeMonitoring: "Surveillance Active",
-      negativeMargin: "Marge Négative",
-      lossOf: "Perte de",
-      fuelWithoutTonnage: "Fuel sans Tonnage",
-      activitySummary: "Activité",
-      operationsRecorded: "opérations enregistrées",
-      zeroAnomalies: "Zéro anomalies",
-      fleetVolume: "Volume Flotte",
-      analyticalPerformance: "Performance Analytique",
-      lastSessions: "dernières sessions",
-      netMargin: "Marge Net",
-      totalRevenueShort: "Total CA",
-      focusMode: "Focus Mode",
-      reduce: "Réduire",
-      fleetLive: "Flotte en Direct",
-      quantumFinance: "Quantum Finance Analyzer",
-      vol: "Vol",
-      prof: "Prof",
-      income: "Encaissements",
-      annualView: "Vue Annuelle",
-      monthSelection: "Sélection Mois",
-      allYears: "Toutes les années",
-      allMonths: "Tous les mois",
-      allDrivers: "Tous les chauffeurs",
-      workshopSummary: "Historique Flux"
-    },
-    EN: {
-      dashboard: "Dashboard",
-      drivers: "Drivers",
-      trips: "Trips",
-      comptabilite: "Accounting",
-      expenses: "Expenses",
-      income: "Revenue",
-      validation: "AI Validation",
-      closing: "Daily Closing",
-      reports: "Reports",
-      audit: "Audit Log",
-      maintenance: "Maintenance",
-      quickEntry: "Quick Entry",
-      import: "Import",
-      settings: "Settings",
-      search: "Search...",
-      syncSheets: "Sync Sheets",
-      iaSync: "AI Sync",
-      fleet: "FLEET 2026",
-      fuel: "Fuel",
-      logistics: "Logistics",
-      analyticalRecap: "Analytical Summary",
-      mileageTracking: "Mileage Tracking",
-      totalExpenses: "Total Expenses",
-      netMarginRev: "Net Margin / Revenue",
-      workshopFinances: "Workshop & Finances",
-      iaDriveExplorer: "AI & Drive Explorer Management",
-      oilChangeTracking: "Oil Change Tracking (10,000 KM Interval)",
-      lastService: "Last Service",
-      save: "Save",
-      syncing: "Syncing...",
-      manualEntry: "Manual Entry",
-      exploreDriveIA: "Explore Drive Folder (AI)",
-      explore: "Explore",
-      oilChangeUpdated: "Oil Change updated",
-      confirmDelete: "Delete this record?",
-      tolls: "Tolls",
-      police: "Police",
-      meals: "Meals",
-      extras: "Extras",
-      volume: "Volume",
-      netProfit: "Net Profit",
-      revenue: "Revenue",
-      activeDriversMatrix: "Active Drivers Matrix",
-      allDrivers: "All Drivers",
-      allMonths: "All Months",
-      allYears: "All Years",
-      allDestinations: "All Destinations",
-      date: "Date",
-      driver: "Driver",
-      destination: "Destination",
-      tonnage: "Tonnage",
-      status: "Status",
-      actions: "Actions",
-      months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-      daysShort: ["M", "T", "W", "T", "F", "S", "S"],
-      active: "Active",
-      inactive: "Inactive",
-      noVehicle: "No vehicle",
-      detailedDriversList: "Detailed Drivers List",
-      phone: "Phone",
-      license: "License",
-      vehicle: "Vehicle",
-      addManualTrip: "Add Manual Trip",
-      start: "Start",
-      distance: "Distance",
-      add: "Add",
-      logbook: "Logbook & Dynamic Accounting",
-      smartColumns: "Smart columns active",
-      totalExp: "Total Exp",
-      brut: "Gross (Rev)",
-      net: "Net (Profit)",
-      comments: "Comments",
-      cloudExpenses: "Cloud Expenses",
-      gedArchiving: "D.M.S & Digital Archiving",
-      syncMaintenance: "Sync Maintenance",
-      syncingInProgress: "Sync in progress...",
-      elementsSelected: "Elements selected",
-      deleteSelection: "Delete selection",
-      expenseEntry: "Expense Entry",
-      amount: "Amount",
-      category: "Category",
-      subCategory: "Sub-category",
-      validate: "Validate",
-      archivedHistory: "Archived History",
-      identification: "Identification",
-      dataInventoryManager: "Data & Inventory Manager",
-      manageHistory: "Manage full history and add trips to Dashboard.",
-      sourcesAll: "Sources (All)",
-      excelOnly: "Excel files only",
-      dashboardOnly: "Dashboard only",
-      monthsAll: "Months (All)",
-      driverAll: "Driver (All)",
-      newTrip: "NEW TRIP",
-      departure: "Departure",
-      arrival: "Arrival",
-      tonnageUnit: "Tonnage (T)",
-      revenueCFA: "Revenue (CFA)",
-      routeToll: "Route/Toll",
-      bonusExtra: "Bonus/Extra",
-      tripsSelected: "trip(s) selected",
-      addToDashboard: "Add to Dashboard",
-      removeFromDashboard: "Remove from Dashboard",
-      itinerary: "Itinerary",
-      noDataFound: "No data found.",
-      editing: "Editing",
-      administrationCMS: "CMS Administration",
-      businessRulesLabel: "Business Rules",
-      uiCustomization: "UI Customization",
-      massiveImport: "Massive Import",
-      advanced: "Advanced",
-      manageDataConfig: "Manage data and site dynamic configuration.",
-      voyageThreshold: "Tonnage threshold for 2 trips",
-      targetMargin: "Target Profit Margin (%)",
-      instantApply: "Changes apply instantly to the Dashboard.",
-      dragDropWidgets: "Drag & Drop Widgets (Order & Visibility)",
-      dragToReorder: "Drag cards to reorder display on the Dashboard.",
-      sidebarCustomization: "Sidebar Customization (Navigation)",
-      toggleSections: "Enable or disable sections visible in the main menu.",
-      dangerZone: "Danger Zone",
-      irreversibleActions: "These actions are irreversible. They will delete all local data.",
-      purgeRangeLabel: "Purge by range",
-      purgeMaintenanceLabel: "Purge Maintenances",
-      purgeTripsOnly: "PURGE TRIPS ONLY (2026)",
-      resetAllData: "RESET ALL DATA",
-      technicalSupport: "Technical Support",
-      activeTrends: "Activity Trends",
-      financialTrends: "Financial Trends",
-      operationalAlerts: "Operational Alerts",
-      fleetStatus: "Fleet Status",
-      profitability: "Profitability",
-      activeDays: "Active Days",
-      tripsCount: "Number of Trips",
-      totalLoadedMonth: "Total Loaded",
-      monthlyVolume: "Period Volume",
-      maxMonthlyLoad: "Max Load",
-      loadRecord: "Load Record",
-      averageLoad: "Average Load",
-      tripEfficiency: "Efficiency per Trip",
-      numberOfTrips: "Number of Trips",
-      daysWithLoading: "Days with Loading",
-      totalRevenue: "Total Revenue",
-      grossRevenue: "Gross Revenue",
-      totalOpCosts: "Total Operational Costs",
-      resultAfterFees: "Result After Fees",
-      profitMargin: "Profit Margin",
-      profitabilityOnRev: "Profitability on Revenue",
-      profitableTrips: "Profitable Trips",
-      fleetSummary: "Fleet Summary",
-      opMargin: "Operational Margin",
-      currentFocus: "Current Focus",
-      monthSelection: "Month Selection",
-      annualView: "Annual View",
-      days: "Days",
-      fleet: "Fleet",
-      voyages: "trips",
-      totalTripsCount: "total trips",
-      fluxHistory: "Flow History",
-      maintenanceShort: "Maint.",
-      noRecords: "No records found",
-      folder: "Folder",
-      intervention: "Intervention",
-      expense: "Expense",
-      savedDetails: "Saved Details",
-      openDrive: "Open on Google Drive",
-      photoGallery: "Photo Gallery",
-      noPhotosFound: "No photos found",
-      fleetAlerts: "Fleet Alerts",
-      activeMonitoring: "Active Monitoring",
-      negativeMargin: "Negative Margin",
-      lossOf: "Loss of",
-      fuelWithoutTonnage: "Fuel without Tonnage",
-      activitySummary: "Activity",
-      operationsRecorded: "operations recorded",
-      zeroAnomalies: "Zero anomalies",
-      fleetVolume: "Fleet Volume",
-      analyticalPerformance: "Analytical Performance",
-      lastSessions: "last sessions",
-      netMargin: "Net Margin",
-      totalRevenueShort: "Total Revenue",
-      focusMode: "Focus Mode",
-      reduce: "Reduce",
-      fleetLive: "Fleet Live",
-      quantumFinance: "Quantum Finance Analyzer",
-      vol: "Vol",
-      prof: "Prof",
-      income: "Revenue",
-      annualView: "Annual View",
-      monthSelection: "Month Selection",
-      allYears: "All Years",
-      allMonths: "All Months",
-      allDrivers: "All Drivers",
-      workshopSummary: "Flow History"
-    }
-  };
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.language, language);
+  }, [language]);
 
-  const t = translations[language];
+  const t = TRANSLATIONS[language] || TRANSLATIONS.FR;
 
   const [drivers, setDrivers] = useState(() => loadJson(APP_STORAGE_KEYS.drivers, DEFAULT_DRIVERS));
   const [vehicles, setVehicles] = useState(() => loadJson(APP_STORAGE_KEYS.vehicles, []));
@@ -1250,13 +865,11 @@ export default function App() {
                  filteredData={filteredData} calendarData={calendarData} formatCurrency={formatCurrency} formatCompactNumber={formatCompactNumber}
                  onSelectDriver={setChauffeur} selectedChauffeur={chauffeur} allTrips={trips}
                  onDateSelect={(selection) => { 
-                   // selection peut être { dates: [], months: [], years: [] }
                    if (!selection) {
                        setSelectedDates([]);
                        setMonth([ALL_MONTHS]);
                        return;
                    }
-
                    if (selection.dates) setSelectedDates(selection.dates);
                    if (selection.months) setMonth(selection.months);
                    if (selection.years) setYear(selection.years);
@@ -1273,6 +886,7 @@ export default function App() {
                  googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
                  currency={currency}
                  t={t}
+                 language={language}
                  allRecords={manualTrips}
                  />
                  )}
@@ -1285,6 +899,7 @@ export default function App() {
                   incomes={incomeRecords} 
                   formatCurrency={formatCurrency} 
                   t={t} 
+                  language={language}
                 />
               )}
               {activeSection === "trips" && (
@@ -1299,6 +914,7 @@ export default function App() {
                   canWrite={rolePermissions.canEdit} 
                   onAddTrip={(t) => setManualTrips([...manualTrips, t])} 
                   t={t} 
+                  language={language}
                 />
               )}
               {activeSection === "comptabilite" && (
@@ -1313,6 +929,7 @@ export default function App() {
                   formatTonnage={formatTonnage} 
                   canWrite={rolePermissions.canEdit} 
                   t={t} 
+                  language={language}
                 />
               )}
               {activeSection === "depenses" && (
@@ -1324,6 +941,7 @@ export default function App() {
                   onSync={syncMaintenanceAndExpenses}
                   isSyncing={isSyncingMaintenance}
                   t={t}
+                  language={language}
                 />
               )}
               {activeSection === "encaissements" && (
@@ -1340,6 +958,8 @@ export default function App() {
                   trips={filteredData || trips}
                   formatCurrency={formatCurrency}
                   canWrite={rolePermissions.canEdit}
+                  t={t}
+                  language={language}
                 />
               )}
               {activeSection === "documents" && (
@@ -1348,6 +968,8 @@ export default function App() {
                   setPendingTickets={rolePermissions.canEdit ? setPendingTickets : null} 
                   onApprove={rolePermissions.canEdit ? handleApproveAITicket : null} 
                   drivers={drivers} 
+                  t={t}
+                  language={language}
                 />
               )}
               {activeSection === "closing" && (
@@ -1361,6 +983,8 @@ export default function App() {
                   formatCurrency={formatCurrency} 
                   canWrite={rolePermissions.canEdit} 
                   onCloseDay={(closing) => setDailyClosings(prev => [closing, ...(prev || [])])} 
+                  t={t}
+                  language={language}
                 />
               )}
               {activeSection === "maintenance" && (
@@ -1375,11 +999,24 @@ export default function App() {
                   onSync={syncMaintenanceAndExpenses}
                   isSyncing={isSyncingMaintenance}
                   t={t}
+                  language={language}
                 />
-              )}              {activeSection === "reports" && <ReportsModule records={trips} manualTrips={manualTrips} setRecords={setManualTrips} chauffeurs={chauffeurOptions} canDelete={true} canEdit={true} t={t} />}
-              {activeSection === "audit" && <AuditLogModule logs={auditLogs} />}
-              {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} />}
-              {activeSection === "admin" && <SmartBulkImporter setTrips={rolePermissions.canEdit ? setManualTrips : null} setAuditLogs={rolePermissions.canEdit ? setAuditLogs : null} />}
+              )}
+              {activeSection === "reports" && (
+                <ReportsModule 
+                  records={trips} 
+                  manualTrips={manualTrips} 
+                  setRecords={setManualTrips} 
+                  chauffeurs={chauffeurOptions} 
+                  canDelete={true} 
+                  canEdit={true} 
+                  t={t} 
+                  language={language}
+                />
+              )}
+              {activeSection === "audit" && <AuditLogModule logs={auditLogs} t={t} language={language} />}
+              {activeSection === "quick-entry" && <ManualEntryModule setTrips={rolePermissions.canEdit ? setManualTrips : null} t={t} language={language} />}
+              {activeSection === "admin" && <SmartBulkImporter setTrips={rolePermissions.canEdit ? setManualTrips : null} setAuditLogs={rolePermissions.canEdit ? setAuditLogs : null} t={t} language={language} />}
               {activeSection === "settings" && (
                 <SettingsModule 
                   drivers={drivers} setDrivers={setDrivers} 
@@ -1393,8 +1030,9 @@ export default function App() {
                   onPurgeRange={handlePurgeRange}
                   onPurgeMaintenance={handlePurgeMaintenance}
                   t={t}
-                  />
-                  )}
+                  language={language}
+                />
+              )}
             </div>
           </ErrorBoundary>
         </div>

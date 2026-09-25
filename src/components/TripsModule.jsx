@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { computeTripProfit } from "../utils/businessMetrics";
+import { translateComment } from "../utils/i18n";
 
 const EMPTY_TRIP = {
   date: "",
@@ -14,7 +15,7 @@ const EMPTY_TRIP = {
   comment: "",
 };
 
-export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onAddTrip: onCreateTrip, t }) {
+export function TripsModule({ trips = [], drivers = [], expenses = [], incomes = [], formatCurrency, formatTonnage, canWrite, onAddTrip: onCreateTrip, t, language = 'FR' }) {
   const [form, setForm] = useState(EMPTY_TRIP);
 
   const enrichedTrips = useMemo(
@@ -26,7 +27,7 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
     [trips, expenses, incomes],
   );
 
-  const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
+  const locale = (language === 'EN' || t?.months?.[0] === "January") ? "en-US" : "fr-FR";
 
   // Dynamic Columns Detection from metadata (customExpenses)
   const dynamicKeys = useMemo(() => {
@@ -146,7 +147,7 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
                       <td className="px-4 py-3 text-right bg-white/[0.02] font-bold text-[#ff8f84] border-l border-white/10">{format(trip.summary?.expense)}</td>
                       <td className="px-4 py-3 text-right bg-[#61d2c0]/5 font-bold text-[#61d2c0]">{format(trip.summary?.income)}</td>
                       <td className="px-4 py-3 text-right bg-[#9fe3b9]/5 font-bold text-[#9fe3b9]">{format(trip.summary?.net)}</td>
-                      <td className="px-4 py-3 truncate italic text-white/40">{trip.commentaires || trip.comment || "-"}</td>
+                      <td className="px-4 py-3 truncate italic text-white/40">{translateComment(trip.commentaires || trip.comment, language) || "-"}</td>
                     </tr>
                   );
                 })}

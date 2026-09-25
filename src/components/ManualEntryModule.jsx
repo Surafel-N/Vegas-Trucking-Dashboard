@@ -28,23 +28,23 @@ const CHAUFFEURS = [
   { id: "SORO TRUCK 52", label: "SORO TRUCK 52" }
 ];
 
-const MAPPING_OPTIONS = [
-  { value: 'ignore', label: 'Ignorer' },
-  { value: 'date', label: 'Date (Support 2026)' },
-  { value: 'chauffeur', label: 'Driver’s Name' },
-  { value: 'start', label: 'Start' },
+const getMappingOptions = (isEn) => [
+  { value: 'ignore', label: isEn ? 'Ignore' : 'Ignorer' },
+  { value: 'date', label: isEn ? 'Date (2026 Support)' : 'Date (Support 2026)' },
+  { value: 'chauffeur', label: isEn ? "Driver's Name" : "Nom du chauffeur" },
+  { value: 'start', label: isEn ? 'Start' : 'Départ' },
   { value: 'destination', label: 'Destination' },
-  { value: 'fuel', label: 'Fuel Cost (CFA)' },
-  { value: 'road', label: 'Road Fees (CFA)' },
-  { value: 'port', label: 'Port Access (CFA)' },
+  { value: 'fuel', label: isEn ? 'Fuel Cost (CFA)' : 'Carburant (CFA)' },
+  { value: 'road', label: isEn ? 'Road Fees (CFA)' : 'Frais de route (CFA)' },
+  { value: 'port', label: isEn ? 'Port Access (CFA)' : 'Accès Port (CFA)' },
   { value: 'police', label: 'Police' },
-  { value: 'food', label: 'Food' },
-  { value: 'expense', label: 'Extra Bonus' },
-  { value: 'total_expense', label: 'Total Expense (CFA)' },
-  { value: 'tonnage', label: 'Tonnage (T)' },
-  { value: 'revenue', label: 'Total Gross (CFA)' },
-  { value: 'km', label: 'Kilométrage (Km)' },
-  { value: 'comments', label: 'Comments' },
+  { value: 'food', label: isEn ? 'Food' : 'Repas' },
+  { value: 'expense', label: isEn ? 'Extra Bonus' : 'Bonus / Extra' },
+  { value: 'total_expense', label: isEn ? 'Total Expense (CFA)' : 'Dépenses Totales (CFA)' },
+  { value: 'tonnage', label: isEn ? 'Tonnage (T)' : 'Tonnage (T)' },
+  { value: 'revenue', label: isEn ? 'Total Gross (CFA)' : 'Revenu Brut (CFA)' },
+  { value: 'km', label: isEn ? 'Mileage (Km)' : 'Kilométrage (Km)' },
+  { value: 'comments', label: isEn ? 'Comments' : 'Commentaires' },
 ];
 
 const KEYWORDS = {
@@ -65,7 +65,8 @@ const KEYWORDS = {
   comments: ["comments", "commentaires", "note"]
 };
 
-export default function ManualEntryModule({ setTrips }) {
+export default function ManualEntryModule({ setTrips, t, language = "FR" }) {
+  const isEn = language === "EN";
   const [mode, setMode] = useState('manual'); // 'manual' or 'paste'
   const [status, setStatus] = useState(null);
   
@@ -306,21 +307,24 @@ export default function ManualEntryModule({ setTrips }) {
 
       if (newTrips.length > 0) {
         setTrips(prev => [...prev, ...newTrips]);
-        alert("IMPORTATION RÉUSSIE :\n\nLignes lues : " + totalLines + "\nIntégrés : " + successCount);
+        alert(isEn 
+          ? `IMPORT SUCCESSFUL:\n\nRows read: ${totalLines}\nImported: ${successCount}`
+          : `IMPORTATION RÉUSSIE :\n\nLignes lues : ${totalLines}\nIntégrés : ${successCount}`
+        );
         setRawRows(null); setPasteContent(''); setMapping([]); setDetectedColumns([]);
       }
-    } catch (e) { alert("Erreur critique d'importation."); }
+    } catch (e) { alert(isEn ? "Critical import error." : "Erreur critique d'importation."); }
   };
 
   return (
     <div className="max-w-6xl mx-auto p-8 bg-[#181818] rounded-[30px] border border-white/5 shadow-2xl text-white">
       <header className="flex items-center justify-between mb-10">
         <div>
-          <h2 className="text-3xl font-bold flex items-center gap-3"><PlusCircle className="text-[#cf5d56]" /> Saisie Rapide</h2>
-          <p className="text-white/40 mt-1 text-sm">Ajoutez vos trajets manuellement ou par copier-coller.</p>
+          <h2 className="text-3xl font-bold flex items-center gap-3"><PlusCircle className="text-[#cf5d56]" /> {isEn ? "Quick Entry" : "Saisie Rapide"}</h2>
+          <p className="text-white/40 mt-1 text-sm">{isEn ? "Add your trips manually or via copy-paste." : "Ajoutez vos trajets manuellement ou par copier-coller."}</p>
         </div>
         <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5">
-          <button onClick={() => setMode('manual')} className={`px-6 py-2 rounded-xl text-sm font-medium transition ${mode === 'manual' ? 'bg-[#cf5d56] text-white' : 'text-white/40 hover:text-white'}`}>Formulaire</button>
+          <button onClick={() => setMode('manual')} className={`px-6 py-2 rounded-xl text-sm font-medium transition ${mode === 'manual' ? 'bg-[#cf5d56] text-white' : 'text-white/40 hover:text-white'}`}>{isEn ? "Form" : "Formulaire"}</button>
           <button onClick={() => setMode('paste')} className={`px-6 py-2 rounded-xl text-sm font-medium transition ${mode === 'paste' ? 'bg-[#cf5d56] text-white' : 'text-white/40 hover:text-white'}`}>Smart Paste</button>
         </div>
       </header>
@@ -330,26 +334,26 @@ export default function ManualEntryModule({ setTrips }) {
       {mode === 'manual' ? (
         <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Chauffeur</span><div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><select value={formData.driverLabel} onChange={e => setFormData({...formData, driverLabel: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition">{CHAUFFEURS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div></label>
-            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Date du trajet</span><div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
-            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Destination</span><div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="text" placeholder="Ex: San Pedro" value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">{isEn ? "Driver" : "Chauffeur"}</span><div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><select value={formData.driverLabel} onChange={e => setFormData({...formData, driverLabel: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition">{CHAUFFEURS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div></label>
+            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">{isEn ? "Trip Date" : "Date du trajet"}</span><div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+            <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Destination</span><div className="relative"><MapPin className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="text" placeholder={isEn ? "e.g. San Pedro" : "Ex: San Pedro"} value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
             <div className="grid grid-cols-2 gap-4">
               <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Tonnage</span><div className="relative"><Weight className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="0.00" value={formData.tonnage} onChange={e => setFormData({...formData, tonnage: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
-              <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">Kilométrage</span><div className="relative"><Route className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="Km" value={formData.km} onChange={e => setFormData({...formData, km: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
+              <label className="block"><span className="text-xs font-bold uppercase tracking-widest text-white/30 mb-2 block">{isEn ? "Mileage" : "Kilométrage"}</span><div className="relative"><Route className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-white/20" /><input type="number" placeholder="Km" value={formData.km} onChange={e => setFormData({...formData, km: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:border-[#cf5d56] outline-none transition" /></div></label>
             </div>
           </div>
           <div className="space-y-4 bg-white/[0.02] p-6 rounded-[24px] border border-white/5">
             <h4 className="text-xs font-bold uppercase tracking-widest text-[#cf5d56] mb-4">Finances (CFA)</h4>
             <div className="grid grid-cols-2 gap-4">
-              <div className="relative"><Fuel className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Gasoil" value={formData.fuel} onChange={e => setFormData({...formData, fuel: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
-              <div className="relative"><ReceiptText className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Péage" value={formData.toll} onChange={e => setFormData({...formData, toll: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
-              <div className="relative"><Anchor className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Port" value={formData.port} onChange={e => setFormData({...formData, port: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
+              <div className="relative"><Fuel className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder={isEn ? "Fuel" : "Gasoil"} value={formData.fuel} onChange={e => setFormData({...formData, fuel: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
+              <div className="relative"><ReceiptText className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder={isEn ? "Toll" : "Péage"} value={formData.toll} onChange={e => setFormData({...formData, toll: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
+              <div className="relative"><Anchor className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder={isEn ? "Port" : "Port"} value={formData.port} onChange={e => setFormData({...formData, port: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
               <div className="relative"><ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Police" value={formData.police} onChange={e => setFormData({...formData, police: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
-              <div className="relative"><Utensils className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Repas" value={formData.food} onChange={e => setFormData({...formData, food: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
-              <div className="relative"><PlusCircle className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder="Extra" value={formData.extra} onChange={e => setFormData({...formData, extra: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
+              <div className="relative"><Utensils className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder={isEn ? "Food" : "Repas"} value={formData.food} onChange={e => setFormData({...formData, food: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
+              <div className="relative"><PlusCircle className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-white/20" /><input type="text" placeholder={isEn ? "Extra" : "Extra"} value={formData.extra} onChange={e => setFormData({...formData, extra: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 pl-9 pr-3 text-sm focus:border-[#cf5d56] outline-none" /></div>
             </div>
-            <label className="block mt-6"><span className="text-xs text-white/30 block mb-2">Revenu Brut Total</span><div className="relative"><Banknote className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#61d2c0]" /><input type="text" placeholder="0 CFA" value={formData.revenue} onChange={e => setFormData({...formData, revenue: e.target.value})} className="w-full bg-black/60 border border-[#61d2c0]/20 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-[#61d2c0] focus:border-[#61d2c0] outline-none transition" /></div></label>
-            <button type="submit" className="w-full bg-[#cf5d56] hover:bg-[#cf5d56]/90 text-white font-bold py-4 rounded-2xl mt-4 transition shadow-lg shadow-[#cf5d56]/20">Enregistrer le trajet</button>
+            <label className="block mt-6"><span className="text-xs text-white/30 block mb-2">{isEn ? "Total Gross Revenue" : "Revenu Brut Total"}</span><div className="relative"><Banknote className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-[#61d2c0]" /><input type="text" placeholder="0 CFA" value={formData.revenue} onChange={e => setFormData({...formData, revenue: e.target.value})} className="w-full bg-black/60 border border-[#61d2c0]/20 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-[#61d2c0] focus:border-[#61d2c0] outline-none transition" /></div></label>
+            <button type="submit" className="w-full bg-[#cf5d56] hover:bg-[#cf5d56]/90 text-white font-bold py-4 rounded-2xl mt-4 transition shadow-lg shadow-[#cf5d56]/20">{isEn ? "Save Trip" : "Enregistrer le trajet"}</button>
           </div>
         </form>
       ) : (
@@ -358,31 +362,31 @@ export default function ManualEntryModule({ setTrips }) {
             <>
               <div className="p-6 bg-[#cf5d56]/5 border border-[#cf5d56]/10 rounded-[24px]">
                 <h4 className="flex items-center gap-2 text-[#ff8f84] font-bold mb-2"><ClipboardPaste className="size-4" /> Smart Paste Engine</h4>
-                <p className="text-sm text-[#ff8f84]/60 leading-relaxed">Collez vos lignes Excel/Sheets ici. La détection des colonnes est désormais automatique.</p>
+                <p className="text-sm text-[#ff8f84]/60 leading-relaxed">{isEn ? "Paste your Excel/Sheets rows here. Column detection is automatic." : "Collez vos lignes Excel/Sheets ici. La détection des colonnes est désormais automatique."}</p>
               </div>
-              <textarea placeholder="Collez vos données ici..." value={pasteContent} onChange={e => setPasteContent(e.target.value)} className="w-full h-64 bg-black/40 border border-white/10 rounded-[24px] p-6 text-sm font-mono focus:border-[#cf5d56] outline-none transition resize-none no-scrollbar" />
-              <div className="flex justify-end"><button onClick={handlePasteProcess} disabled={!pasteContent.trim()} className="bg-[#cf5d56] disabled:opacity-30 hover:bg-[#cf5d56]/90 text-white font-bold px-10 py-4 rounded-2xl transition shadow-lg shadow-[#cf5d56]/20 flex items-center gap-2">Suivant <ArrowRight className="size-4" /></button></div>
+              <textarea placeholder={isEn ? "Paste your data here..." : "Collez vos données ici..."} value={pasteContent} onChange={e => setPasteContent(e.target.value)} className="w-full h-64 bg-black/40 border border-white/10 rounded-[24px] p-6 text-sm font-mono focus:border-[#cf5d56] outline-none transition resize-none no-scrollbar" />
+              <div className="flex justify-end"><button onClick={handlePasteProcess} disabled={!pasteContent.trim()} className="bg-[#cf5d56] disabled:opacity-30 hover:bg-[#cf5d56]/90 text-white font-bold px-10 py-4 rounded-2xl transition shadow-lg shadow-[#cf5d56]/20 flex items-center gap-2">{isEn ? "Next" : "Suivant"} <ArrowRight className="size-4" /></button></div>
             </>
           ) : (
             <div className="animate-in fade-in duration-500 flex flex-col gap-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold flex items-center gap-2"><TableIcon className="text-[#cf5d56]" /> Mapping Intelligent</h3>
+                <h3 className="text-xl font-bold flex items-center gap-2"><TableIcon className="text-[#cf5d56]" /> {isEn ? "Intelligent Mapping" : "Mapping Intelligent"}</h3>
                 <div className="flex gap-3">
-                    <button onClick={() => {setRawRows(null); setDetectedColumns([]);}} className="px-4 py-2 rounded-xl border border-white/10 text-white/40 hover:text-white transition flex items-center gap-2"><Undo2 className="size-4" /> Annuler</button>
-                    <button onClick={handleValidateMapping} className="bg-[#cf5d56] text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-[#cf5d56]/20 flex items-center gap-2 hover:scale-105 active:scale-95 transition"><Zap className="size-4" /> Valider l'Import</button>
+                    <button onClick={() => {setRawRows(null); setDetectedColumns([]);}} className="px-4 py-2 rounded-xl border border-white/10 text-white/40 hover:text-white transition flex items-center gap-2"><Undo2 className="size-4" /> {isEn ? "Cancel" : "Annuler"}</button>
+                    <button onClick={handleValidateMapping} className="bg-[#cf5d56] text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-[#cf5d56]/20 flex items-center gap-2 hover:scale-105 active:scale-95 transition"><Zap className="size-4" /> {isEn ? "Validate Import" : "Valider l'Import"}</button>
                 </div>
               </div>
               <div className="bg-white/[0.02] p-6 rounded-[24px] border border-white/5 space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-[#cf5d56]/10 p-2 rounded-lg"><User className="size-5 text-[#cf5d56]" /></div>
                   <div className="flex-1">
-                    <p className="text-xs uppercase font-bold text-white/30 tracking-widest mb-1">Attribuer à quel chauffeur ?</p>
-                    <select value={globalDriver} onChange={e => setGlobalDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-[#cf5d56]"><option value="none">Utiliser la colonne Driver's Name du texte</option>{CHAUFFEURS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                    <p className="text-xs uppercase font-bold text-white/30 tracking-widest mb-1">{isEn ? "Assign to which driver?" : "Attribuer à quel chauffeur ?"}</p>
+                    <select value={globalDriver} onChange={e => setGlobalDriver(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-[#cf5d56]"><option value="none">{isEn ? "Use Driver's Name column from text" : "Utiliser la colonne Driver's Name du texte"}</option>{CHAUFFEURS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
                   </div>
                 </div>
                 {mapping.includes('chauffeur') && globalDriver === 'none' && Object.keys(uniqueNamesMap).length > 0 && (
                   <div className="pt-4 border-t border-white/5">
-                    <p className="text-[10px] uppercase font-bold text-white/20 mb-3 flex items-center gap-2"><Info className="size-3" /> Mapper les noms détectés :</p>
+                    <p className="text-[10px] uppercase font-bold text-white/20 mb-3 flex items-center gap-2"><Info className="size-3" /> {isEn ? "Map detected names:" : "Mapper les noms détectés :"}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.keys(uniqueNamesMap).map(name => (<div key={name} className="flex items-center justify-between bg-black/20 p-2 rounded-xl border border-white/5"><span className="text-xs text-white/60 font-mono truncate max-w-[120px]">{name}</span><select value={uniqueNamesMap[name]} onChange={e => setUniqueNamesMap({...uniqueNamesMap, [name]: e.target.value})} className="bg-transparent text-[10px] font-bold text-[#ff8f84] outline-none">{CHAUFFEURS.map(c => <option key={c.id} value={c.id} className="bg-[#181818]">{c.label}</option>)}</select></div>))}</div>
                   </div>
                 )}
@@ -395,7 +399,7 @@ export default function ManualEntryModule({ setTrips }) {
                                 <th key={i} className="p-4 border-r border-white/5">
                                     <div className={`p-1 rounded-xl transition ${detectedColumns.includes(i) ? 'bg-[#cf5d56]/10 border border-[#cf5d56]/30' : ''}`}>
                                         <select value={field} onChange={e => {const newMap = [...mapping]; newMap[i] = e.target.value; setMapping(newMap);}} className={`w-full bg-black/60 border rounded-xl px-3 py-2 text-xs font-bold outline-none transition ${field !== 'ignore' ? 'border-[#cf5d56] text-[#ff8f84]' : 'border-white/10 text-white/40'}`}>
-                                            {MAPPING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                            {getMappingOptions(isEn).map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                         </select>
                                     </div>
                                 </th>

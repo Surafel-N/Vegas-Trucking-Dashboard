@@ -21,7 +21,8 @@ export function FilterBar({
   onEndDateChange,
   onReset,
   onClearAllStorage,
-  t
+  t,
+  language = 'FR'
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -41,13 +42,13 @@ export function FilterBar({
             className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-white/10"
           >
             {isOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-            {isOpen ? (t?.reduce || "Fermer") : (t?.settings || "Filtres")}
+            {isOpen ? (t?.reduce || (language === 'EN' ? "Close" : "Fermer")) : (t?.settings || (language === 'EN' ? "Filters" : "Filtres"))}
           </button>
 
           <button
             type="button"
             onClick={onReset}
-            title={t?.save || "Réinitialiser"}
+            title={t?.reset || (language === 'EN' ? "Reset" : "Réinitialiser")}
             className="rounded-lg border border-white/10 bg-white/4 p-1.5 text-white/74 transition hover:bg-white/8"
           >
             <RotateCcw className="size-3.5" />
@@ -57,7 +58,7 @@ export function FilterBar({
 
       <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 ${isOpen ? 'grid' : 'hidden'}`}>
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.driver || "Chauffeur"}</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.driver || (language === 'EN' ? "Driver" : "Chauffeur")}</span>
           <div className="relative">
             <UserRound className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/30" />
             <select
@@ -65,13 +66,13 @@ export function FilterBar({
               onChange={(e) => onChauffeurChange(e.target.value)}
               className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] pl-9 pr-4 text-xs text-white outline-none transition focus:border-[#cf5d56]"
             >
-              {chauffeurs.map((c) => <option key={c} value={c}>{c === ALL_CHAUFFEURS ? (t?.allDrivers || "Tous les chauffeurs") : c}</option>)}
+              {chauffeurs.map((c) => <option key={c} value={c}>{c === ALL_CHAUFFEURS ? (t?.allDrivers || (language === 'EN' ? "All drivers" : "Tous les chauffeurs")) : c}</option>)}
             </select>
           </div>
         </label>
 
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.income || "Mois"}</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.month || (language === 'EN' ? "Months" : "Mois")}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {months.map((m) => {
               const isSelected = Array.isArray(month) ? month.includes(String(m.value)) : month === String(m.value);
@@ -108,7 +109,7 @@ export function FilterBar({
         </div>
 
         <div className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.allYears || "Années"}</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.year || (language === 'EN' ? "Years" : "Années")}</span>
           <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-white/8 bg-[#0d0d0d] min-h-[36px]">
             {years.map((y) => {
               const isSelected = Array.isArray(year) ? year.includes(y) : year === y;
@@ -144,19 +145,18 @@ export function FilterBar({
         </div>
 
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.destination || "Destination"}</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{t?.destination || (language === 'EN' ? "Destination" : "Destination")}</span>
           <select
             value={destination}
             onChange={(e) => onDestinationChange(e.target.value)}
             className="h-9 w-full appearance-none rounded-xl border border-white/8 bg-[#0d0d0d] px-3 text-xs text-white outline-none transition focus:border-[#cf5d56]"
           >
-            {destinations.map((d) => <option key={d} value={d}>{d === ALL_DESTINATIONS ? (t?.allDestinations || "Toutes les destinations") : d}</option>)}
+            {destinations.map((d) => <option key={d} value={d}>{d === ALL_DESTINATIONS ? (t?.allDestinations || (language === 'EN' ? "All destinations" : "Toutes les destinations")) : d}</option>)}
           </select>
         </label>
-...
 
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Début</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{language === 'EN' ? "Start" : "Début"}</span>
           <input
             type="date"
             value={startDate}
@@ -166,7 +166,7 @@ export function FilterBar({
         </label>
 
         <label className="space-y-1">
-          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">Fin</span>
+          <span className="text-[10px] font-bold uppercase text-white/40 ml-1">{language === 'EN' ? "End" : "Fin"}</span>
           <input
             type="date"
             value={endDate}

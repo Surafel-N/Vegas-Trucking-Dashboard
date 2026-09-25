@@ -36,8 +36,11 @@ export function SettingsModule({
   onClearAllStorage,
   onPurgeTrips,
   onPurgeRange,
-  onPurgeMaintenance
+  onPurgeMaintenance,
+  t,
+  language = "FR"
 }) {
+  const isEn = language === "EN";
   const [activeTab, setActiveSection] = useState("drivers");
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [purgeRange, setPurgeRange] = useState({ start: 1, end: 1, year: "2026" });
@@ -127,19 +130,19 @@ export function SettingsModule({
   };
 
   const sidebarItems = [
-    { id: "drivers", label: "Chauffeurs", icon: Users },
-    { id: "vehicles", label: "Véhicules", icon: Truck },
+    { id: "drivers", label: isEn ? "Drivers" : "Chauffeurs", icon: Users },
+    { id: "vehicles", label: isEn ? "Vehicles" : "Véhicules", icon: Truck },
     { id: "destinations", label: "Destinations", icon: MapPin },
-    { id: "rules", label: "Règles Métier", icon: Settings2 },
-    { id: "ui", label: "Personnalisation UI", icon: LayoutTemplate },
-    { id: "import", label: "Importation Massive", icon: Database },
-    { id: "advanced", label: "Avancé", icon: Trash2 },
+    { id: "rules", label: isEn ? "Business Rules" : "Règles Métier", icon: Settings2 },
+    { id: "ui", label: isEn ? "UI Layout" : "Personnalisation UI", icon: LayoutTemplate },
+    { id: "import", label: isEn ? "Bulk Import" : "Importation Massive", icon: Database },
+    { id: "advanced", label: isEn ? "Advanced" : "Avancé", icon: Trash2 },
   ];
 
   return (
     <section className="panel-enter rounded-[32px] border border-white/5 bg-[#121212] overflow-hidden flex h-[700px] shadow-2xl">
       <aside className="w-64 border-r border-white/5 bg-black/20 p-6 flex flex-col gap-2">
-        <h3 className="text-xs uppercase tracking-[0.2em] text-white/30 mb-6 px-3">Administration CMS</h3>
+        <h3 className="text-xs uppercase tracking-[0.2em] text-white/30 mb-6 px-3">{isEn ? "CMS Administration" : "Administration CMS"}</h3>
         {sidebarItems.map((item) => (
           <button
             key={item.id}
@@ -159,15 +162,15 @@ export function SettingsModule({
       <main className="flex-1 p-8 overflow-auto text-white">
         <header className="mb-8 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold capitalize">{activeTab}</h2>
-            <p className="text-sm text-white/40 mt-1">Gère les données et la configuration dynamique du site.</p>
+            <h2 className="text-2xl font-bold capitalize">{sidebarItems.find(i => i.id === activeTab)?.label || activeTab}</h2>
+            <p className="text-sm text-white/40 mt-1">{isEn ? "Manage data and dynamic dashboard configuration." : "Gère les données et la configuration dynamique du site."}</p>
           </div>
           {["drivers", "vehicles", "destinations"].includes(activeTab) && (
             <button 
               onClick={activeTab === "drivers" ? addDriver : activeTab === "vehicles" ? addVehicle : addDestination}
               className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full border border-white/10 text-sm transition"
             >
-              <Plus className="size-4" /> Ajouter
+              <Plus className="size-4" /> {isEn ? "Add" : "Ajouter"}
             </button>
           )}
         </header>
@@ -229,7 +232,7 @@ export function SettingsModule({
           <div className="space-y-6 max-w-md">
             <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-4">
               <label className="block">
-                <span className="text-sm text-white/40 block mb-2 font-medium">Seuil tonnage pour 2 voyages</span>
+                <span className="text-sm text-white/40 block mb-2 font-medium">{isEn ? "Tonnage threshold for 2 trips" : "Seuil tonnage pour 2 voyages"}</span>
                 <input 
                   type="number" 
                   value={businessRules.voyageThreshold} 
@@ -238,7 +241,7 @@ export function SettingsModule({
                 />
               </label>
               <label className="block">
-                <span className="text-sm text-white/40 block mb-2 font-medium">Objectif Marge Bénéficiaire (%)</span>
+                <span className="text-sm text-white/40 block mb-2 font-medium">{isEn ? "Target Profit Margin (%)" : "Objectif Marge Bénéficiaire (%)"}</span>
                 <input 
                   type="number" 
                   step="0.01"
@@ -249,7 +252,7 @@ export function SettingsModule({
               </label>
             </div>
             <p className="text-xs text-[#61d2c0]/60 flex items-center gap-2 px-2">
-              <Save className="size-3" /> Les modifications s'appliquent instantanément au Dashboard.
+              <Save className="size-3" /> {isEn ? "Changes apply immediately to the dashboard." : "Les modifications s'appliquent instantanément au Dashboard."}
             </p>
           </div>
         )}
@@ -259,9 +262,9 @@ export function SettingsModule({
             <section>
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#cf5d56]">
                 <GripVertical className="size-5" />
-                Drag & Drop Widgets (Ordre & Visibilité)
+                {isEn ? "Drag & Drop Widgets (Order & Visibility)" : "Drag & Drop Widgets (Ordre & Visibilité)"}
               </h3>
-              <p className="text-xs text-white/30 mb-4 px-1">Fais glisser les cartes pour réorganiser l'ordre d'affichage sur le Dashboard.</p>
+              <p className="text-xs text-white/30 mb-4 px-1">{isEn ? "Drag cards to reorder display on the dashboard." : "Fais glisser les cartes pour réorganiser l'ordre d'affichage sur le Dashboard."}</p>
               <div className="grid gap-3">
                 {uiConfig.widgets.map((widget, index) => (
                   <div 
@@ -298,9 +301,9 @@ export function SettingsModule({
             <section className="pt-6 border-t border-white/5">
               <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-[#61d2c0]">
                 <LayoutTemplate className="size-6" />
-                Personnalisation du Menu Latéral (Navigation)
+                {isEn ? "Sidebar Navigation Customization" : "Personnalisation du Menu Latéral (Navigation)"}
               </h3>
-              <p className="text-sm text-white/40 mb-6">Active ou désactive les sections visibles dans le menu de navigation principal.</p>
+              <p className="text-sm text-white/40 mb-6">{isEn ? "Enable or disable visible sections in the main navigation menu." : "Active ou désactive les sections visibles dans le menu de navigation principal."}</p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {uiConfig.menu.map((item) => (
@@ -329,34 +332,34 @@ export function SettingsModule({
             <section className="p-8 rounded-[40px] border border-red-500/20 bg-red-500/5">
               <h3 className="text-xl font-bold text-red-400 mb-2 flex items-center gap-3">
                 <AlertTriangle className="size-6" />
-                Zone de Danger
+                {isEn ? "Danger Zone" : "Zone de Danger"}
               </h3>
               <p className="text-sm text-white/40 mb-6">
-                Ces actions sont irréversibles. Elles supprimeront toutes les données locales stockées dans votre navigateur.
+                {isEn ? "These actions are irreversible. They will remove local data stored in your browser." : "Ces actions sont irréversibles. Elles supprimeront toutes les données locales stockées dans votre navigateur."}
               </p>
 
               <div className="p-5 rounded-3xl bg-orange-500/5 border border-orange-500/10 mb-6">
                 <h4 className="text-[10px] font-black uppercase text-orange-500 mb-4 tracking-[0.2em] flex items-center gap-2">
-                  <Database className="size-3.5" /> Purge par plage
+                  <Database className="size-3.5" /> {isEn ? "Purge by range" : "Purge par plage"}
                 </h4>
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-bold text-white/20 uppercase">Année</label>
+                    <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "Year" : "Année"}</label>
                     <select value={purgeRange.year} onChange={e => setPurgeRange({...purgeRange, year: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
                        <option value="2026">2026</option>
                        <option value="2025">2025</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[8px] font-bold text-white/20 uppercase">Mois Début</label>
+                    <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "Start Month" : "Mois Début"}</label>
                     <select value={purgeRange.start} onChange={e => setPurgeRange({...purgeRange, start: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>Mois {m}</option>)}
+                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{isEn ? `Month ${m}` : `Mois ${m}`}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[8px] font-bold text-white/20 uppercase">Mois Fin</label>
+                    <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "End Month" : "Mois Fin"}</label>
                     <select value={purgeRange.end} onChange={e => setPurgeRange({...purgeRange, end: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>Mois {m}</option>)}
+                       {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{isEn ? `Month ${m}` : `Mois ${m}`}</option>)}
                     </select>
                   </div>
                 </div>
@@ -364,33 +367,33 @@ export function SettingsModule({
                     onClick={() => onPurgeRange(purgeRange.start, purgeRange.end, purgeRange.year)}
                     className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
                   >
-                    Purger cette période
+                    {isEn ? "Purge this period" : "Purger cette période"}
                   </button>
                 </div>
 
                 <div className="p-5 rounded-3xl bg-blue-500/5 border border-blue-500/10 mb-6">
                   <h4 className="text-[10px] font-black uppercase text-blue-400 mb-4 tracking-[0.2em] flex items-center gap-2">
-                    <Truck className="size-3.5" /> Purge Maintenances
+                    <Truck className="size-3.5" /> {isEn ? "Purge Maintenance" : "Purge Maintenances"}
                   </h4>
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     <div className="space-y-1">
-                      <label className="text-[8px] font-bold text-white/20 uppercase">Année</label>
+                      <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "Year" : "Année"}</label>
                       <select value={maintPurge.year} onChange={e => setMaintPurge({...maintPurge, year: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
                         <option value="2026">2026</option>
                         <option value="2025">2025</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[8px] font-bold text-white/20 uppercase">Mois</label>
+                      <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "Month" : "Mois"}</label>
                       <select value={maintPurge.month} onChange={e => setMaintPurge({...maintPurge, month: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                        <option value={ALL_MONTHS}>Tous</option>
-                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={String(m).padStart(2, '0')}>Mois {m}</option>)}
+                        <option value={ALL_MONTHS}>{isEn ? "All" : "Tous"}</option>
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={String(m).padStart(2, '0')}>{isEn ? `Month ${m}` : `Mois ${m}`}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[8px] font-bold text-white/20 uppercase">Jour (Facultatif)</label>
+                      <label className="text-[8px] font-bold text-white/20 uppercase">{isEn ? "Day (Optional)" : "Jour (Facultatif)"}</label>
                       <select value={maintPurge.day} onChange={e => setMaintPurge({...maintPurge, day: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none">
-                        <option value={ALL_MONTHS}>Tous</option>
+                        <option value={ALL_MONTHS}>{isEn ? "All" : "Tous"}</option>
                         {Array.from({length: 31}, (_, i) => i + 1).map(d => <option key={d} value={String(d).padStart(2, '0')}>{d}</option>)}
                       </select>
                     </div>
@@ -399,7 +402,7 @@ export function SettingsModule({
                     onClick={() => onPurgeMaintenance(maintPurge.year, maintPurge.month, maintPurge.day)}
                     className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
                   >
-                    Purger Maintenances
+                    {isEn ? "Purge Maintenance" : "Purger Maintenances"}
                   </button>
                 </div>
                 
@@ -408,7 +411,7 @@ export function SettingsModule({
                   className="w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
                 >
                   <Database className="size-5" />
-                  PURGER UNIQUEMENT LES TRAJETS (2026)
+                  {isEn ? "PURGE ONLY TRIPS (2026)" : "PURGER UNIQUEMENT LES TRAJETS (2026)"}
                 </button>
 
               <button 
@@ -416,16 +419,16 @@ export function SettingsModule({
                 className="w-full py-4 rounded-2xl bg-red-500 text-white font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center justify-center gap-3"
               >
                 <Trash2 className="size-5" />
-                RÉINITIALISER TOUTES LES DONNÉES
+                {isEn ? "RESET ALL DATA" : "RÉINITIALISER TOUTES LES DONNÉES"}
               </button>
             </section>
 
             <section className="p-8 rounded-[40px] border border-white/5 bg-white/[0.02]">
-              <h3 className="text-lg font-bold mb-2">Support Technique</h3>
+              <h3 className="text-lg font-bold mb-2">{isEn ? "Technical Support" : "Support Technique"}</h3>
               <p className="text-xs text-white/30 leading-relaxed">
-                Version logicielle : 1.4.2-2026<br/>
-                Moteur de synchronisation : Sheets v4 Native Fetch<br/>
-                ID Système : {Math.random().toString(36).substr(2, 9).toUpperCase()}
+                {isEn ? "Software version" : "Version logicielle"} : 1.4.2-2026<br/>
+                {isEn ? "Sync engine" : "Moteur de synchronisation"} : Sheets v4 Native Fetch<br/>
+                {isEn ? "System ID" : "ID Système"} : {Math.random().toString(36).substr(2, 9).toUpperCase()}
               </p>
             </section>
           </div>

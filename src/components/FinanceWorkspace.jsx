@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { buildFinanceTimeline, validateUploadFile } from "../utils/financeRecords";
+import { translateCategory } from "../utils/i18n";
 
 function formatBytes(value) {
   if (!value) return "0 B";
@@ -90,11 +91,15 @@ export function FinanceWorkspace({
   onDeleteIncome = () => {},
   onDeleteDocument = () => {},
   onClearAllFinance = () => {},
+  t,
+  language = "FR"
 }) {
+  const isEn = language === "EN";
+  const locale = isEn ? "en-US" : "fr-FR";
   const safeExpenses = expenseRecords || [];
   const safeIncomes = incomeRecords || (type === "income" ? records : []) || [];
   const safeDocs = documentRecords || [];
-  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString(locale) + " CFA";
 
   const [expenseReference, setExpenseReference] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
@@ -239,15 +244,15 @@ export function FinanceWorkspace({
     <section className="space-y-6">
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
-          <p className="text-sm text-white/46">Total depenses saisies</p>
+          <p className="text-sm text-white/46">{isEn ? "Total Expenses Recorded" : "Total depenses saisies"}</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-[#ff8f84]">{format(totals.expenses)}</p>
         </div>
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
-          <p className="text-sm text-white/46">Total encaissements saisis</p>
+          <p className="text-sm text-white/46">{isEn ? "Total Inflows Recorded" : "Total encaissements saisis"}</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-[#9fe3b9]">{format(totals.incomes)}</p>
         </div>
         <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-4 text-white">
-          <p className="text-sm text-white/46">Documents recus</p>
+          <p className="text-sm text-white/46">{isEn ? "Documents Received" : "Documents recus"}</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight">{totals.docs}</p>
         </div>
       </section>
@@ -260,12 +265,12 @@ export function FinanceWorkspace({
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("depenses")}`}>
-          <SectionTitle icon={Wallet} title="Depenses" description="Deposer les factures depensees avec montant et justificatif." />
+          <SectionTitle icon={Wallet} title={isEn ? "Expenses" : "Depenses"} description={isEn ? "File expense invoices with amount and receipt." : "Deposer les factures depensees avec montant et justificatif."} />
           <form className="mt-4 space-y-3" onSubmit={submitExpense}>
             <input
               value={expenseReference}
               onChange={(event) => setExpenseReference(event.target.value)}
-              placeholder="Reference facture"
+              placeholder={isEn ? "Invoice reference" : "Reference facture"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <input
@@ -280,32 +285,32 @@ export function FinanceWorkspace({
               step="1"
               value={expenseAmount}
               onChange={(event) => setExpenseAmount(event.target.value)}
-              placeholder="Montant CFA"
+              placeholder={isEn ? "Amount CFA" : "Montant CFA"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Categorie depense</option>
+              <option value="">{isEn ? "Expense category" : "Categorie depense"}</option>
               {expenseCategories.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{translateCategory(value, language)}</option>
               ))}
             </select>
             <select value={expenseDriverId} onChange={(event) => setExpenseDriverId(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Chauffeur (optionnel)</option>
+              <option value="">{isEn ? "Driver (optional)" : "Chauffeur (optionnel)"}</option>
               {drivers.map((driver) => (
                 <option key={driver.id} value={driver.id}>{driver.name}</option>
               ))}
             </select>
             <select value={expenseTripId} onChange={(event) => setExpenseTripId(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Trajet (optionnel)</option>
+              <option value="">{isEn ? "Trip (optional)" : "Trajet (optionnel)"}</option>
               {trips.slice(0, 120).map((trip) => (
                 <option key={trip.id} value={trip.id}>{trip.date} | {trip.start} to {trip.destination}</option>
               ))}
             </select>
             <select value={expensePaymentMode} onChange={(event) => setExpensePaymentMode(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
               <option>Cash</option>
-              <option>Virement</option>
+              <option>{isEn ? "Bank Wire" : "Virement"}</option>
               <option>Mobile Money</option>
-              <option>Cheque</option>
+              <option>{isEn ? "Check" : "Cheque"}</option>
             </select>
             <input
               ref={expenseFileRef}
@@ -319,7 +324,7 @@ export function FinanceWorkspace({
               className="inline-flex items-center gap-2 rounded-full border border-[#cf5d56]/45 bg-[#cf5d56] px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
             >
               <ReceiptText className="size-4" />
-              Ajouter depense
+              {isEn ? "Add Expense" : "Ajouter depense"}
             </button>
           </form>
 
@@ -331,12 +336,12 @@ export function FinanceWorkspace({
         </article>
 
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("encaissements")}`}>
-          <SectionTitle icon={HandCoins} title="Encaissements" description="Saisir les factures encaissees et charger la preuve." />
+          <SectionTitle icon={HandCoins} title={isEn ? "Inflows / Revenue" : "Encaissements"} description={isEn ? "Enter received revenue invoices and upload proof." : "Saisir les factures encaissees et charger la preuve."} />
           <form className="mt-4 space-y-3" onSubmit={submitIncome}>
             <input
               value={incomeReference}
               onChange={(event) => setIncomeReference(event.target.value)}
-              placeholder="Reference facture encaissee"
+              placeholder={isEn ? "Inflow invoice reference" : "Reference facture encaissee"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <input
@@ -351,32 +356,32 @@ export function FinanceWorkspace({
               step="1"
               value={incomeAmount}
               onChange={(event) => setIncomeAmount(event.target.value)}
-              placeholder="Montant encaisse CFA"
+              placeholder={isEn ? "Amount received CFA" : "Montant encaisse CFA"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <select value={incomeCategory} onChange={(event) => setIncomeCategory(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Categorie encaissement</option>
+              <option value="">{isEn ? "Inflow category" : "Categorie encaissement"}</option>
               {incomeCategories.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{translateCategory(value, language)}</option>
               ))}
             </select>
             <select value={incomeDriverId} onChange={(event) => setIncomeDriverId(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Chauffeur (optionnel)</option>
+              <option value="">{isEn ? "Driver (optional)" : "Chauffeur (optionnel)"}</option>
               {drivers.map((driver) => (
                 <option key={driver.id} value={driver.id}>{driver.name}</option>
               ))}
             </select>
             <select value={incomeTripId} onChange={(event) => setIncomeTripId(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">Trajet (optionnel)</option>
+              <option value="">{isEn ? "Trip (optional)" : "Trajet (optionnel)"}</option>
               {trips.slice(0, 120).map((trip) => (
                 <option key={trip.id} value={trip.id}>{trip.date} | {trip.start} to {trip.destination}</option>
               ))}
             </select>
             <select value={incomePaymentMode} onChange={(event) => setIncomePaymentMode(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option>Cash</option>
-              <option>Virement</option>
-              <option>Mobile Money</option>
-              <option>Cheque</option>
+              <option value="Cash">Cash</option>
+              <option value="Virement">{isEn ? "Bank Wire" : "Virement"}</option>
+              <option value="Mobile Money">Mobile Money</option>
+              <option value="Cheque">{isEn ? "Check" : "Cheque"}</option>
             </select>
             <input
               ref={incomeFileRef}
@@ -390,7 +395,7 @@ export function FinanceWorkspace({
               className="inline-flex items-center gap-2 rounded-full border border-[#cf5d56]/45 bg-[#cf5d56] px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
             >
               <HandCoins className="size-4" />
-              Ajouter encaissement
+              {isEn ? "Add Inflow" : "Ajouter encaissement"}
             </button>
           </form>
 
@@ -402,12 +407,12 @@ export function FinanceWorkspace({
         </article>
 
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("documents")}`}>
-          <SectionTitle icon={FileCheck2} title="Documents lies" description="Documents crees depuis OCR ou import comptable." />
+          <SectionTitle icon={FileCheck2} title={isEn ? "Linked Documents" : "Documents lies"} description={isEn ? "Documents created from OCR or accounting import." : "Documents crees depuis OCR ou import comptable."} />
           <div className="mt-4 space-y-2">
             {documentRecords.slice(0, 8).map((item) => (
               <FinanceItem key={item.id} item={item} formatCurrency={formatCurrency} onDelete={onDeleteDocument} />
             ))}
-            {!documentRecords.length ? <p className="text-sm text-white/45">Aucun document lie.</p> : null}
+            {!documentRecords.length ? <p className="text-sm text-white/45">{isEn ? "No linked documents." : "Aucun document lie."}</p> : null}
           </div>
         </article>
       </section>
@@ -415,9 +420,9 @@ export function FinanceWorkspace({
       <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,#161616_0%,#0f0f0f_100%)] p-5 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-xl font-semibold tracking-tight">Historique consolide</h3>
+            <h3 className="text-xl font-semibold tracking-tight">{isEn ? "Consolidated History" : "Historique consolide"}</h3>
             <p className="mt-1 text-sm text-white/50">
-              Recherche un document, une facture de depense ou une facture encaissee.
+              {isEn ? "Search a document, expense invoice or inflow invoice." : "Recherche un document, une facture de depense ou une facture encaissee."}
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -426,7 +431,7 @@ export function FinanceWorkspace({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Recherche reference, type ou fichier"
+                placeholder={isEn ? "Search reference, type or file" : "Recherche reference, type ou fichier"}
                 className="h-11 w-full min-w-[260px] rounded-xl border border-white/8 bg-black/25 pl-10 pr-3 text-sm outline-none transition focus:border-[#cf5d56]"
               />
             </label>
@@ -437,7 +442,7 @@ export function FinanceWorkspace({
               className="inline-flex items-center gap-2 rounded-full border border-[#cf5d56]/26 bg-[#cf5d56]/10 px-4 py-2 text-sm font-medium text-[#ff8f84] transition hover:bg-[#cf5d56]/18 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Trash2 className="size-4" />
-              Vider tout
+              {isEn ? "Clear All" : "Vider tout"}
             </button>
           </div>
         </div>
@@ -447,17 +452,17 @@ export function FinanceWorkspace({
             <table className="min-w-full border-separate border-spacing-0">
               <thead className="sticky top-0 bg-black/72 text-left text-xs uppercase tracking-[0.18em] text-white/44 backdrop-blur">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Categorie</th>
-                  <th className="px-4 py-3 font-medium">Reference</th>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Montant</th>
-                  <th className="px-4 py-3 font-medium">Fichier</th>
+                  <th className="px-4 py-3 font-medium">{isEn ? "Category" : "Categorie"}</th>
+                  <th className="px-4 py-3 font-medium">{isEn ? "Reference" : "Reference"}</th>
+                  <th className="px-4 py-3 font-medium">{isEn ? "Date" : "Date"}</th>
+                  <th className="px-4 py-3 font-medium">{isEn ? "Amount" : "Montant"}</th>
+                  <th className="px-4 py-3 font-medium">{isEn ? "File" : "Fichier"}</th>
                 </tr>
               </thead>
               <tbody className="text-sm text-white/72">
                 {filteredTimeline.map((item) => (
                   <tr key={item.id} className="border-t border-white/6 hover:bg-white/[0.04]">
-                    <td className="whitespace-nowrap px-4 py-3">{item.category}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{translateCategory(item.category, language)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-white">{item.reference}</td>
                     <td className="whitespace-nowrap px-4 py-3">{item.date}</td>
                     <td className={`whitespace-nowrap px-4 py-3 ${item.amountTone}`}>
@@ -473,7 +478,7 @@ export function FinanceWorkspace({
                 {!filteredTimeline.length ? (
                   <tr>
                     <td className="px-4 py-5 text-center text-sm text-white/45" colSpan={5}>
-                      Aucun resultat avec ce filtre.
+                      {isEn ? "No results with this filter." : "Aucun resultat avec ce filtre."}
                     </td>
                   </tr>
                 ) : null}

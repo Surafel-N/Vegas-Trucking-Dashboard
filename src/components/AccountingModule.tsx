@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { AccountingTransaction, AccountingCategory } from '../utils/accountingParser';
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from '../utils/accountingInitialData';
+import { Language, translateCategory, translateComment, translateStatus, translatePaymentMethod, TRANSLATIONS } from '../utils/i18n';
 
 // Extraction de l'ID d'un fichier Google Drive
 export function getDriveId(link?: string): string | null {
@@ -148,6 +149,7 @@ interface AccountingModuleProps {
   formatTonnage?: (val: number) => string;
   canWrite?: boolean;
   t?: any;
+  language?: Language;
 }
 
 // Configuration visuelle des catégories comptables
@@ -186,7 +188,11 @@ export function AccountingModule({
   formatCurrency,
   formatTonnage,
   canWrite = true,
+  t,
+  language = "FR",
 }: AccountingModuleProps) {
+  const isEn = language === "EN";
+  const text = t || (isEn ? TRANSLATIONS.EN : TRANSLATIONS.FR);
   const formatMoney = typeof formatCurrency === "function" 
     ? formatCurrency 
     : (val: number) => Number(val || 0).toLocaleString("fr-FR") + " CFA";
@@ -580,14 +586,18 @@ export function AccountingModule({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">Comptabilité & Trésorerie Flotte</h1>
+                <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">
+                  {isEn ? "Accounting & Fleet Cash Flow" : "Comptabilité & Trésorerie Flotte"}
+                </h1>
                 <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
                   <span className="size-1.5 rounded-full bg-[#10B981] animate-ping" />
-                  Feuille 'Spreedsheet' Connectée
+                  {isEn ? "'Spreedsheet' Sheet Connected" : "Feuille 'Spreedsheet' Connectée"}
                 </span>
               </div>
               <p className="text-xs text-white/50 mt-1">
-                Grand livre sémantique de trésorerie ({allTx.length} flux) et facturation clients au tonnage
+                {isEn 
+                  ? `Semantic cash flow ledger (${allTx.length} flows) & client tonnage billing` 
+                  : `Grand livre sémantique de trésorerie (${allTx.length} flux) et facturation clients au tonnage`}
               </p>
             </div>
           </div>
@@ -605,7 +615,7 @@ export function AccountingModule({
               }`}
             >
               <FileText className="size-3.5" />
-              <span>Grand Livre Spreedsheet ({allTx.length})</span>
+              <span>{isEn ? `Spreedsheet Ledger (${allTx.length})` : `Grand Livre Spreedsheet (${allTx.length})`}</span>
             </button>
 
             <button
@@ -617,7 +627,7 @@ export function AccountingModule({
               }`}
             >
               <Receipt className="size-3.5" />
-              <span>Factures Clients ({safeInvoices.length})</span>
+              <span>{isEn ? `Client Invoices (${safeInvoices.length})` : `Factures Clients (${safeInvoices.length})`}</span>
             </button>
           </div>
 
@@ -626,10 +636,10 @@ export function AccountingModule({
               onClick={onSync}
               disabled={isSyncing}
               className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
-              title="Synchroniser avec Google Sheets"
+              title={isEn ? "Sync with Google Sheets" : "Synchroniser avec Google Sheets"}
             >
               <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin text-[#00F2FF]' : ''}`} />
-              <span>{isSyncing ? "Synchro..." : "Actualiser"}</span>
+              <span>{isSyncing ? (isEn ? "Syncing..." : "Synchro...") : (isEn ? "Refresh" : "Actualiser")}</span>
             </button>
           )}
         </div>
@@ -646,7 +656,9 @@ export function AccountingModule({
             <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#10B981]/10 transition-all"></div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Entrées Réelles</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {isEn ? "Total Real Inflows" : "Total Entrées Réelles"}
+                </span>
                 <div className="size-8 rounded-xl bg-[#10B981]/10 border border-[#10B981]/25 flex items-center justify-center text-[#10B981]">
                   <ArrowDownRight className="size-4" />
                 </div>
@@ -654,8 +666,10 @@ export function AccountingModule({
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#10B981]">{formatMoney(metrics.totalIn)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>Paiements Clients & Retenues</span>
-                  <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'in').length} encaissements</span>
+                  <span>{isEn ? "Client Payments & Withholdings" : "Paiements Clients & Retenues"}</span>
+                  <span className="font-bold text-white/80">
+                    {filteredTransactions.filter(t => t.type === 'in').length} {isEn ? "inflows" : "encaissements"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -664,7 +678,9 @@ export function AccountingModule({
             <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#CF5D56]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#CF5D56]/10 transition-all"></div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Dépenses Réelles</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {isEn ? "Total Real Expenses" : "Total Dépenses Réelles"}
+                </span>
                 <div className="size-8 rounded-xl bg-[#CF5D56]/10 border border-[#CF5D56]/25 flex items-center justify-center text-[#CF5D56]">
                   <ArrowUpRight className="size-4" />
                 </div>
@@ -672,8 +688,10 @@ export function AccountingModule({
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black tracking-tight text-[#CF5D56]">{formatMoney(metrics.totalOut)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>Carburant, Salaires, Pièces</span>
-                  <span className="font-bold text-white/80">{filteredTransactions.filter(t => t.type === 'out').length} décaissements</span>
+                  <span>{isEn ? "Fuel, Salaries, Parts" : "Carburant, Salaires, Pièces"}</span>
+                  <span className="font-bold text-white/80">
+                    {filteredTransactions.filter(t => t.type === 'out').length} {isEn ? "outflows" : "décaissements"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -682,7 +700,9 @@ export function AccountingModule({
             <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
               <div className={`absolute top-0 right-0 w-32 h-32 ${metrics.net >= 0 ? 'bg-[#00F2FF]/5' : 'bg-red-500/5'} rounded-full blur-3xl pointer-events-none`}></div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Flux Net de Trésorerie</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {isEn ? "Net Cash Flow" : "Flux Net de Trésorerie"}
+                </span>
                 <div className={`size-8 rounded-xl ${metrics.net >= 0 ? 'bg-[#00F2FF]/10 text-[#00F2FF] border-[#00F2FF]/25' : 'bg-red-500/10 text-red-400 border-red-500/25'} border flex items-center justify-center`}>
                   <TrendingUp className="size-4" />
                 </div>
@@ -692,7 +712,7 @@ export function AccountingModule({
                   {metrics.net >= 0 ? `+${formatMoney(metrics.net)}` : formatMoney(metrics.net)}
                 </p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>Marge de couverture</span>
+                  <span>{isEn ? "Coverage Margin" : "Marge de couverture"}</span>
                   <span className="font-black text-white/80">{metrics.ratio.toFixed(1)}%</span>
                 </div>
               </div>
@@ -702,7 +722,9 @@ export function AccountingModule({
             <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#F59E0B]/10 transition-all"></div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Dernier Solde (BALANCE)</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {isEn ? "Last Balance (CASH)" : "Dernier Solde (BALANCE)"}
+                </span>
                 <div className="size-8 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/25 flex items-center justify-center text-[#F59E0B]">
                   <Building2 className="size-4" />
                 </div>
@@ -710,9 +732,9 @@ export function AccountingModule({
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black tracking-tight text-white">{formatMoney(metrics.balance)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>Solde en caisse & banque</span>
+                  <span>{isEn ? "Cash & bank balance" : "Solde en caisse & banque"}</span>
                   <span className="font-bold text-[#F59E0B] flex items-center gap-1">
-                    <Check className="size-3" /> Certifié Spreedsheet
+                    <Check className="size-3" /> {isEn ? "Certified Spreedsheet" : "Certifié Spreedsheet"}
                   </span>
                 </div>
               </div>
@@ -727,16 +749,18 @@ export function AccountingModule({
                 <div>
                   <h2 className="text-base font-black text-white flex items-center gap-2">
                     <BarChart2 className="size-4 text-[#00F2FF]" />
-                    Évolution Mensuelle des Flux de Trésorerie
+                    {isEn ? "Monthly Cash Flow Evolution" : "Évolution Mensuelle des Flux de Trésorerie"}
                   </h2>
-                  <p className="text-xs text-white/40 mt-0.5">Comparatif des encaissements vs décaissements opérationnels</p>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    {isEn ? "Comparison of operational inflows vs outflows" : "Comparatif des encaissements vs décaissements opérationnels"}
+                  </p>
                 </div>
                 <div className="flex items-center gap-4 text-xs font-bold">
                   <span className="flex items-center gap-1.5 text-[#10B981]">
-                    <span className="size-2 rounded-full bg-[#10B981]"></span> Entrées
+                    <span className="size-2 rounded-full bg-[#10B981]"></span> {isEn ? "Inflows" : "Entrées"}
                   </span>
                   <span className="flex items-center gap-1.5 text-[#CF5D56]">
-                    <span className="size-2 rounded-full bg-[#CF5D56]"></span> Dépenses
+                    <span className="size-2 rounded-full bg-[#CF5D56]"></span> {isEn ? "Expenses" : "Dépenses"}
                   </span>
                 </div>
               </div>
@@ -765,7 +789,10 @@ export function AccountingModule({
                         boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
                         fontSize: "12px"
                       }}
-                      formatter={(val: any, name: any) => [formatMoney(val), name === "in" ? "Entrées (+)" : "Dépenses (-)"]}
+                      formatter={(val: any, name: any) => [
+                        formatMoney(val), 
+                        name === "in" ? (isEn ? "Inflows (+)" : "Entrées (+)") : (isEn ? "Expenses (-)" : "Dépenses (-)")
+                      ]}
                       labelStyle={{ color: "#fff", fontWeight: "bold", marginBottom: "4px" }}
                     />
                     <Bar dataKey="in" name="in" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
@@ -781,9 +808,11 @@ export function AccountingModule({
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-base font-black text-white flex items-center gap-2">
                     <PieIcon className="size-4 text-[#F59E0B]" />
-                    Top Dépenses par Catégorie
+                    {isEn ? "Top Expenses by Category" : "Top Dépenses par Catégorie"}
                   </h2>
-                  <span className="text-[10px] font-bold text-white/40">Cliquez pour filtrer</span>
+                  <span className="text-[10px] font-bold text-white/40">
+                    {isEn ? "Click to filter" : "Cliquez pour filtrer"}
+                  </span>
                 </div>
 
                 <div className="space-y-3 overflow-y-auto max-h-[250px] pr-1">
@@ -808,7 +837,7 @@ export function AccountingModule({
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span className="font-bold text-white/80 truncate max-w-[160px] flex items-center gap-1.5">
                               <span className="size-2 rounded-full" style={{ backgroundColor: style.color }}></span>
-                              {cat.name}
+                              {translateCategory(cat.name, language)}
                             </span>
                             <span className="font-black text-white text-[11px]">{formatMoney(cat.total)}</span>
                           </div>
@@ -832,7 +861,7 @@ export function AccountingModule({
                   onClick={() => setSelectedCategory("ALL")}
                   className="mt-3 w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-[11px] font-bold transition-all text-center"
                 >
-                  Réinitialiser le filtre de catégorie
+                  {isEn ? "Reset category filter" : "Réinitialiser le filtre de catégorie"}
                 </button>
               )}
             </div>
@@ -849,7 +878,7 @@ export function AccountingModule({
                     selectedYear === "ALL" ? 'bg-[#00F2FF] text-black shadow-md shadow-[#00F2FF]/20' : 'text-white/60 hover:text-white'
                   }`}
                 >
-                  Toutes Années
+                  {isEn ? "All Years" : "Toutes Années"}
                 </button>
                 {availableYears.map(yr => (
                   <button
@@ -872,7 +901,7 @@ export function AccountingModule({
                     selectedType === "ALL" ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'
                   }`}
                 >
-                  Tous les Flux
+                  {isEn ? "All Flows" : "Tous les Flux"}
                 </button>
                 <button
                   onClick={() => setSelectedType("in")}
@@ -881,7 +910,7 @@ export function AccountingModule({
                   }`}
                 >
                   <span className="size-1.5 rounded-full bg-current"></span>
-                  Entrées Seules
+                  {isEn ? "Inflows Only" : "Entrées Seules"}
                 </button>
                 <button
                   onClick={() => setSelectedType("out")}
@@ -890,7 +919,7 @@ export function AccountingModule({
                   }`}
                 >
                   <span className="size-1.5 rounded-full bg-current"></span>
-                  Dépenses Seules
+                  {isEn ? "Expenses Only" : "Dépenses Seules"}
                 </button>
               </div>
 
@@ -904,7 +933,7 @@ export function AccountingModule({
                 }`}
               >
                 <FolderOpen className="size-3.5" />
-                <span>Justificatifs Drive</span>
+                <span>{isEn ? "Drive Receipts" : "Justificatifs Drive"}</span>
                 <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px] font-black">
                   {metrics.driveCount}
                 </span>
@@ -919,19 +948,19 @@ export function AccountingModule({
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
                 >
-                  <option value="ALL">Tous les mois (1 à 12)</option>
-                  <option value="1">Janvier</option>
-                  <option value="2">Février</option>
-                  <option value="3">Mars</option>
-                  <option value="4">Avril</option>
-                  <option value="5">Mai</option>
-                  <option value="6">Juin</option>
-                  <option value="7">Juillet</option>
-                  <option value="8">Août</option>
-                  <option value="9">Septembre</option>
-                  <option value="10">Octobre</option>
-                  <option value="11">Novembre</option>
-                  <option value="12">Décembre</option>
+                  <option value="ALL">{isEn ? "All months (1 to 12)" : "Tous les mois (1 à 12)"}</option>
+                  <option value="1">{isEn ? "January" : "Janvier"}</option>
+                  <option value="2">{isEn ? "February" : "Février"}</option>
+                  <option value="3">{isEn ? "March" : "Mars"}</option>
+                  <option value="4">{isEn ? "April" : "Avril"}</option>
+                  <option value="5">{isEn ? "May" : "Mai"}</option>
+                  <option value="6">{isEn ? "June" : "Juin"}</option>
+                  <option value="7">{isEn ? "July" : "Juillet"}</option>
+                  <option value="8">{isEn ? "August" : "Août"}</option>
+                  <option value="9">{isEn ? "September" : "Septembre"}</option>
+                  <option value="10">{isEn ? "October" : "Octobre"}</option>
+                  <option value="11">{isEn ? "November" : "Novembre"}</option>
+                  <option value="12">{isEn ? "December" : "Décembre"}</option>
                 </select>
               </div>
 
@@ -941,15 +970,23 @@ export function AccountingModule({
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-[#00F2FF]"
                 >
-                  <option value="ALL">Toutes les catégories ({availableCategories.length})</option>
-                  <optgroup label="Entrées d'argent">
+                  <option value="ALL">
+                    {isEn 
+                      ? `All categories (${availableCategories.length})` 
+                      : `Toutes les catégories (${availableCategories.length})`}
+                  </option>
+                  <optgroup label={isEn ? "Cash Inflows" : "Entrées d'argent"}>
                     {availableCategories.filter(c => c.type === 'in').map(c => (
-                      <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
+                      <option key={c.name} value={c.name}>
+                        {translateCategory(c.name, language)} ({c.count} {isEn ? "ops" : "op."} - {formatMoney(c.total)})
+                      </option>
                     ))}
                   </optgroup>
-                  <optgroup label="Dépenses & Charges">
+                  <optgroup label={isEn ? "Expenses & Charges" : "Dépenses & Charges"}>
                     {availableCategories.filter(c => c.type === 'out').map(c => (
-                      <option key={c.name} value={c.name}>{c.name} ({c.count} op. - {formatMoney(c.total)})</option>
+                      <option key={c.name} value={c.name}>
+                        {translateCategory(c.name, language)} ({c.count} {isEn ? "ops" : "op."} - {formatMoney(c.total)})
+                      </option>
                     ))}
                   </optgroup>
                 </select>
@@ -959,7 +996,7 @@ export function AccountingModule({
                 <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="text"
-                  placeholder="Rechercher par mot-clé, date, montant, commentaire..."
+                  placeholder={isEn ? "Search by keyword, date, amount, comment..." : "Rechercher par mot-clé, date, montant, commentaire..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs font-medium focus:outline-none focus:border-[#00F2FF]"
@@ -976,20 +1013,24 @@ export function AccountingModule({
             </div>
 
             <div className="flex items-center justify-between text-xs text-white/40 pt-1 border-t border-white/5">
-              <span>{filteredTransactions.length} écriture(s) affichée(s)</span>
+              <span>
+                {isEn 
+                  ? `${filteredTransactions.length} transaction(s) displayed` 
+                  : `${filteredTransactions.length} écriture(s) affichée(s)`}
+              </span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleExportCSV}
                   className="text-white/60 hover:text-white font-bold flex items-center gap-1"
                 >
-                  <Download className="size-3" /> Exporter CSV
+                  <Download className="size-3" /> {isEn ? "Export CSV" : "Exporter CSV"}
                 </button>
                 {canWrite && (
                   <button
                     onClick={() => setIsNewTxModalOpen(true)}
                     className="text-[#10B981] hover:underline font-bold flex items-center gap-1"
                   >
-                    <Plus className="size-3" /> Nouvelle Écriture
+                    <Plus className="size-3" /> {isEn ? "New Entry" : "Nouvelle Écriture"}
                   </button>
                 )}
               </div>
@@ -1002,14 +1043,16 @@ export function AccountingModule({
               <div>
                 <h3 className="text-lg font-black text-white flex items-center gap-2">
                   <FileText className="size-5 text-[#10B981]" />
-                  Grand Livre des Écritures • Feuille 'Spreedsheet'
+                  {isEn ? "General Ledger • 'Spreedsheet' Tab" : "Grand Livre des Écritures • Feuille 'Spreedsheet'"}
                 </h3>
                 <p className="text-xs text-white/40 mt-0.5">
-                  Flux bancaires et opérationnels avec analyse sémantique des commentaires et soldes certifiés
+                  {isEn 
+                    ? "Bank and operational flows with semantic comment analysis & certified balances" 
+                    : "Flux bancaires et opérationnels avec analyse sémantique des commentaires et soldes certifiés"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white/50">Trier:</span>
+                <span className="text-xs font-bold text-white/50">{isEn ? "Sort:" : "Trier:"}</span>
                 <button
                   onClick={() => {
                     if (sortField === "date") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1019,7 +1062,7 @@ export function AccountingModule({
                     sortField === "date" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
                   }`}
                 >
-                  Date {sortField === "date" && (sortOrder === "desc" ? "↓" : "↑")}
+                  {isEn ? "Date" : "Date"} {sortField === "date" && (sortOrder === "desc" ? "↓" : "↑")}
                 </button>
                 <button
                   onClick={() => {
@@ -1030,7 +1073,7 @@ export function AccountingModule({
                     sortField === "amount" ? 'bg-white/10 text-white border-white/20' : 'text-white/40 border-transparent hover:text-white'
                   }`}
                 >
-                  Montant {sortField === "amount" && (sortOrder === "desc" ? "↓" : "↑")}
+                  {isEn ? "Amount" : "Montant"} {sortField === "amount" && (sortOrder === "desc" ? "↓" : "↑")}
                 </button>
               </div>
             </div>
@@ -1039,21 +1082,21 @@ export function AccountingModule({
               <table className="w-full text-left text-xs">
                 <thead className="bg-white/[0.02] border-b border-white/5 text-[11px] font-black uppercase tracking-wider text-white/40">
                   <tr>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Flux</th>
-                    <th className="py-3 px-4">Catégorie</th>
-                    <th className="py-3 px-4">Libellé / Commentaire (Spreedsheet)</th>
-                    <th className="py-3 px-4 text-right">Montant (CFA)</th>
-                    <th className="py-3 px-4 text-right">Solde Caisse</th>
-                    <th className="py-3 px-4 text-center">Justificatif</th>
-                    {canWrite && <th className="py-3 px-4 text-center">Action</th>}
+                    <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
+                    <th className="py-3 px-4">{isEn ? "Flow" : "Flux"}</th>
+                    <th className="py-3 px-4">{isEn ? "Category" : "Catégorie"}</th>
+                    <th className="py-3 px-4">{isEn ? "Description / Comment (Spreedsheet)" : "Libellé / Commentaire (Spreedsheet)"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Amount (CFA)" : "Montant (CFA)"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Cash Balance" : "Solde Caisse"}</th>
+                    <th className="py-3 px-4 text-center">{isEn ? "Receipt" : "Justificatif"}</th>
+                    {canWrite && <th className="py-3 px-4 text-center">{isEn ? "Action" : "Action"}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
                   {filteredTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={canWrite ? 8 : 7} className="py-12 text-center text-white/40 font-bold">
-                        Aucune écriture comptable ne correspond aux critères sélectionnés.
+                        {isEn ? "No accounting records match the selected criteria." : "Aucune écriture comptable ne correspond aux critères sélectionnés."}
                       </td>
                     </tr>
                   ) : (
@@ -1077,11 +1120,11 @@ export function AccountingModule({
                           <td className="py-3 px-4 whitespace-nowrap">
                             {tx.type === "in" ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30">
-                                <ArrowDownRight className="size-3" /> ENTRÉE
+                                <ArrowDownRight className="size-3" /> {isEn ? "INFLOW" : "ENTRÉE"}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#CF5D56]/15 text-[#CF5D56] border border-[#CF5D56]/30">
-                                <ArrowUpRight className="size-3" /> DÉPENSE
+                                <ArrowUpRight className="size-3" /> {isEn ? "EXPENSE" : "DÉPENSE"}
                               </span>
                             )}
                           </td>
@@ -1097,14 +1140,14 @@ export function AccountingModule({
                               }}
                             >
                               <Icon className="size-3" />
-                              <span>{tx.category}</span>
+                              <span>{translateCategory(tx.category, language)}</span>
                             </span>
                           </td>
 
                           {/* Commentaire */}
                           <td className="py-3 px-4">
                             <div className="text-white/80 font-medium max-w-[340px] truncate" title={tx.comment}>
-                              {tx.comment || <span className="text-white/20 italic">Sans commentaire</span>}
+                              {tx.comment ? translateComment(tx.comment, language) : <span className="text-white/20 italic">{isEn ? "No comment" : "Sans commentaire"}</span>}
                             </div>
                           </td>
 
@@ -1139,10 +1182,10 @@ export function AccountingModule({
                                   driveLink: tx.driveLink!
                                 })}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] border border-[#3B82F6]/30 text-[11px] font-bold transition-all shadow-sm active:scale-95"
-                                title="Voir la facture ou le reçu Drive"
+                                title={isEn ? "View invoice or Drive receipt" : "Voir la facture ou le reçu Drive"}
                               >
                                 <Eye className="size-3" />
-                                <span>Voir Justificatif</span>
+                                <span>{isEn ? "View Receipt" : "Voir Justificatif"}</span>
                               </button>
                             ) : (
                               <span className="text-white/20 text-[11px]">-</span>
@@ -1156,7 +1199,7 @@ export function AccountingModule({
                                 <button
                                   onClick={() => handleDeleteTx(tx.id)}
                                   className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all mx-auto"
-                                  title="Supprimer"
+                                  title={isEn ? "Delete" : "Supprimer"}
                                 >
                                   <Trash2 className="size-3.5" />
                                 </button>
@@ -1184,29 +1227,45 @@ export function AccountingModule({
           {/* 4 CARDS KPIS FACTURATION */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
-              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Budget Total Facturé</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                {isEn ? "Total Invoiced Budget" : "Budget Total Facturé"}
+              </span>
               <p className="text-2xl lg:text-3xl font-black text-white mt-2">{formatMoney(invoiceMetrics.totalBudget)}</p>
-              <p className="text-xs text-white/50 mt-1 font-bold">{formatTon(invoiceMetrics.totalTonnage)} transportées</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">
+                {formatTon(invoiceMetrics.totalTonnage)} {isEn ? "transported" : "transportées"}
+              </p>
             </div>
 
             <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
-              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Total Réellement Payé</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                {isEn ? "Total Actually Paid" : "Total Réellement Payé"}
+              </span>
               <p className="text-2xl lg:text-3xl font-black text-[#10B981] mt-2">{formatMoney(invoiceMetrics.totalPaid)}</p>
-              <p className="text-xs text-white/50 mt-1 font-bold">{invoiceMetrics.recoveryRate.toFixed(1)}% d'encaissement</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">
+                {invoiceMetrics.recoveryRate.toFixed(1)}% {isEn ? "collected" : "d'encaissement"}
+              </p>
             </div>
 
             <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
-              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Reste à Payer (Créance)</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                {isEn ? "Outstanding Balance (Receivables)" : "Reste à Payer (Créance)"}
+              </span>
               <p className="text-2xl lg:text-3xl font-black text-[#CF5D56] mt-2">{formatMoney(invoiceMetrics.totalRemaining)}</p>
-              <p className="text-xs text-white/50 mt-1 font-bold">Reliquats clients en attente</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">
+                {isEn ? "Pending client balances" : "Reliquats clients en attente"}
+              </p>
             </div>
 
             <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl">
-              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">Factures en Retard</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                {isEn ? "Overdue Invoices" : "Factures en Retard"}
+              </span>
               <p className={`text-2xl lg:text-3xl font-black mt-2 ${invoiceMetrics.overdueCount > 0 ? 'text-[#EF4444]' : 'text-white'}`}>
                 {invoiceMetrics.overdueCount}
               </p>
-              <p className="text-xs text-white/50 mt-1 font-bold">Échéance dépassée</p>
+              <p className="text-xs text-white/50 mt-1 font-bold">
+                {isEn ? "Past due date" : "Échéance dépassée"}
+              </p>
             </div>
           </div>
 
@@ -1217,7 +1276,7 @@ export function AccountingModule({
                 <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
                 <input
                   type="text"
-                  placeholder="Rechercher facture..."
+                  placeholder={isEn ? "Search invoice..." : "Rechercher facture..."}
                   value={invoiceSearch}
                   onChange={(e) => setInvoiceSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none"
@@ -1228,11 +1287,11 @@ export function AccountingModule({
                 onChange={(e) => setInvoiceStatus(e.target.value)}
                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold"
               >
-                <option value="ALL">Tous statuts</option>
-                <option value="paid">Payées</option>
-                <option value="partial">Partielles</option>
-                <option value="pending">En attente</option>
-                <option value="overdue">En retard</option>
+                <option value="ALL">{isEn ? "All statuses" : "Tous statuts"}</option>
+                <option value="paid">{isEn ? "Paid" : "Payées"}</option>
+                <option value="partial">{isEn ? "Partial" : "Partielles"}</option>
+                <option value="pending">{isEn ? "Pending" : "En attente"}</option>
+                <option value="overdue">{isEn ? "Overdue" : "En retard"}</option>
               </select>
             </div>
 
@@ -1241,7 +1300,7 @@ export function AccountingModule({
                 onClick={handleExportInvoicesCSV}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold"
               >
-                <Download className="size-3.5" /> Exporter CSV
+                <Download className="size-3.5" /> {isEn ? "Export CSV" : "Exporter CSV"}
               </button>
               {canWrite && (
                 <button
@@ -1257,7 +1316,7 @@ export function AccountingModule({
                   }}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF5D56] text-white text-xs font-black uppercase"
                 >
-                  <Plus className="size-3.5" /> Nouvelle Facture
+                  <Plus className="size-3.5" /> {isEn ? "New Invoice" : "Nouvelle Facture"}
                 </button>
               )}
             </div>
@@ -1269,16 +1328,16 @@ export function AccountingModule({
               <table className="w-full text-left text-xs">
                 <thead className="bg-white/[0.02] border-b border-white/5 text-[11px] font-black uppercase tracking-wider text-white/40">
                   <tr>
-                    <th className="py-3 px-4">N° Facture</th>
-                    <th className="py-3 px-4">Client</th>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Échéance</th>
-                    <th className="py-3 px-4 text-right">Tonnage</th>
-                    <th className="py-3 px-4 text-right">Total Facturé</th>
-                    <th className="py-3 px-4 text-right">Payé</th>
-                    <th className="py-3 px-4 text-right">Reste à Payer</th>
-                    <th className="py-3 px-4 text-center">Statut</th>
-                    <th className="py-3 px-4 text-center">Justificatif</th>
+                    <th className="py-3 px-4">{isEn ? "Invoice #" : "N° Facture"}</th>
+                    <th className="py-3 px-4">{isEn ? "Client" : "Client"}</th>
+                    <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
+                    <th className="py-3 px-4">{isEn ? "Due Date" : "Échéance"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Tonnage" : "Tonnage"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Total Invoiced" : "Total Facturé"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Paid" : "Payé"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Remaining" : "Reste à Payer"}</th>
+                    <th className="py-3 px-4 text-center">{isEn ? "Status" : "Statut"}</th>
+                    <th className="py-3 px-4 text-center">{isEn ? "Receipt" : "Justificatif"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -1302,7 +1361,7 @@ export function AccountingModule({
                             status === "partial" ? 'bg-[#00F2FF]/20 text-[#00F2FF]' :
                             status === "overdue" ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white/60'
                           }`}>
-                            {status === "paid" ? "Payée" : status === "partial" ? "Partielle" : status === "overdue" ? "En retard" : "En attente"}
+                            {translateStatus(status, language)}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -1312,13 +1371,13 @@ export function AccountingModule({
                                 title: inv.invoiceNumber,
                                 date: inv.date,
                                 amount: inv.totalAmount,
-                                category: "Facture Client",
+                                category: isEn ? "Client Invoice" : "Facture Client",
                                 comment: inv.notes || inv.client,
                                 driveLink: inv.driveLink!
                               })}
                               className="px-2 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] font-bold text-[10px]"
                             >
-                              Aperçu
+                              {isEn ? "Preview" : "Aperçu"}
                             </button>
                           ) : (
                             <span className="text-white/20">-</span>
@@ -1342,10 +1401,10 @@ export function AccountingModule({
               <div>
                 <h3 className="text-base font-black text-white flex items-center gap-2">
                   <FolderOpen className="size-4 text-[#3B82F6]" />
-                  Justificatif • {previewDoc.category}
+                  {isEn ? "Receipt • " : "Justificatif • "} {translateCategory(previewDoc.category, language)}
                 </h3>
                 <p className="text-xs text-white/50 mt-0.5">
-                  Date : {previewDoc.date} • Montant : <span className="font-bold text-white">{formatMoney(previewDoc.amount)}</span>
+                  {isEn ? "Date: " : "Date : "} {previewDoc.date} • {isEn ? "Amount: " : "Montant : "} <span className="font-bold text-white">{formatMoney(previewDoc.amount)}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1355,7 +1414,7 @@ export function AccountingModule({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all"
                 >
-                  <ExternalLink className="size-3.5" /> Ouvrir dans Drive
+                  <ExternalLink className="size-3.5" /> {isEn ? "Open in Drive" : "Ouvrir dans Drive"}
                 </a>
                 <button
                   onClick={() => setPreviewDoc(null)}
@@ -1372,7 +1431,7 @@ export function AccountingModule({
                   src={getDriveEmbedUrl(previewDoc.driveLink)!}
                   className="w-full h-full min-h-[420px] border-0"
                   allow="autoplay"
-                  title="Aperçu Google Drive"
+                  title={isEn ? "Google Drive Preview" : "Aperçu Google Drive"}
                 />
               ) : (
                 <div className="text-center p-8 space-y-4 max-w-md">
@@ -1380,9 +1439,13 @@ export function AccountingModule({
                     <FolderOpen className="size-8" />
                   </div>
                   <div>
-                    <h4 className="text-base font-black text-white">Dossier Google Drive</h4>
+                    <h4 className="text-base font-black text-white">
+                      {isEn ? "Google Drive Folder" : "Dossier Google Drive"}
+                    </h4>
                     <p className="text-xs text-white/50 mt-1">
-                      Ce justificatif est un dossier contenant des pièces comptables (factures, reçus, bons). Cliquez ci-dessous pour le consulter directement.
+                      {isEn 
+                        ? "This receipt is a folder containing accounting documents (invoices, receipts, vouchers). Click below to view it directly." 
+                        : "Ce justificatif est un dossier contenant des pièces comptables (factures, reçus, bons). Cliquez ci-dessous pour le consulter directement."}
                     </p>
                   </div>
                   <a
@@ -1391,7 +1454,7 @@ export function AccountingModule({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563eb] text-white text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-[#3B82F6]/25"
                   >
-                    <ExternalLink className="size-4" /> Consulter le dossier complet
+                    <ExternalLink className="size-4" /> {isEn ? "View Complete Folder" : "Consulter le dossier complet"}
                   </a>
                 </div>
               )}
@@ -1399,7 +1462,7 @@ export function AccountingModule({
 
             {previewDoc.comment && (
               <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-white/70">
-                <span className="font-bold text-white/90">Commentaire associé :</span> {previewDoc.comment}
+                <span className="font-bold text-white/90">{isEn ? "Associated Comment:" : "Commentaire associé :"}</span> {translateComment(previewDoc.comment, language)}
               </div>
             )}
           </div>
@@ -1413,7 +1476,7 @@ export function AccountingModule({
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h3 className="text-lg font-black text-white flex items-center gap-2">
                 <Plus className="size-5 text-[#10B981]" />
-                Ajouter une Écriture au Grand Livre
+                {isEn ? "Add Entry to General Ledger" : "Ajouter une Écriture au Grand Livre"}
               </h3>
               <button
                 onClick={() => setIsNewTxModalOpen(false)}
@@ -1426,7 +1489,7 @@ export function AccountingModule({
             <form onSubmit={handleCreateTx} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Type de Flux
+                  {isEn ? "Flow Type" : "Type de Flux"}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1436,7 +1499,7 @@ export function AccountingModule({
                       newTxType === "out" ? 'bg-[#CF5D56] text-white border-[#CF5D56]' : 'bg-white/5 text-white/60 border-white/10'
                     }`}
                   >
-                    <ArrowUpRight className="size-4" /> Dépense (-)
+                    <ArrowUpRight className="size-4" /> {isEn ? "Expense (-)" : "Dépense (-)"}
                   </button>
                   <button
                     type="button"
@@ -1445,14 +1508,14 @@ export function AccountingModule({
                       newTxType === "in" ? 'bg-[#10B981] text-black border-[#10B981]' : 'bg-white/5 text-white/60 border-white/10'
                     }`}
                   >
-                    <ArrowDownRight className="size-4" /> Entrée (+)
+                    <ArrowDownRight className="size-4" /> {isEn ? "Inflow (+)" : "Entrée (+)"}
                   </button>
                 </div>
               </div>
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Date de l'opération
+                  {isEn ? "Transaction Date" : "Date de l'opération"}
                 </label>
                 <input
                   type="date"
@@ -1465,7 +1528,7 @@ export function AccountingModule({
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Catégorie Comptable
+                  {isEn ? "Accounting Category" : "Catégorie Comptable"}
                 </label>
                 <select
                   value={newTxCategory}
@@ -1474,28 +1537,28 @@ export function AccountingModule({
                 >
                   {newTxType === "in" ? (
                     <>
-                      <option value="Paiements Clients & Factures">Paiements Clients & Factures</option>
-                      <option value="Remboursement Retenue (20%)">Remboursement Retenue (20%)</option>
-                      <option value="Apports & Avances Associés">Apports & Avances Associés</option>
-                      <option value="Régularisation / Rejet Chèque">Régularisation / Rejet Chèque</option>
+                      <option value="Paiements Clients & Factures">{translateCategory("Paiements Clients & Factures", language)}</option>
+                      <option value="Remboursement Retenue (20%)">{translateCategory("Remboursement Retenue (20%)", language)}</option>
+                      <option value="Apports & Avances Associés">{translateCategory("Apports & Avances Associés", language)}</option>
+                      <option value="Régularisation / Rejet Chèque">{translateCategory("Régularisation / Rejet Chèque", language)}</option>
                     </>
                   ) : (
                     <>
-                      <option value="Carburant (Gasoil)">Carburant (Gasoil)</option>
-                      <option value="Frais de Route & Péages">Frais de Route & Péages</option>
-                      <option value="Salaires & Rémunérations">Salaires & Rémunérations</option>
-                      <option value="Pneus & Train Roulant">Pneus & Train Roulant</option>
-                      <option value="Maintenance & Vidanges">Maintenance & Vidanges</option>
-                      <option value="Mécanique & Pièces de Rechange">Mécanique & Pièces de Rechange</option>
-                      <option value="Loyer & Logement Flotte">Loyer & Logement Flotte</option>
-                      <option value="Assurances Flotte">Assurances Flotte</option>
-                      <option value="Cartes de Transport & Régularisations">Cartes de Transport & Régularisations</option>
-                      <option value="Transport Urbain (Yango)">Transport Urbain (Yango)</option>
-                      <option value="Frais Bancaires & Wave">Frais Bancaires & Wave</option>
-                      <option value="GPS, Télécoms & Énergie">GPS, Télécoms & Énergie</option>
-                      <option value="Lavage & Entretien Flotte">Lavage & Entretien Flotte</option>
-                      <option value="Dépenses Personnelles">Dépenses Personnelles</option>
-                      <option value="Charges Générales & Divers">Charges Générales & Divers</option>
+                      <option value="Carburant (Gasoil)">{translateCategory("Carburant (Gasoil)", language)}</option>
+                      <option value="Frais de Route & Péages">{translateCategory("Frais de Route & Péages", language)}</option>
+                      <option value="Salaires & Rémunérations">{translateCategory("Salaires & Rémunérations", language)}</option>
+                      <option value="Pneus & Train Roulant">{translateCategory("Pneus & Train Roulant", language)}</option>
+                      <option value="Maintenance & Vidanges">{translateCategory("Maintenance & Vidanges", language)}</option>
+                      <option value="Mécanique & Pièces de Rechange">{translateCategory("Mécanique & Pièces de Rechange", language)}</option>
+                      <option value="Loyer & Logement Flotte">{translateCategory("Loyer & Logement Flotte", language)}</option>
+                      <option value="Assurances Flotte">{translateCategory("Assurances Flotte", language)}</option>
+                      <option value="Cartes de Transport & Régularisations">{translateCategory("Cartes de Transport & Régularisations", language)}</option>
+                      <option value="Transport Urbain (Yango)">{translateCategory("Transport Urbain (Yango)", language)}</option>
+                      <option value="Frais Bancaires & Wave">{translateCategory("Frais Bancaires & Wave", language)}</option>
+                      <option value="GPS, Télécoms & Énergie">{translateCategory("GPS, Télécoms & Énergie", language)}</option>
+                      <option value="Lavage & Entretien Flotte">{translateCategory("Lavage & Entretien Flotte", language)}</option>
+                      <option value="Dépenses Personnelles">{translateCategory("Dépenses Personnelles", language)}</option>
+                      <option value="Charges Générales & Divers">{translateCategory("Charges Générales & Divers", language)}</option>
                     </>
                   )}
                 </select>
@@ -1503,7 +1566,7 @@ export function AccountingModule({
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Montant en CFA
+                  {isEn ? "Amount in CFA" : "Montant en CFA"}
                 </label>
                 <input
                   type="number"
@@ -1517,11 +1580,11 @@ export function AccountingModule({
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Description / Commentaire
+                  {isEn ? "Description / Comment" : "Description / Commentaire"}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Ex: Facture révision ou encaissement..."
+                  placeholder={isEn ? "Ex: Maintenance invoice or collection..." : "Ex: Facture révision ou encaissement..."}
                   value={newTxComment}
                   onChange={(e) => setNewTxComment(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:outline-none focus:border-[#00F2FF]"
@@ -1530,7 +1593,7 @@ export function AccountingModule({
 
               <div>
                 <label className="block text-[11px] font-black uppercase tracking-wider text-white/40 mb-1.5">
-                  Lien Google Drive (Optionnel)
+                  {isEn ? "Google Drive Link (Optional)" : "Lien Google Drive (Optionnel)"}
                 </label>
                 <input
                   type="url"
@@ -1547,13 +1610,13 @@ export function AccountingModule({
                   onClick={() => setIsNewTxModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-white/10 text-white/70 hover:text-white text-xs font-bold"
                 >
-                  Annuler
+                  {isEn ? "Cancel" : "Annuler"}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-[#10B981]/25"
                 >
-                  Enregistrer
+                  {isEn ? "Save" : "Enregistrer"}
                 </button>
               </div>
             </form>
@@ -1566,33 +1629,35 @@ export function AccountingModule({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg rounded-[28px] border border-white/10 bg-[#181818] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/8 pb-3">
-              <h3 className="text-base font-black text-white">Ajouter une Facture Client</h3>
+              <h3 className="text-base font-black text-white">
+                {isEn ? "Add Client Invoice" : "Ajouter une Facture Client"}
+              </h3>
               <button onClick={() => setIsInvoiceModalOpen(false)} className="text-white/40 hover:text-white">
                 <X className="size-4" />
               </button>
             </div>
             <form onSubmit={handleSaveInvoice} className="space-y-3 text-xs">
               <div>
-                <label className="text-white/40 font-bold block mb-1">N° Facture</label>
+                <label className="text-white/40 font-bold block mb-1">{isEn ? "Invoice #" : "N° Facture"}</label>
                 <input value={formNumber} onChange={(e) => setFormNumber(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
               </div>
               <div>
-                <label className="text-white/40 font-bold block mb-1">Client</label>
+                <label className="text-white/40 font-bold block mb-1">{isEn ? "Client" : "Client"}</label>
                 <input value={formClient} onChange={(e) => setFormClient(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Date</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Date" : "Date"}</label>
                   <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Échéance</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Due Date" : "Échéance"}</label>
                   <input type="date" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Tonnage (T)</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Tonnage (T)" : "Tonnage (T)"}</label>
                   <input type="number" value={formTonnage} onChange={(e) => {
                     setFormTonnage(e.target.value);
                     const t = parseFloat(e.target.value) || 0;
@@ -1601,7 +1666,7 @@ export function AccountingModule({
                   }} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Taux/Tonne (CFA)</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Rate/Ton (CFA)" : "Taux/Tonne (CFA)"}</label>
                   <input type="number" value={formRate} onChange={(e) => {
                     setFormRate(e.target.value);
                     const r = parseFloat(e.target.value) || 0;
@@ -1612,21 +1677,25 @@ export function AccountingModule({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Total Facturé (CFA)</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Total Invoiced (CFA)" : "Total Facturé (CFA)"}</label>
                   <input type="number" value={formTotal} onChange={(e) => setFormTotal(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
                 <div>
-                  <label className="text-white/40 font-bold block mb-1">Montant Déjà Payé (CFA)</label>
+                  <label className="text-white/40 font-bold block mb-1">{isEn ? "Already Paid Amount (CFA)" : "Montant Déjà Payé (CFA)"}</label>
                   <input type="number" value={formPaid} onChange={(e) => setFormPaid(e.target.value)} className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
                 </div>
               </div>
               <div>
-                <label className="text-white/40 font-bold block mb-1">Lien Google Drive</label>
+                <label className="text-white/40 font-bold block mb-1">{isEn ? "Google Drive Link" : "Lien Google Drive"}</label>
                 <input type="url" value={formDriveLink} onChange={(e) => setFormDriveLink(e.target.value)} placeholder="https://drive.google.com/..." className="w-full p-2 rounded-xl bg-white/5 border border-white/10 text-white" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsInvoiceModalOpen(false)} className="px-4 py-1.5 rounded-xl border border-white/10 text-white/60">Annuler</button>
-                <button type="submit" className="px-4 py-1.5 rounded-xl bg-[#CF5D56] text-white font-bold">Enregistrer</button>
+                <button type="button" onClick={() => setIsInvoiceModalOpen(false)} className="px-4 py-1.5 rounded-xl border border-white/10 text-white/60">
+                  {isEn ? "Cancel" : "Annuler"}
+                </button>
+                <button type="submit" className="px-4 py-1.5 rounded-xl bg-[#CF5D56] text-white font-bold">
+                  {isEn ? "Save" : "Enregistrer"}
+                </button>
               </div>
             </form>
           </div>

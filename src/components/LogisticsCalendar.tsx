@@ -16,8 +16,10 @@ export function LogisticsCalendar({
   selectedDates = [],
   onSelection,
   currency = "CFA",
-  t
+  t,
+  language = "FR"
 }) {
+  const isEn = language === "EN";
   const [viewMode, setViewMode] = useState("month"); // "month", "year_months", "global_years"
 
   const CFA_TO_USD_RATE = 560;
@@ -26,7 +28,7 @@ export function LogisticsCalendar({
     if (currency === "USD") {
       return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(val / CFA_TO_USD_RATE);
     }
-    return Math.round(val).toLocaleString() + (currency === "CFA" ? " CFA" : "");
+    return Math.round(val).toLocaleString(isEn ? "en-US" : "fr-FR") + (currency === "CFA" ? " CFA" : "");
   };
 
   const currentViewYear = viewDate.getFullYear();
@@ -34,8 +36,8 @@ export function LogisticsCalendar({
 
   const monthName = useMemo(() => {
     if (t?.months) return t.months[currentViewMonth];
-    return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(viewDate);
-  }, [viewDate, t]);
+    return new Intl.DateTimeFormat(isEn ? "en-US" : "fr-FR", { month: "long" }).format(viewDate);
+  }, [viewDate, t, isEn, currentViewMonth]);
 
   const todayISO = new Date().toISOString().split('T')[0];
 
@@ -66,7 +68,7 @@ export function LogisticsCalendar({
   const monthsActivity = useMemo(() => {
     const months = Array(12).fill(0).map((_, i) => ({
       idx: i + 1,
-      name: t?.months ? t.months[i].substring(0,3) : new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(new Date(currentViewYear, i, 1)),
+      name: t?.months ? t.months[i].substring(0,3) : new Intl.DateTimeFormat(isEn ? "en-US" : "fr-FR", { month: "short" }).format(new Date(currentViewYear, i, 1)),
       tonnage: 0,
       trips: 0
     }));
@@ -79,7 +81,7 @@ export function LogisticsCalendar({
       }
     });
     return months;
-  }, [filteredRecords, currentViewYear, t]);
+  }, [filteredRecords, currentViewYear, t, isEn]);
 
   // Activité pour la vue GLOBALE ANNÉES
   const globalYearsActivity = useMemo(() => {
@@ -131,7 +133,7 @@ export function LogisticsCalendar({
       onSelection('year', newYears);
   };
 
-  const daysLabels = t?.daysShort || "LMMJVSD".split('');
+  const daysLabels = isEn ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : (t?.daysShort || "LMMJVSD".split(''));
 
   return (
     <div className="flex flex-col h-full w-full select-none font-sans relative">
@@ -149,11 +151,11 @@ export function LogisticsCalendar({
             </div>
           </div>
           <div className="flex gap-2.5 mt-2">
-            <button onClick={() => setViewMode("month")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'month' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/40 hover:bg-white/5'}`}><CalendarIcon className="size-3" /> {t?.days || "Jours"}</button>
+            <button onClick={() => setViewMode("month")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'month' ? 'bg-[#cf5d56] text-white shadow-lg shadow-[#cf5d56]/20' : 'text-white/40 hover:bg-white/5'}`}><CalendarIcon className="size-3" /> {t?.days || (isEn ? "Days" : "Jours")}</button>
 
-            <button onClick={() => setViewMode("year_months")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'year_months' ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20' : 'text-white/40 hover:bg-white/5'}`}><MonthIcon className="size-3" /> {t?.income || "Mois"}</button>
+            <button onClick={() => setViewMode("year_months")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'year_months' ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20' : 'text-white/40 hover:bg-white/5'}`}><MonthIcon className="size-3" /> {t?.month || (isEn ? "Months" : "Mois")}</button>
 
-            <button onClick={() => setViewMode("global_years")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'global_years' ? 'bg-[#BF5AF2] text-white shadow-lg shadow-[#BF5AF2]/20' : 'text-white/40 hover:bg-white/5'}`}><Grid2X2 className="size-3" /> {t?.allYears || "Années"}</button>
+            <button onClick={() => setViewMode("global_years")} className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all ${viewMode === 'global_years' ? 'bg-[#BF5AF2] text-white shadow-lg shadow-[#BF5AF2]/20' : 'text-white/40 hover:bg-white/5'}`}><Grid2X2 className="size-3" /> {t?.year || (isEn ? "Years" : "Années")}</button>
 
           </div>
         </div>

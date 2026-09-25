@@ -24,24 +24,24 @@ const OFFICIAL_DRIVERS = [
   { id: "SORO TRUCK 52", label: "SORO TRUCK 52" }
 ];
 
-const MAPPING_OPTIONS = [
-  { value: 'ignore', label: 'Ignorer' },
-  { value: 'date', label: 'Date (Support 2026)' },
-  { value: 'chauffeur', label: 'Driver’s Name' },
-  { value: 'start', label: 'Start' },
+const getMappingOptions = (isEn) => [
+  { value: 'ignore', label: isEn ? 'Ignore' : 'Ignorer' },
+  { value: 'date', label: isEn ? 'Date (2026 Support)' : 'Date (Support 2026)' },
+  { value: 'chauffeur', label: isEn ? "Driver's Name" : "Nom du chauffeur" },
+  { value: 'start', label: isEn ? 'Start' : 'Départ' },
   { value: 'destination', label: 'Destination' },
-  { value: 'fuel', label: 'Fuel Cost (CFA)' },
-  { value: 'road', label: 'Road Fees (CFA)' },
-  { value: 'port', label: 'Port Access (CFA)' },
+  { value: 'fuel', label: isEn ? 'Fuel Cost (CFA)' : 'Carburant (CFA)' },
+  { value: 'road', label: isEn ? 'Road Fees (CFA)' : 'Frais de route (CFA)' },
+  { value: 'port', label: isEn ? 'Port Access (CFA)' : 'Accès Port (CFA)' },
   { value: 'police', label: 'Police' },
-  { value: 'food', label: 'Food' },
-  { value: 'expense', label: 'Extra Bonus' },
-  { value: 'total_expense', label: 'Total Expense (CFA)' },
-  { value: 'tonnage', label: 'Tonnage (T)' },
-  { value: 'revenue', label: 'Total Gross (CFA)' },
-  { value: 'total_net_cfa', label: 'Total Net (CFA)' },
-  { value: 'km', label: 'Kilométrage (Km)' },
-  { value: 'comments', label: 'Comments' },
+  { value: 'food', label: isEn ? 'Food' : 'Repas' },
+  { value: 'expense', label: isEn ? 'Extra Bonus' : 'Bonus / Extra' },
+  { value: 'total_expense', label: isEn ? 'Total Expense (CFA)' : 'Dépenses Totales (CFA)' },
+  { value: 'tonnage', label: isEn ? 'Tonnage (T)' : 'Tonnage (T)' },
+  { value: 'revenue', label: isEn ? 'Total Gross (CFA)' : 'Revenu Brut (CFA)' },
+  { value: 'total_net_cfa', label: isEn ? 'Total Net (CFA)' : 'Total Net (CFA)' },
+  { value: 'km', label: isEn ? 'Mileage (Km)' : 'Kilométrage (Km)' },
+  { value: 'comments', label: isEn ? 'Comments' : 'Commentaires' },
 ];
 
 const KEYWORDS = {
@@ -63,7 +63,8 @@ const KEYWORDS = {
   comments: ["comments", "commentaires", "note"]
 };
 
-export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
+export default function SmartBulkImporter({ setTrips, setAuditLogs, t, language = "FR" }) {
+  const isEn = language === "EN";
   const [loading, setLoading] = useState(false);
   const [rawRows, setRawRows] = useState(null);
   const [mapping, setMapping] = useState([]);
@@ -295,8 +296,10 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
 
           if (hasOverlap) {
             const overwrite = window.confirm(
-              "⚠️ CONFLIT DÉTECTÉ : Des données existent déjà pour ces dates et chauffeurs.\n\n" +
-              "Voulez-vous ÉCRASER les anciennes données avec cet import ?"
+              isEn 
+                ? "⚠️ CONFLICT DETECTED : Data already exists for these dates and drivers.\n\nDo you want to OVERWRITE old data with this import?"
+                : "⚠️ CONFLIT DÉTECTÉ : Des données existent déjà pour ces dates et chauffeurs.\n\n" +
+                  "Voulez-vous ÉCRASER les anciennes données avec cet import ?"
             );
             if (overwrite) {
               finalTrips = prev.filter(t => !importedKeys.has(t.date + '_' + t.driverLabel));
@@ -312,11 +315,11 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
               setAuditLogs(prevLogs => [{
                 id: `log-${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                type: "Bulk Import (Excel)",
+                type: isEn ? "Bulk Import (Excel)" : "Bulk Import (Excel)",
                 count: newTrips.length,
                 batchId: batchId
               }, ...prevLogs]);
-              alert("IMPORTATION RÉUSSIE :\n\nTrajets intégrés : " + newTrips.length);
+              alert(isEn ? `IMPORT SUCCESSFUL:\n\nIntegrated trips: ${newTrips.length}` : `IMPORTATION RÉUSSIE :\n\nTrajets intégrés : ${newTrips.length}`);
               setRawRows(null); setPasteContent(""); setMapping([]); setDetectedColumns([]);
             }, 0);
             return [...finalTrips, ...newTrips];
@@ -324,7 +327,7 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
           return prev;
         });
       }
-    } catch (e) { alert("Erreur critique d'importation."); }
+    } catch (e) { alert(isEn ? "Critical import error." : "Erreur critique d'importation."); }
   };
 
   return (
@@ -340,16 +343,16 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
               <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
               <div className="border-2 border-dashed border-white/10 group-hover:border-[#cf5d56]/40 rounded-[30px] p-12 text-center bg-white/[0.02] transition-all flex flex-col items-center justify-center h-64">
                 <FileSpreadsheet className="size-16 text-[#cf5d56] mb-4" />
-                <h3 className="text-xl font-bold">Importer Excel</h3>
-                <p className="text-sm text-white/30 mt-2">Cliquez ou glissez votre .xlsx</p>
+                <h3 className="text-xl font-bold">{isEn ? "Import Excel" : "Importer Excel"}</h3>
+                <p className="text-sm text-white/30 mt-2">{isEn ? "Click or drag your .xlsx file" : "Cliquez ou glissez votre .xlsx"}</p>
               </div>
             </div>
             <div className="flex flex-col gap-4">
               <div className="relative flex-1">
-                <textarea placeholder="Collez vos lignes Excel ici..." value={pasteContent} onChange={e => setPasteContent(e.target.value)} className="w-full h-full min-h-[200px] bg-black/40 border border-white/10 rounded-[30px] p-6 text-sm font-mono outline-none focus:border-[#cf5d56] transition resize-none no-scrollbar" />
+                <textarea placeholder={isEn ? "Paste your Excel rows here..." : "Collez vos lignes Excel ici..."} value={pasteContent} onChange={e => setPasteContent(e.target.value)} className="w-full h-full min-h-[200px] bg-black/40 border border-white/10 rounded-[30px] p-6 text-sm font-mono outline-none focus:border-[#cf5d56] transition resize-none no-scrollbar" />
                 <ClipboardPaste className="absolute right-6 bottom-6 size-6 text-white/10" />
               </div>
-              <button onClick={handlePasteProcess} disabled={!pasteContent.trim()} className="bg-[#cf5d56] hover:bg-[#cf5d56]/90 py-4 rounded-[20px] font-bold flex items-center justify-center gap-3 transition disabled:opacity-20 shadow-lg shadow-[#cf5d56]/10">Traiter le collage <ArrowRight className="size-4" /></button>
+              <button onClick={handlePasteProcess} disabled={!pasteContent.trim()} className="bg-[#cf5d56] hover:bg-[#cf5d56]/90 py-4 rounded-[20px] font-bold flex items-center justify-center gap-3 transition disabled:opacity-20 shadow-lg shadow-[#cf5d56]/10">{isEn ? "Process Paste" : "Traiter le collage"} <ArrowRight className="size-4" /></button>
             </div>
           </div>
           {status && <div className={`mt-10 p-5 rounded-[24px] flex items-center gap-4 animate-in slide-in-from-bottom-4 ${status.error ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'}`}>{status.error ? <AlertCircle className="size-6" /> : <CheckCircle2 className="size-6" />}<span className="font-bold tracking-tight">{status.error || status.success}</span></div>}
@@ -359,25 +362,25 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
           <header className="p-8 border-b border-white/5 flex items-center justify-between shrink-0 bg-black/20">
             <div>
               <h2 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3"><Settings2 className="text-[#cf5d56] size-7" /> Visual Mapping Engine</h2>
-              <p className="text-white/30 text-xs mt-1">Configurez les colonnes pour l'intégration 2026.</p>
+              <p className="text-white/30 text-xs mt-1">{isEn ? "Configure columns for 2026 data integration." : "Configurez les colonnes pour l'intégration 2026."}</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 bg-black/40 px-4 py-2.5 rounded-2xl border border-white/5">
                 <User className="size-4 text-[#cf5d56]" />
-                <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Chauffeur :</span>
+                <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">{isEn ? "Driver :" : "Chauffeur :"}</span>
                 <select value={globalDriver} onChange={e => setGlobalDriver(e.target.value)} className="bg-transparent text-sm font-black text-[#ff8f84] outline-none cursor-pointer">
-                  <option value="none" className="bg-[#181818]">Utiliser colonne Driver's Name</option>
+                  <option value="none" className="bg-[#181818]">{isEn ? "Use Driver's Name column" : "Utiliser colonne Driver's Name"}</option>
                   {OFFICIAL_DRIVERS.map(d => <option key={d.id} value={d.id} className="bg-[#181818]">{d.label}</option>)}
                 </select>
               </div>
               <button onClick={() => {setRawRows(null); setDetectedColumns([]);}} className="p-3 hover:bg-white/5 rounded-2xl transition text-white/40"><Undo2 className="size-5" /></button>
-              <button onClick={handleValidateMapping} className="flex items-center gap-3 px-10 py-3.5 rounded-2xl font-black bg-[#cf5d56] text-white shadow-xl shadow-[#cf5d56]/20 hover:scale-105 active:scale-95 transition-all"><Zap className="size-5" /> INTÉGRER AU DASHBOARD</button>
+              <button onClick={handleValidateMapping} className="flex items-center gap-3 px-10 py-3.5 rounded-2xl font-black bg-[#cf5d56] text-white shadow-xl shadow-[#cf5d56]/20 hover:scale-105 active:scale-95 transition-all"><Zap className="size-5" /> {isEn ? "INTEGRATE TO DASHBOARD" : "INTÉGRER AU DASHBOARD"}</button>
             </div>
           </header>
 
           {mapping.includes('chauffeur') && globalDriver === 'none' && Object.keys(uniqueNamesMap).length > 0 && (
             <div className="mx-8 mt-4 p-4 bg-white/[0.02] rounded-2xl border border-white/5">
-              <p className="text-[10px] uppercase font-bold text-white/20 mb-3 flex items-center gap-2"><Info className="size-3" /> Mapper les noms détectés :</p>
+              <p className="text-[10px] uppercase font-bold text-white/20 mb-3 flex items-center gap-2"><Info className="size-3" /> {isEn ? "Map detected names:" : "Mapper les noms détectés :"}</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {Object.keys(uniqueNamesMap).map(name => (
                   <div key={name} className="flex items-center justify-between bg-black/20 p-2 rounded-xl border border-white/5">
@@ -400,7 +403,7 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
                       <th key={i} className="p-5 border-r border-b border-white/5 text-left">
                         <div className={`p-1 rounded-xl transition ${detectedColumns.includes(i) ? 'bg-[#cf5d56]/10 border border-[#cf5d56]/30' : ''}`}>
                           <select value={field} onChange={e => {const newMap = [...mapping]; newMap[i] = e.target.value; setMapping(newMap);}} className={`w-full bg-[#181818] border rounded-xl px-4 py-3 text-[11px] font-black uppercase tracking-wider outline-none transition appearance-none cursor-pointer ${field !== 'ignore' ? 'border-[#cf5d56] text-[#ff8f84] shadow-lg shadow-[#cf5d56]/10' : 'border-white/10 text-white/40 hover:border-white/20'}`}>
-                            {MAPPING_OPTIONS.map(opt => (<option key={opt.value} value={opt.value} className="bg-[#181818]">{opt.label}</option>))}
+                            {getMappingOptions(isEn).map(opt => (<option key={opt.value} value={opt.value} className="bg-[#181818]">{opt.label}</option>))}
                           </select>
                         </div>
                       </th>
@@ -420,8 +423,8 @@ export default function SmartBulkImporter({ setTrips, setAuditLogs }) {
             </div>
           </div>
           <footer className="p-6 bg-black/20 border-t border-white/5 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4 text-[10px] text-white/20 uppercase tracking-[0.3em] font-black"><TableIcon className="size-4" /> <span>Prévisualisation</span><span className="bg-white/5 px-3 py-1.5 rounded-lg text-white/40 border border-white/10">Fichier: {fileName}</span></div>
-            <div className="text-[10px] text-[#cf5d56] font-black italic tracking-widest uppercase">REQUIS : Date, Destination, Total Gross</div>
+            <div className="flex items-center gap-4 text-[10px] text-white/20 uppercase tracking-[0.3em] font-black"><TableIcon className="size-4" /> <span>{isEn ? "Preview" : "Prévisualisation"}</span><span className="bg-white/5 px-3 py-1.5 rounded-lg text-white/40 border border-white/10">{isEn ? "File: " : "Fichier: "}{fileName}</span></div>
+            <div className="text-[10px] text-[#cf5d56] font-black italic tracking-widest uppercase">{isEn ? "REQUIRED : Date, Destination, Total Gross" : "REQUIS : Date, Destination, Total Gross"}</div>
           </footer>
         </div>
       )}
