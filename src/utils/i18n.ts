@@ -10,10 +10,16 @@ export const TRANSLATIONS = {
     drivers: "Chauffeurs",
     trips: "Trajets",
     comptabilite: "Comptabilité",
+    accounting: "Comptabilité",
     depenses: "Dépenses",
+    expenses: "Dépenses",
     encaissements: "Encaissements",
+    income: "Encaissements",
+    incomes: "Encaissements",
     documents: "Validation IA",
+    validation: "Validation IA",
     closing: "Clôture jour",
+    dailyClosing: "Clôture jour",
     reports: "Rapports",
     audit: "Audit Log",
     maintenance: "Maintenance",
@@ -436,10 +442,16 @@ export const TRANSLATIONS = {
     drivers: "Drivers",
     trips: "Trips",
     comptabilite: "Accounting",
+    accounting: "Accounting",
     depenses: "Expenses",
+    expenses: "Expenses",
     encaissements: "Receivables",
+    income: "Receivables",
+    incomes: "Receivables",
     documents: "AI Validation",
+    validation: "AI Validation",
     closing: "Daily Closing",
+    dailyClosing: "Daily Closing",
     reports: "Reports",
     audit: "Audit Log",
     maintenance: "Maintenance",
@@ -857,65 +869,306 @@ export const TRANSLATIONS = {
   }
 };
 
-// Dictionnaire de traduction des catégories comptables et opérationnelles
+// Dictionnaire exhaustif de traduction des catégories comptables, opérationnelles et de flotte
 export const CATEGORY_TRANSLATIONS: Record<string, string> = {
-  // Entrées
+  // --- ENTRÉES & FACTURATION CLIENTS ---
   "Paiements Clients & Factures": "Client Invoices & Payments",
-  "Remboursement Retenue (20%)": "Withholding Tax Refund (20%)",
-  "Apports & Avances Associés": "Partner Contributions & Advances",
-  "Régularisation / Rejet Chèque": "Adjustment / Check Bounce",
-  "Recette trajet": "Trip Revenue",
+  "Paiement Client & Facture": "Client Invoices & Payments",
+  "Paiement Client": "Client Payment",
+  "Paiements Clients": "Client Payments",
   "Facture Client": "Client Invoice",
+  "Factures Clients": "Client Invoices",
+  "Facture": "Invoice",
+  "Facturation": "Billing",
+  "Recette trajet": "Trip Revenue",
+  "Recette": "Revenue",
+  "Recettes": "Revenue",
+  "Remboursement Retenue (20%)": "Withholding Tax Refund (20%)",
+  "Remboursement Retenue": "Withholding Tax Refund",
+  "Retenue 20%": "20% Withholding",
+  "Apports & Avances Associés": "Partner Contributions & Advances",
+  "Apport & Avance Associé": "Partner Contribution & Advance",
+  "Apport": "Partner Contribution",
+  "Apports": "Partner Contributions",
+  "Avance Associé": "Partner Advance",
+  "Régularisation / Rejet Chèque": "Adjustment / Check Bounce",
+  "Régularisation": "Adjustment",
+  "Rejet Chèque": "Check Bounce",
+  "Chèque rejeté": "Bounced Check",
 
-  // Dépenses Opérationnelles & Flotte
+  // --- FRAIS DE CARBURANT & ÉNERGIE ---
   "Carburant (Gasoil)": "Fuel (Diesel)",
-  "Frais de Route & Péages": "Road Fees & Tolls",
-  "Salaires & Rémunérations": "Salaries & Wages",
-  "Pneus & Train Roulant": "Tires & Running Gear",
-  "Maintenance & Vidanges": "Maintenance & Oil Changes",
-  "Mécanique & Pièces de Rechange": "Mechanical & Spare Parts",
-  "Loyer & Logement Flotte": "Rent & Fleet Housing",
-  "Assurances Flotte": "Fleet Insurance",
-  "Cartes de Transport & Régularisations": "Transport Cards & Adjustments",
-  "Impôts & Taxes d’État": "State Taxes & Duties",
-  "Transport Urbain (Yango)": "Urban Transport (Yango)",
-  "Frais Bancaires & Wave": "Bank Fees & Wave",
-  "GPS, Télécoms & Énergie": "GPS, Telecom & Power",
-  "Lavage & Entretien Flotte": "Fleet Wash & Care",
-  "Dépenses Personnelles": "Personal Expenses",
-  "Charges Générales & Divers": "General & Miscellaneous Expenses",
-  "Dépense Opérationnelle": "Operational Expense",
+  "Carburant": "Fuel (Diesel)",
+  "Gasoil": "Diesel Fuel",
+  "Achat carburant": "Fuel Purchase",
+  "Achat gasoil": "Diesel Purchase",
+  "Ravitaillement": "Refueling",
+  "Carburant moteur": "Engine Fuel",
 
-  // Catégories Dépenses Module classique
-  "Entretien": "Maintenance & Care",
-  "Administratif": "Administrative",
-  "Sinistres": "Incidents & Damage",
-  "Dépenses Bureau": "Office Expenses",
-  "Dépenses Administratives": "Administrative Expenses",
+  // --- FRAIS DE ROUTE, PÉAGES, POLICE, REPAS ---
+  "Frais de Route & Péages": "Road Fees & Tolls",
+  "Frais de Route": "Road Expenses",
+  "Frais de route": "Road Expenses",
+  "Péage": "Road Toll",
+  "Péages": "Road Tolls",
+  "Péages & Ponts": "Tolls & Bridges",
+  "Péages & Autoroute": "Tolls & Highway",
+  "Péages, Police, Repas, Extras": "Tolls, Police, Meals, Extras",
+  "Police": "Police Inspections",
+  "Contrôle Police": "Police Check",
+  "Contrôles Police": "Police Controls",
+  "Police & Contrôles": "Police & Inspections",
+  "Repas": "Meals & Food",
+  "Repas & Route": "Meals & Road Per Diem",
+  "Repas & Frais": "Meals & Expenses",
+  "Nourriture": "Food",
+  "Mission": "Mission Allowance",
+  "Indemnités": "Per Diem Allowance",
+  "Avance chauffeur": "Driver Advance",
+
+  // --- PNEUS, VIDANGES & TRAIN ROULANT ---
+  "Pneus & Train Roulant": "Tires & Running Gear",
+  "Pneus & Train": "Tires & Running Gear",
+  "Pneus & Roues": "Tires & Wheels",
   "Pneus": "Tires",
+  "Pneu": "Tire",
+  "Remplacement pneus": "Tire Replacement",
+  "Permutation pneus": "Tire Rotation",
+  "Chambre à air": "Inner Tube",
+  "Maintenance & Vidanges": "Maintenance & Oil Changes",
+  "Vidanges & Huiles": "Oil & Lubrication",
   "Vidange": "Oil Change",
+  "Vidanges": "Oil Changes",
+  "Vidange Moteur": "Engine Oil Change",
+  "Vidange moteur": "Engine Oil Change",
+  "Graissage": "Chassis Greasing",
+  "Graissage complet": "Full Chassis Greasing",
+  "Lavage & Entretien Flotte": "Fleet Wash & Care",
+  "Lavage": "Fleet Wash",
+  "Lavage camion": "Truck Wash",
+
+  // --- MÉCANIQUE, PIÈCES & ATELIER ---
+  "Mécanique & Pièces de Rechange": "Mechanical & Spare Parts",
+  "Pièces & Réparations": "Parts & Repairs",
+  "Pièce & Hydraulique": "Parts & Hydraulics",
+  "Pièces": "Spare Parts",
+  "Pièce": "Spare Part",
   "Freins": "Brakes",
+  "Système Freinage": "Braking System",
   "Moteur": "Engine",
   "Carrosserie": "Bodywork",
+  "Batterie": "Battery",
+  "Alternateur": "Alternator",
+  "Démarreur": "Starter",
+  "Amortisseurs": "Shock Absorbers",
+  "Suspension": "Suspension",
+  "Lames de suspension": "Leaf Springs",
+  "Embrayage": "Clutch",
+  "Boîte de vitesses": "Gearbox",
+  "Pont": "Axle",
+  "Pont arrière": "Rear Axle",
+  "Radiateur": "Radiator",
+  "Pompe": "Pump",
+  "Pompe à eau": "Water Pump",
+  "Injecteur": "Fuel Injector",
+  "Intervention Atelier": "Workshop Service",
+  "Atelier": "Workshop",
+  "Main d'oeuvre": "Labor",
+  "Mécanicien": "Mechanic",
+  "Réparation": "Repair",
+  "Réparations": "Repairs",
+  "Réparations & pièces": "Repairs & Spare Parts",
+  "Spécifique + Atelier": "Specific + Workshop",
+  "Part atelier": "Workshop Share",
+  "Workshop service": "Workshop Service",
+
+  // --- ASSURANCES, TAXES & ADMINISTRATIF ---
+  "Assurances Flotte": "Fleet Insurance",
   "Assurance": "Insurance",
-  "Visite Technique": "Technical Inspection",
-  "Patente": "Business License Tax",
+  "Assurances": "Insurance",
+  "Cartes de Transport & Régularisations": "Transport Cards & Adjustments",
+  "Carte de Transport": "Transport Card",
+  "Impôts & Taxes d’État": "State Taxes & Duties",
+  "Impôts & Taxes d'État": "State Taxes & Duties",
+  "Impôts & Taxes": "Taxes & Duties",
+  "Impôts": "Taxes",
+  "Impôt": "Tax",
   "Taxes": "Taxes & Duties",
-  "Accrochage": "Minor Collision",
-  "Dépannage": "Towing & Assistance",
-  "Vol": "Theft",
+  "Patente": "Business License Tax",
+  "Visite Technique": "Technical Inspection",
+  "Administratif": "Administrative",
+  "Dépenses Administratives": "Administrative Expenses",
+  "Document administratif": "Administrative Document",
+  "Comptabilité": "Accounting",
+
+  // --- FRAIS GÉNÉRAUX, BANCAIRE, TÉLÉCOM, LOGEMENT ---
+  "Salaires & Rémunérations": "Salaries & Wages",
+  "Salaires": "Salaries",
+  "Salaire": "Salary",
+  "Rémunérations": "Wages",
+  "Primes": "Bonuses",
+  "Prime": "Bonus",
+  "Loyer & Logement Flotte": "Rent & Fleet Housing",
   "Loyer": "Rent",
   "Électricité": "Power & Utilities",
   "Internet": "Internet & Telecom",
-  "Impôt": "Tax",
-  "Document administratif": "Administrative Document",
-  "Comptabilité": "Accounting"
+  "Dépenses Bureau": "Office Expenses",
+  "Transport Urbain (Yango)": "Urban Transport (Yango)",
+  "Transport Urbain": "Urban Transport",
+  "Yango": "Yango Ride",
+  "Frais Bancaires & Wave": "Bank Fees & Wave",
+  "Frais Bancaires": "Bank Fees",
+  "Wave": "Wave Mobile Money",
+  "GPS, Télécoms & Énergie": "GPS, Telecom & Power",
+  "GPS": "GPS Tracking",
+  "Télécoms": "Telecom",
+  "Dépenses Personnelles": "Personal Expenses",
+  "Charges Générales & Divers": "General & Miscellaneous Expenses",
+  "Charges Générales": "General Expenses",
+  "Divers & Extras": "Misc & Extras",
+  "Extras & Divers": "Extras & Misc",
+  "Divers": "Miscellaneous",
+  "Extras": "Extras",
+  "Extra": "Extra",
+  "Autre": "Other",
+  "Autres": "Others",
+  "Autres charges": "Other Expenses",
+  "Dépense Opérationnelle": "Operational Expense",
+  "Dépenses Opérationnelles": "Operational Expenses",
+  "Dépense": "Expense",
+  "Dépenses": "Expenses",
+  "Entrée": "Inflow",
+  "Entrées": "Inflows",
+  "Sortie": "Outflow",
+  "Sorties": "Outflows",
+  "Sinistres": "Incidents & Damage",
+  "Accrochage": "Minor Collision",
+  "Dépannage": "Towing & Assistance",
+  "Vol": "Theft",
+  "Flotte Générale": "General Fleet",
+  "Tous": "All",
+  "Toutes": "All",
+  "Tout": "All"
 };
 
-// Traduction dynamique des catégories selon la langue
-export function translateCategory(cat: string, lang: Language): string {
-  if (lang === 'FR' || !cat) return cat;
-  return CATEGORY_TRANSLATIONS[cat] || cat;
+// Normaliseur de chaîne pour comparaison robuste (supprime accents, guillemets courbes, espaces)
+function normalizeCategoryKey(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+// Table de correspondance normalisée pré-calculée
+const NORMALIZED_CATEGORY_MAP = new Map<string, string>();
+for (const [key, val] of Object.entries(CATEGORY_TRANSLATIONS)) {
+  NORMALIZED_CATEGORY_MAP.set(normalizeCategoryKey(key), val);
+}
+
+// Traduction dynamique ultra-robuste des catégories selon la langue
+export function translateCategory(cat: string | null | undefined, lang: Language): string {
+  if (!cat) return "";
+  if (lang === 'FR') return cat;
+
+  const raw = String(cat).trim();
+  // 1. Recherche directe dans le dictionnaire
+  if (CATEGORY_TRANSLATIONS[raw]) {
+    return CATEGORY_TRANSLATIONS[raw];
+  }
+
+  // 2. Recherche normalisée (insensible aux accents, casses et apostrophes)
+  const norm = normalizeCategoryKey(raw);
+  if (NORMALIZED_CATEGORY_MAP.has(norm)) {
+    return NORMALIZED_CATEGORY_MAP.get(norm)!;
+  }
+
+  // 3. Heuristiques sémantiques basées sur mots-clés
+  if (norm.includes("carburant") || norm.includes("gasoil") || norm.includes("diesel")) {
+    return "Fuel (Diesel)";
+  }
+  if (norm.includes("peage") || norm.includes("toll")) {
+    return "Road Fees & Tolls";
+  }
+  if (norm.includes("frais de route") || norm.includes("route")) {
+    return "Road Expenses";
+  }
+  if (norm.includes("police") || norm.includes("controle") || norm.includes("inspec")) {
+    return "Police & Inspections";
+  }
+  if (norm.includes("repas") || norm.includes("food") || norm.includes("nourriture")) {
+    return "Meals & Per Diem";
+  }
+  if (norm.includes("salaire") || norm.includes("remuneration") || norm.includes("paie")) {
+    return "Salaries & Wages";
+  }
+  if (norm.includes("pneu") || norm.includes("roue") || norm.includes("tire")) {
+    return "Tires & Running Gear";
+  }
+  if (norm.includes("vidange") || norm.includes("huile") || norm.includes("oil")) {
+    return "Oil Change & Maintenance";
+  }
+  if (norm.includes("mecanique") || norm.includes("reparation") || norm.includes("piece") || norm.includes("garage") || norm.includes("atelier")) {
+    return "Mechanical & Spare Parts";
+  }
+  if (norm.includes("frein") || norm.includes("brake")) {
+    return "Braking System";
+  }
+  if (norm.includes("moteur") || norm.includes("engine")) {
+    return "Engine";
+  }
+  if (norm.includes("loyer") || norm.includes("logement") || norm.includes("rent")) {
+    return "Rent & Fleet Housing";
+  }
+  if (norm.includes("assurance") || norm.includes("insurance")) {
+    return "Fleet Insurance";
+  }
+  if (norm.includes("carte de transport") || norm.includes("transport card")) {
+    return "Transport Cards & Adjustments";
+  }
+  if (norm.includes("impot") || norm.includes("taxe") || norm.includes("patente")) {
+    return "State Taxes & Duties";
+  }
+  if (norm.includes("yango") || norm.includes("transport urbain")) {
+    return "Urban Transport (Yango)";
+  }
+  if (norm.includes("banque") || norm.includes("wave")) {
+    return "Bank Fees & Wave";
+  }
+  if (norm.includes("gps") || norm.includes("telecom") || norm.includes("energie") || norm.includes("electricite")) {
+    return "GPS, Telecom & Utilities";
+  }
+  if (norm.includes("lavage") || norm.includes("nettoyage") || norm.includes("entretien")) {
+    return "Fleet Wash & Care";
+  }
+  if (norm.includes("personnel")) {
+    return "Personal Expenses";
+  }
+  if (norm.includes("charge") || norm.includes("divers") || norm.includes("extra") || norm.includes("autre")) {
+    return "General & Miscellaneous Expenses";
+  }
+  if (norm.includes("facture") || norm.includes("paiement") || norm.includes("client") || norm.includes("recette")) {
+    return "Client Invoices & Payments";
+  }
+  if (norm.includes("retenue") || norm.includes("20%")) {
+    return "Withholding Tax Refund (20%)";
+  }
+  if (norm.includes("apport") || norm.includes("avance associe")) {
+    return "Partner Advances & Contributions";
+  }
+  if (norm.includes("regularisation") || norm.includes("rejet")) {
+    return "Adjustment / Check Bounce";
+  }
+  if (norm.includes("operationnelle") || norm.includes("operationnel")) {
+    return "Operational Expense";
+  }
+  if (norm.includes("sinistre") || norm.includes("accrochage") || norm.includes("depannage") || norm.includes("vol")) {
+    return "Incidents & Assistance";
+  }
+
+  return raw;
 }
 
 // Dictionnaire sémantique pour la traduction des commentaires, libellés et notes d'exploitation

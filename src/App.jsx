@@ -317,21 +317,22 @@ export default function App() {
     audit: ShieldCheck, "quick-entry": PlusCircle, admin: RefreshCcw
   };
 
+  const isEn = language === "EN";
   const menuLabels = {
-    dashboard: t.dashboard,
-    drivers: t.drivers,
-    trips: t.trips,
-    comptabilite: t.comptabilite || "Comptabilité",
-    depenses: t.expenses,
-    encaissements: t.income,
-    documents: t.validation,
-    closing: t.closing,
-    reports: t.reports,
-    audit: t.audit,
-    maintenance: t.maintenance,
-    "quick-entry": t.quickEntry,
-    admin: t.import,
-    settings: t.settings
+    dashboard: t.dashboard || (isEn ? "Dashboard" : "Tableau de Bord"),
+    drivers: t.drivers || (isEn ? "Drivers" : "Chauffeurs"),
+    trips: t.trips || (isEn ? "Trips" : "Trajets"),
+    comptabilite: t.comptabilite || t.accounting || (isEn ? "Accounting" : "Comptabilité"),
+    depenses: t.depenses || t.expenses || (isEn ? "Expenses" : "Dépenses"),
+    encaissements: t.encaissements || t.income || t.incomes || (isEn ? "Receivables" : "Encaissements"),
+    documents: t.documents || t.validation || (isEn ? "AI Validation" : "Validation IA"),
+    closing: t.closing || t.dailyClosing || (isEn ? "Daily Closing" : "Clôture jour"),
+    reports: t.reports || (isEn ? "Reports" : "Rapports"),
+    audit: t.audit || (isEn ? "Audit Log" : "Audit Log"),
+    maintenance: t.maintenance || (isEn ? "Maintenance" : "Maintenance"),
+    "quick-entry": t.quickEntry || (isEn ? "Quick Entry" : "Saisie Rapide"),
+    admin: t.import || (isEn ? "Import Data" : "Importation"),
+    settings: t.settings || (isEn ? "Settings" : "Réglages")
   };
 
   const filteredMenu = useMemo(() => {

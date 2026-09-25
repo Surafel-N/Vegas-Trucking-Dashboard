@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { computeTripProfit } from "../utils/businessMetrics";
-import { translateComment } from "../utils/i18n";
+import { translateComment, translateCategory } from "../utils/i18n";
 
 const EMPTY_TRIP = {
   date: "",
@@ -112,7 +112,7 @@ export function TripsModule({ trips = [], drivers = [], expenses = [], incomes =
                   
                   {/* Dynamic Columns from Custom Expenses */}
                   {dynamicKeys.map(key => (
-                    <th key={key} className="px-4 py-4 w-32 text-right text-[#61d2c0] bg-white/[0.02] italic">{key}</th>
+                    <th key={key} className="px-4 py-4 w-32 text-right text-[#61d2c0] bg-white/[0.02] italic">{translateCategory(key, language)}</th>
                   ))}
 
                   <th className="px-4 py-4 w-32 text-right bg-white/5 font-bold text-white border-l border-white/10">{t?.totalExp || "Total Exp"}</th>

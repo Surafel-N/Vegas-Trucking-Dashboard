@@ -1553,6 +1553,7 @@ export function AccountingModule({
                       <option value="Loyer & Logement Flotte">{translateCategory("Loyer & Logement Flotte", language)}</option>
                       <option value="Assurances Flotte">{translateCategory("Assurances Flotte", language)}</option>
                       <option value="Cartes de Transport & Régularisations">{translateCategory("Cartes de Transport & Régularisations", language)}</option>
+                      <option value="Impôts & Taxes d’État">{translateCategory("Impôts & Taxes d’État", language)}</option>
                       <option value="Transport Urbain (Yango)">{translateCategory("Transport Urbain (Yango)", language)}</option>
                       <option value="Frais Bancaires & Wave">{translateCategory("Frais Bancaires & Wave", language)}</option>
                       <option value="GPS, Télécoms & Énergie">{translateCategory("GPS, Télécoms & Énergie", language)}</option>

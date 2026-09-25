@@ -30,8 +30,8 @@ function SectionTitle({ icon: Icon, title, description }) {
   );
 }
 
-function FinanceItem({ item, formatCurrency, onDelete }) {
-  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString() + " CFA";
+function FinanceItem({ item, formatCurrency, onDelete, isEn = false }) {
+  const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString(isEn ? "en-US" : "fr-FR") + " CFA";
   return (
     <div className="rounded-[20px] border border-white/8 bg-black/18 p-3">
       <div className="flex items-start justify-between gap-3">
@@ -53,7 +53,7 @@ function FinanceItem({ item, formatCurrency, onDelete }) {
             className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 transition hover:bg-white/[0.08]"
           >
             <FileDown className="size-3.5" />
-            Voir
+            {isEn ? "View" : "Voir"}
           </a>
           <button
             type="button"
@@ -61,7 +61,7 @@ function FinanceItem({ item, formatCurrency, onDelete }) {
             className="inline-flex items-center gap-1 rounded-full border border-[#cf5d56]/22 bg-[#cf5d56]/10 px-2.5 py-1 text-[#ff8f84] transition hover:bg-[#cf5d56]/18"
           >
             <Trash2 className="size-3.5" />
-            Suppr.
+            {isEn ? "Delete" : "Suppr."}
           </button>
         </div>
       </div>
@@ -100,6 +100,18 @@ export function FinanceWorkspace({
   const safeIncomes = incomeRecords || (type === "income" ? records : []) || [];
   const safeDocs = documentRecords || [];
   const format = typeof formatCurrency === "function" ? formatCurrency : (val) => Number(val || 0).toLocaleString(locale) + " CFA";
+
+  const safeExpenseCategories = (expenseCategories && expenseCategories.length > 0)
+    ? expenseCategories
+    : (Array.isArray(categories?.expense) && categories.expense.length > 0
+        ? categories.expense
+        : ["Carburant", "Péage", "Police", "Repas", "Maintenance", "Autre"]);
+
+  const safeIncomeCategories = (incomeCategories && incomeCategories.length > 0)
+    ? incomeCategories
+    : (Array.isArray(categories?.income) && categories.income.length > 0
+        ? categories.income
+        : ["Recette trajet", "Facture Client", "Apport"]);
 
   const [expenseReference, setExpenseReference] = useState("");
   const [expenseDate, setExpenseDate] = useState("");
@@ -289,8 +301,8 @@ export function FinanceWorkspace({
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">{isEn ? "Expense category" : "Categorie depense"}</option>
-              {expenseCategories.map((value) => (
+              <option value="">{isEn ? "Expense category" : "Catégorie dépense"}</option>
+              {safeExpenseCategories.map((value) => (
                 <option key={value} value={value}>{translateCategory(value, language)}</option>
               ))}
             </select>
@@ -310,7 +322,7 @@ export function FinanceWorkspace({
               <option>Cash</option>
               <option>{isEn ? "Bank Wire" : "Virement"}</option>
               <option>Mobile Money</option>
-              <option>{isEn ? "Check" : "Cheque"}</option>
+              <option>{isEn ? "Check" : "Chèque"}</option>
             </select>
             <input
               ref={expenseFileRef}
@@ -324,24 +336,24 @@ export function FinanceWorkspace({
               className="inline-flex items-center gap-2 rounded-full border border-[#cf5d56]/45 bg-[#cf5d56] px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
             >
               <ReceiptText className="size-4" />
-              {isEn ? "Add Expense" : "Ajouter depense"}
+              {isEn ? "Add Expense" : "Ajouter dépense"}
             </button>
           </form>
 
           <div className="mt-4 space-y-2">
             {expenseRecords.slice(0, 5).map((item) => (
-              <FinanceItem key={item.id} item={{ ...item, amountTone: "text-[#ff8f84]" }} formatCurrency={formatCurrency} onDelete={onDeleteExpense} />
+              <FinanceItem key={item.id} item={{ ...item, amountTone: "text-[#ff8f84]" }} formatCurrency={formatCurrency} onDelete={onDeleteExpense} isEn={isEn} />
             ))}
           </div>
         </article>
 
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("encaissements")}`}>
-          <SectionTitle icon={HandCoins} title={isEn ? "Inflows / Revenue" : "Encaissements"} description={isEn ? "Enter received revenue invoices and upload proof." : "Saisir les factures encaissees et charger la preuve."} />
+          <SectionTitle icon={HandCoins} title={isEn ? "Inflows / Revenue" : "Encaissements"} description={isEn ? "Enter received revenue invoices and upload proof." : "Saisir les factures encaissées et charger la preuve."} />
           <form className="mt-4 space-y-3" onSubmit={submitIncome}>
             <input
               value={incomeReference}
               onChange={(event) => setIncomeReference(event.target.value)}
-              placeholder={isEn ? "Inflow invoice reference" : "Reference facture encaissee"}
+              placeholder={isEn ? "Inflow invoice reference" : "Référence facture encaissée"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <input
@@ -356,12 +368,12 @@ export function FinanceWorkspace({
               step="1"
               value={incomeAmount}
               onChange={(event) => setIncomeAmount(event.target.value)}
-              placeholder={isEn ? "Amount received CFA" : "Montant encaisse CFA"}
+              placeholder={isEn ? "Amount received CFA" : "Montant encaissé CFA"}
               className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]"
             />
             <select value={incomeCategory} onChange={(event) => setIncomeCategory(event.target.value)} className="h-11 w-full rounded-xl border border-white/8 bg-black/25 px-3 text-sm outline-none transition focus:border-[#cf5d56]">
-              <option value="">{isEn ? "Inflow category" : "Categorie encaissement"}</option>
-              {incomeCategories.map((value) => (
+              <option value="">{isEn ? "Inflow category" : "Catégorie encaissement"}</option>
+              {safeIncomeCategories.map((value) => (
                 <option key={value} value={value}>{translateCategory(value, language)}</option>
               ))}
             </select>
@@ -381,7 +393,7 @@ export function FinanceWorkspace({
               <option value="Cash">Cash</option>
               <option value="Virement">{isEn ? "Bank Wire" : "Virement"}</option>
               <option value="Mobile Money">Mobile Money</option>
-              <option value="Cheque">{isEn ? "Check" : "Cheque"}</option>
+              <option value="Cheque">{isEn ? "Check" : "Chèque"}</option>
             </select>
             <input
               ref={incomeFileRef}
@@ -401,18 +413,18 @@ export function FinanceWorkspace({
 
           <div className="mt-4 space-y-2">
             {incomeRecords.slice(0, 5).map((item) => (
-              <FinanceItem key={item.id} item={{ ...item, amountTone: "text-[#9fe3b9]" }} formatCurrency={formatCurrency} onDelete={onDeleteIncome} />
+              <FinanceItem key={item.id} item={{ ...item, amountTone: "text-[#9fe3b9]" }} formatCurrency={formatCurrency} onDelete={onDeleteIncome} isEn={isEn} />
             ))}
           </div>
         </article>
 
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("documents")}`}>
-          <SectionTitle icon={FileCheck2} title={isEn ? "Linked Documents" : "Documents lies"} description={isEn ? "Documents created from OCR or accounting import." : "Documents crees depuis OCR ou import comptable."} />
+          <SectionTitle icon={FileCheck2} title={isEn ? "Linked Documents" : "Documents liés"} description={isEn ? "Documents created from OCR or accounting import." : "Documents créés depuis OCR ou import comptable."} />
           <div className="mt-4 space-y-2">
             {documentRecords.slice(0, 8).map((item) => (
-              <FinanceItem key={item.id} item={item} formatCurrency={formatCurrency} onDelete={onDeleteDocument} />
+              <FinanceItem key={item.id} item={item} formatCurrency={formatCurrency} onDelete={onDeleteDocument} isEn={isEn} />
             ))}
-            {!documentRecords.length ? <p className="text-sm text-white/45">{isEn ? "No linked documents." : "Aucun document lie."}</p> : null}
+            {!documentRecords.length ? <p className="text-sm text-white/45">{isEn ? "No linked documents." : "Aucun document lié."}</p> : null}
           </div>
         </article>
       </section>
