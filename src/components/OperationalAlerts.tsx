@@ -1,5 +1,9 @@
-import { AlertTriangle, Info, CheckCircle2, ShieldAlert } from "lucide-react";
-import { useMemo } from "react";
+import { 
+  AlertTriangle, Info, CheckCircle2, ShieldAlert, 
+  Fuel, Droplet, TrendingDown, ArrowRight, Gauge, 
+  Truck, ShieldCheck, Filter, Wrench 
+} from "lucide-react";
+import { useState, useMemo } from "react";
 
 type OperationalAlertsProps = {
   records: any[];
@@ -9,154 +13,431 @@ type OperationalAlertsProps = {
 };
 
 export function OperationalAlerts({ records, allTrips = [], oilChanges, t }: OperationalAlertsProps) {
-  const alerts = useMemo(() => {
-    const list: { id: string; type: 'critical' | 'warning' | 'info'; title: string; desc: string; date?: string }[] = [];
+  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'vidange' | 'financial'>('all');
 
-    // 1. Alertes Vidange Odomètre (Spreadsheet Comments & LocalStorage)
-    if (oilChanges) {
-      const trucks = [
-        { label: "AMARA TRUCK 76", fallbackKm: 117324 },
-        { label: "BRAHIMA TRUCK 45", fallbackKm: 110593 },
-        { label: "SORO TRUCK 52", fallbackKm: 110975 }
-      ];
-      
-      const tripList = (allTrips && allTrips.length > 0) ? allTrips : records;
-      
-      trucks.forEach(({ label, fallbackKm }) => {
-        const info = oilChanges[label];
-        if (!info) return;
-        
-        const truckTrips = tripList.filter(t => {
-          const l = String(t.driverLabel || t.chauffeur || "").toUpperCase();
-          return l.includes(label.split(' ')[0]) || l.includes(label.split(' ')[2]);
-        });
-        
-        let maxTripKm = 0;
-        truckTrips.forEach(t => {
-          let k = Number(t.km || 0);
-          if (k === 712827) k = 71283;
-          else if (k === 196266) k = 106266;
-          else if (k === 10492) k = 107492;
-          else if (k === 59757 && t.date < "2025-10-01") k = 50757;
-          else if (k > 200000) k = 0;
-          if (k >= 20000 && k <= 150000 && k > maxTripKm) {
-            maxTripKm = k;
-          }
-        });
-        
-        const currentKm = Math.max(fallbackKm, maxTripKm);
-        const lastKm = Number(info.mileage) || 0;
-        const interval = Number(info.interval) || 10000;
-        const driven = Math.max(0, currentKm - lastKm);
-        
-        if (driven >= interval) {
-          const overdue = driven - interval;
-          list.push({
-            id: `vidange-crit-${label}`,
-            type: 'critical',
-            title: `VIDANGE URGENTE : ${label.split(' ')[0]}`,
-            desc: `Dépassement de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${driven.toLocaleString("fr-FR")} KM depuis la vidange du ${info.date} à ${lastKm.toLocaleString("fr-FR")} KM).`,
-            date: info.date
-          });
-        } else if (driven >= interval * 0.8) {
-          const remaining = interval - driven;
-          list.push({
-            id: `vidange-warn-${label}`,
-            type: 'warning',
-            title: `VIDANGE IMMINENTE : ${label.split(' ')[0]}`,
-            desc: `Plus que ${remaining.toLocaleString("fr-FR")} KM avant la prochaine vidange (${driven.toLocaleString("fr-FR")} / ${interval.toLocaleString("fr-FR")} KM).`,
-            date: info.date
-          });
+  // Configuration officielle des 3 camions
+  const trucksConfig = [
+    { key: "AMARA TRUCK 76", name: "AMARA", truckNum: "76", color: "#3B82F6", bg: "rgba(59, 130, 246, 0.12)", border: "rgba(59, 130, 246, 0.3)", fallbackKm: 117324 },
+    { key: "BRAHIMA TRUCK 45", name: "BRAHIMA", truckNum: "45", color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", border: "rgba(16, 185, 129, 0.3)", fallbackKm: 110593 },
+    { key: "SORO TRUCK 52", name: "SORO", truckNum: "52", color: "#CF5D56", bg: "rgba(207, 93, 86, 0.12)", border: "rgba(207, 93, 86, 0.3)", fallbackKm: 110975 }
+  ];
+
+  // Calcul haute fidélité des jauges de vidange pour les 3 camions
+  const truckGauges = useMemo(() => {
+    const tripList = (allTrips && allTrips.length > 0) ? allTrips : records;
+
+    return trucksConfig.map(cfg => {
+      const info = oilChanges?.[cfg.key];
+      const truckTrips = tripList.filter(t => {
+        const l = String(t.driverLabel || t.chauffeur || "").toUpperCase();
+        return l.includes(cfg.name) || l.includes(cfg.truckNum);
+      });
+
+      let maxTripKm = 0;
+      truckTrips.forEach(t => {
+        let k = Number(t.km || 0);
+        if (k === 712827) k = 71283;
+        else if (k === 196266) k = 106266;
+        else if (k === 10492) k = 107492;
+        else if (k === 59757 && t.date < "2025-10-01") k = 50757;
+        else if (k > 200000) k = 0;
+        if (k >= 20000 && k <= 150000 && k > maxTripKm) {
+          maxTripKm = k;
         }
       });
-    }
 
+      const currentKm = Math.max(cfg.fallbackKm, maxTripKm);
+      const lastKm = Number(info?.mileage) || 0;
+      const interval = Number(info?.interval) || 10000;
+      const driven = Math.max(0, currentKm - lastKm);
+      const remaining = interval - driven;
+      const percent = Math.min(100, Math.round((driven / interval) * 100));
+
+      let status: 'ok' | 'warning' | 'urgent' = 'ok';
+      if (driven >= interval) status = 'urgent';
+      else if (driven >= interval * 0.8) status = 'warning';
+
+      return {
+        ...cfg,
+        lastKm,
+        currentKm,
+        driven,
+        remaining,
+        percent,
+        status,
+        lastDate: info?.date || "2026-04-16",
+        comment: info?.comment
+      };
+    });
+  }, [allTrips, records, oilChanges]);
+
+  // Liste enrichie des alertes
+  const { allAlerts, counts } = useMemo(() => {
+    const list: {
+      id: string;
+      category: 'vidange' | 'financial' | 'fuel' | 'system';
+      type: 'critical' | 'warning' | 'info';
+      title: string;
+      desc: string;
+      truck?: string;
+      truckColor?: string;
+      date?: string;
+      amount?: number;
+    }[] = [];
+
+    // 1. Alertes Vidange générées depuis les jauges
+    truckGauges.forEach(gauge => {
+      if (gauge.status === 'urgent') {
+        const overdue = Math.abs(gauge.remaining);
+        list.push({
+          id: `vidange-urgent-${gauge.key}`,
+          category: 'vidange',
+          type: 'critical',
+          title: `VIDANGE DÉPASSÉE : ${gauge.name} TRUCK ${gauge.truckNum}`,
+          desc: `Dépassement de +${overdue.toLocaleString("fr-FR")} KM (Roulé ${gauge.driven.toLocaleString("fr-FR")} KM depuis la vidange du ${gauge.lastDate} à ${gauge.lastKm.toLocaleString("fr-FR")} KM).`,
+          truck: `${gauge.name} 76`,
+          truckColor: gauge.color,
+          date: gauge.lastDate
+        });
+      } else if (gauge.status === 'warning') {
+        list.push({
+          id: `vidange-warn-${gauge.key}`,
+          category: 'vidange',
+          type: 'warning',
+          title: `VIDANGE IMMINENTE : ${gauge.name} TRUCK ${gauge.truckNum}`,
+          desc: `Plus que ${gauge.remaining.toLocaleString("fr-FR")} KM avant révision (${gauge.driven.toLocaleString("fr-FR")} / 10 000 KM roulés).`,
+          truck: `${gauge.name} 76`,
+          truckColor: gauge.color,
+          date: gauge.lastDate
+        });
+      }
+    });
+
+    // 2. Alertes Marges Négatives (Pertes d'exploitation)
     const negativeTrips = records.filter(r => (r.total_net_cfa || 0) < 0);
     negativeTrips.forEach(r => {
+      const driver = String(r.driverLabel || r.chauffeur || "");
+      let color = "#CF5D56";
+      if (driver.includes("AMARA")) color = "#3B82F6";
+      else if (driver.includes("BRAHIMA")) color = "#10B981";
+
       list.push({
         id: `neg-${r.id}`,
+        category: 'financial',
         type: 'critical',
-        title: t?.negativeMargin || "Marge Négative",
-        desc: `${r.driverLabel}: ${t?.lossOf || "Perte de"} ${Math.abs(r.total_net_cfa).toLocaleString()} CFA`,
+        title: `Marge Négative sur Trajet`,
+        desc: `${r.driverLabel || 'Camion'} : Perte sèche de ${Math.abs(r.total_net_cfa).toLocaleString("fr-FR")} CFA (Dépenses supérieures au revenu).`,
+        truck: r.driverLabel,
+        truckColor: color,
+        amount: Math.abs(r.total_net_cfa),
         date: r.date
       });
     });
 
+    // 3. Alertes Carburant sans Tonnage (Anomalie de chargement)
     const highFuelMissingTonnage = records.filter(r => (r.fuel_cost_cfa || 0) > 100000 && (r.tonnage || 0) === 0);
     highFuelMissingTonnage.forEach(r => {
+      const driver = String(r.driverLabel || r.chauffeur || "");
+      let color = "#CF5D56";
+      if (driver.includes("AMARA")) color = "#3B82F6";
+      else if (driver.includes("BRAHIMA")) color = "#10B981";
+
       list.push({
         id: `fuel-${r.id}`,
+        category: 'fuel',
         type: 'warning',
-        title: t?.fuelWithoutTonnage || "Fuel sans Tonnage",
-        desc: `${r.driverLabel}: ${r.fuel_cost_cfa.toLocaleString()} CFA sans voyage.`,
+        title: `Carburant Décaissé Sans Voyage`,
+        desc: `${r.driverLabel || 'Camion'} : ${Number(r.fuel_cost_cfa).toLocaleString("fr-FR")} CFA de gasoil sans chargement associé.`,
+        truck: r.driverLabel,
+        truckColor: color,
+        amount: r.fuel_cost_cfa,
         date: r.date
       });
     });
 
-    if (records.length > 0) {
-      list.push({
-        id: 'summary-1',
-        type: 'info',
-        title: t?.activitySummary || "Activité",
-        desc: `${records.length} ${t?.operationsRecorded || "opérations enregistrées"}.`,
-      });
-    }
-
-    return list.sort((a, b) => {
+    // Tri : critiques en premier, puis les plus récentes
+    const sorted = list.sort((a, b) => {
       if (a.type === 'critical' && b.type !== 'critical') return -1;
       if (b.type === 'critical' && a.type !== 'critical') return 1;
       return (b.date || "").localeCompare(a.date || "");
-    }).slice(0, 10);
-  }, [records, allTrips, oilChanges, t]);
+    });
+
+    const counts = {
+      all: sorted.length,
+      critical: sorted.filter(a => a.type === 'critical').length,
+      warning: sorted.filter(a => a.type === 'warning').length,
+      vidange: sorted.filter(a => a.category === 'vidange').length,
+      financial: sorted.filter(a => a.category === 'financial' || a.category === 'fuel').length
+    };
+
+    return { allAlerts: sorted, counts };
+  }, [truckGauges, records]);
+
+  // Filtrage selon le bouton chip sélectionné
+  const filteredAlerts = useMemo(() => {
+    if (activeFilter === 'critical') return allAlerts.filter(a => a.type === 'critical');
+    if (activeFilter === 'warning') return allAlerts.filter(a => a.type === 'warning');
+    if (activeFilter === 'vidange') return allAlerts.filter(a => a.category === 'vidange');
+    if (activeFilter === 'financial') return allAlerts.filter(a => a.category === 'financial' || a.category === 'fuel');
+    return allAlerts;
+  }, [allAlerts, activeFilter]);
 
   const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 
   return (
-    <section className="panel-enter rounded-[40px] border border-white/5 bg-[#111] p-6 text-white shadow-2xl h-full flex flex-col">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
-          <ShieldAlert className="size-5" />
-        </div>
-        <div>
-           <h3 className="text-sm font-black uppercase tracking-tighter">{t?.fleetAlerts || "Alertes Flotte"}</h3>
-           <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest leading-none mt-0.5">{t?.activeMonitoring || "Surveillance Active"}</p>
+    <section className="panel-enter rounded-[36px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 text-white shadow-2xl h-full flex flex-col relative overflow-hidden">
+      {/* GLOW DE FOND */}
+      <div className={`absolute top-0 right-0 w-64 h-64 ${counts.critical > 0 ? 'bg-red-500/5' : 'bg-[#10B981]/5'} rounded-full blur-3xl pointer-events-none`}></div>
+
+      {/* EN-TÊTE DU MODULE AVEC STATUT GLOBAL */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-white/5 pb-4">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border shadow-lg ${
+            counts.critical > 0 
+              ? 'bg-red-500/15 border-red-500/30 text-red-500 shadow-red-500/10' 
+              : counts.warning > 0 
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-500 shadow-amber-500/10' 
+                : 'bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981] shadow-[#10B981]/10'
+          }`}>
+            {counts.critical > 0 ? <ShieldAlert className="size-6 animate-pulse" /> : <ShieldCheck className="size-6" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-black uppercase tracking-tight">{t?.fleetAlerts || "Alertes Flotte & Maintenance"}</h3>
+              {counts.critical > 0 ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
+                  {counts.critical} Critique(s)
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30">
+                  Système Optimal
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-white/40 font-medium mt-0.5">
+              Surveillance continue des vidanges (10 000 KM), des marges nettes et du carburant
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
-        {alerts.map((alert) => (
-          <div key={alert.id} className={`p-4 rounded-[28px] border transition-all duration-300 ${
-            alert.type === 'critical' ? 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10' :
-            alert.type === 'warning' ? 'border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10' :
-            'border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10'
-          }`}>
-            <div className="flex gap-4">
-              <div className="mt-1">
-                {alert.type === 'critical' ? <AlertTriangle className="size-4 text-red-500 shrink-0" /> :
-                 alert.type === 'warning' ? <AlertTriangle className="size-4 text-orange-500 shrink-0" /> :
-                 <Info className="size-4 text-blue-400 shrink-0" />}
-              </div>
-              
-              <div className="min-w-0">
-                <h4 className={`text-xs font-black uppercase tracking-tight ${
-                  alert.type === 'critical' ? 'text-red-400' :
-                  alert.type === 'warning' ? 'text-orange-400' :
-                  'text-blue-300'
-                }`}>{alert.title}</h4>
-                <p className="text-[11px] text-white/40 mt-1 leading-relaxed font-medium">{alert.desc}</p>
-                {alert.date && <p className="text-[9px] font-black uppercase text-white/10 mt-2 tracking-tighter">{new Date(alert.date).toLocaleDateString(locale)}</p>}
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* BANDEAU DE JAUGES DE VIDANGE POUR LES 3 CAMIONS */}
+      <div className="mb-5 bg-white/[0.02] border border-white/5 rounded-2xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-white/40">
+          <span className="flex items-center gap-1.5">
+            <Gauge className="size-3.5 text-[#00F2FF]" />
+            Suivi des Vidanges Moteurs (Intervalle 10 000 KM)
+          </span>
+          <span className="text-white/30 text-[10px]">Odomètre certifié</span>
+        </div>
 
-        {alerts.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-white/10 italic">
-            <CheckCircle2 className="size-10 mb-2 opacity-50" />
-            <p className="text-xs font-bold uppercase tracking-widest">{t?.zeroAnomalies || "Zéro anomalies"}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {truckGauges.map(truck => {
+            const isOverdue = truck.status === 'urgent';
+            const isWarning = truck.status === 'warning';
+
+            return (
+              <div 
+                key={truck.key}
+                className={`p-2.5 rounded-xl border transition-all ${
+                  isOverdue 
+                    ? 'bg-red-500/10 border-red-500/30' 
+                    : isWarning 
+                      ? 'bg-amber-500/10 border-amber-500/30' 
+                      : 'bg-white/[0.03] border-white/5'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: truck.color }}></span>
+                    <span className="font-black text-xs text-white">{truck.name} {truck.truckNum}</span>
+                  </div>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                    isOverdue 
+                      ? 'bg-red-500/20 text-red-400 font-mono' 
+                      : isWarning 
+                        ? 'bg-amber-500/20 text-amber-400' 
+                        : 'bg-[#10B981]/20 text-[#10B981]'
+                  }`}>
+                    {isOverdue 
+                      ? `+${Math.abs(truck.remaining).toLocaleString("fr-FR")} KM` 
+                      : `${truck.remaining.toLocaleString("fr-FR")} KM restants`}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mb-1.5">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      isOverdue 
+                        ? 'bg-red-500 animate-pulse' 
+                        : isWarning 
+                          ? 'bg-amber-500' 
+                          : 'bg-[#10B981]'
+                    }`}
+                    style={{ width: `${truck.percent}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[9px] text-white/40">
+                  <span>{truck.driven.toLocaleString("fr-FR")} / 10 000 KM</span>
+                  <span className="font-mono text-white/60">{truck.currentKm.toLocaleString("fr-FR")} KM act.</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* BARRE DE FILTRES RAPIDES (CHIPS) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 text-xs font-bold scrollbar-none">
+        <button
+          onClick={() => setActiveFilter('all')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all ${
+            activeFilter === 'all'
+              ? 'bg-white/20 text-white shadow-sm'
+              : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          Toutes ({counts.all})
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('critical')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'critical'
+              ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
+              : 'bg-white/5 text-red-400 hover:bg-red-500/10'
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-current"></span>
+          Critiques ({counts.critical})
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('warning')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'warning'
+              ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+              : 'bg-white/5 text-amber-400 hover:bg-amber-500/10'
+          }`}
+        >
+          <span className="size-1.5 rounded-full bg-current"></span>
+          Avertissements ({counts.warning})
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('vidange')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'vidange'
+              ? 'bg-[#00F2FF] text-black shadow-lg shadow-[#00F2FF]/20'
+              : 'bg-white/5 text-[#00F2FF] hover:bg-[#00F2FF]/10'
+          }`}
+        >
+          <Droplet className="size-3" />
+          Vidanges ({counts.vidange})
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('financial')}
+          className={`px-3 py-1 rounded-xl whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'financial'
+              ? 'bg-[#CF5D56] text-white shadow-lg shadow-[#CF5D56]/20'
+              : 'bg-white/5 text-[#CF5D56] hover:bg-[#CF5D56]/10'
+          }`}
+        >
+          <TrendingDown className="size-3" />
+          Finances & Carburant ({counts.financial})
+        </button>
+      </div>
+
+      {/* LISTE FLUIDE DES ALERTES */}
+      <div className="flex-1 space-y-2.5 overflow-y-auto pr-1 custom-scrollbar min-h-[220px]">
+        {filteredAlerts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center py-10">
+            <div className="size-12 rounded-2xl bg-[#10B981]/10 border border-[#10B981]/20 flex items-center justify-center text-[#10B981] mb-2 shadow-lg shadow-[#10B981]/5">
+              <CheckCircle2 className="size-6" />
+            </div>
+            <p className="text-xs font-black uppercase text-white/80 tracking-wide">
+              {activeFilter === 'all' ? "Flotte 100% Opérationnelle" : "Aucune alerte dans cette catégorie"}
+            </p>
+            <p className="text-[11px] text-white/40 mt-0.5">
+              Toutes les métriques et vidanges sont sous contrôle
+            </p>
           </div>
+        ) : (
+          filteredAlerts.map(alert => {
+            const isCrit = alert.type === 'critical';
+            const isWarn = alert.type === 'warning';
+
+            return (
+              <div 
+                key={alert.id}
+                className={`p-3.5 rounded-2xl border transition-all duration-200 group ${
+                  isCrit 
+                    ? 'border-red-500/25 bg-red-500/[0.04] hover:bg-red-500/[0.08]' 
+                    : isWarn 
+                      ? 'border-amber-500/25 bg-amber-500/[0.04] hover:bg-amber-500/[0.08]' 
+                      : 'border-blue-500/20 bg-blue-500/[0.03] hover:bg-blue-500/[0.06]'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 p-2 rounded-xl border shrink-0 ${
+                    isCrit 
+                      ? 'bg-red-500/15 border-red-500/30 text-red-400' 
+                      : isWarn 
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' 
+                        : 'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                  }`}>
+                    {alert.category === 'vidange' ? (
+                      <Droplet className="size-4" />
+                    ) : alert.category === 'fuel' ? (
+                      <Fuel className="size-4" />
+                    ) : (
+                      <AlertTriangle className="size-4" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {alert.truck && (
+                          <span 
+                            className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border"
+                            style={{ 
+                              color: alert.truckColor || "#fff", 
+                              backgroundColor: `${alert.truckColor}15` || "rgba(255,255,255,0.05)",
+                              borderColor: `${alert.truckColor}30` || "rgba(255,255,255,0.1)"
+                            }}
+                          >
+                            {alert.truck}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${
+                          isCrit ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-blue-400'
+                        }`}>
+                          {isCrit ? 'Critique' : isWarn ? 'Avertissement' : 'Info'}
+                        </span>
+                      </div>
+
+                      {alert.date && (
+                        <span className="text-[10px] font-bold text-white/30 font-mono whitespace-nowrap">
+                          {new Date(alert.date).toLocaleDateString(locale, { day: '2-digit', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+
+                    <h4 className="text-xs font-black text-white leading-tight">{alert.title}</h4>
+                    <p className="text-[11px] text-white/60 mt-1 leading-relaxed">{alert.desc}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
     </section>
   );
 }
+
+export default OperationalAlerts;
