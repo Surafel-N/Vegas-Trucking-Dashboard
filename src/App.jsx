@@ -79,6 +79,8 @@ import { DriversModule } from "./components/DriversModule";
 import ManualEntryModule from "./components/ManualEntryModule";
 import AITicketValidationModule from "./components/AITicketValidationModule";
 import AccountingModule, { INITIAL_INVOICES } from "./components/AccountingModule";
+import { parseSpreadsheetAccounting } from "./utils/accountingParser";
+import { INITIAL_ACCOUNTING_TRANSACTIONS } from "./utils/accountingInitialData";
 
 const APP_STORAGE_KEYS = {
   auth: "sdv_auth_session_v1",
@@ -95,7 +97,8 @@ const APP_STORAGE_KEYS = {
   ui: "sdv_cms_ui_v1",
   pending_ai_tickets: "sdv_pending_ai_tickets_v1",
   maintenance: "sdv_maintenance_v1",
-  oil_changes: "sdv_oil_changes_v1"
+  oil_changes: "sdv_oil_changes_v1",
+  accounting_transactions: "sdv_accounting_transactions_v2"
 };
 
 // Données initiales certifiées de dernière vidange (extraites des commentaires Spreedsheet)
@@ -595,10 +598,15 @@ export default function App() {
   const [incomeRecords, setIncomeRecords] = useState(() => loadFinanceRecords("incomes"));
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
   const [invoices, setInvoices] = useState(() => loadJson(APP_STORAGE_KEYS.invoices, INITIAL_INVOICES));
+  const [accountingTransactions, setAccountingTransactions] = useState(() => loadJson(APP_STORAGE_KEYS.accounting_transactions, INITIAL_ACCOUNTING_TRANSACTIONS));
 
   useEffect(() => {
     saveJson(APP_STORAGE_KEYS.invoices, invoices);
   }, [invoices]);
+
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.accounting_transactions, accountingTransactions);
+  }, [accountingTransactions]);
 
   useEffect(() => {
     saveFinanceRecords("expenses", expenseRecords);
@@ -627,9 +635,11 @@ export default function App() {
             
             const res = await fetch(url, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
             const data = await res.json();
-            const counts = processMaintenanceData(data.sheets[0].data[0].rowData);
+            const rawRows = data?.sheets?.[0]?.data?.[0]?.rowData || [];
+            const counts = processMaintenanceData(rawRows);
+            const acctCount = processAccountingSpreadsheet(rawRows);
             
-            alert(`SYNC TERMINÉE : ${counts.maintenance} Maintenances et ${counts.expenses} Dépenses récupérées.`);
+            alert(`SYNC TERMINÉE : ${counts.maintenance} Maintenances, ${counts.expenses} Dépenses et ${acctCount} Écritures Comptables récupérées.`);
             setIsSyncingMaintenance(false);
           }
         },
@@ -984,6 +994,20 @@ export default function App() {
     return { maintenance: maintenanceList.length, expenses: expensesList.length };
   };
 
+  const processAccountingSpreadsheet = (rowData) => {
+    if (!rowData) return 0;
+    try {
+      const { transactions: parsedTx } = parseSpreadsheetAccounting(rowData);
+      if (parsedTx && parsedTx.length > 0) {
+        setAccountingTransactions(parsedTx);
+        return parsedTx.length;
+      }
+    } catch (err) {
+      console.error("Error parsing accounting spreadsheet:", err);
+    }
+    return 0;
+  };
+
   // Fonction de synchronisation silencieuse (sans popup)
   const performSilentSync = async () => {
     if (isSyncing || isSyncingMaintenance) return;
@@ -1000,7 +1024,8 @@ export default function App() {
         const data = await backendRes.json();
         const tripsCount = processTripsData(data.trips);
         const maintCount = processMaintenanceData(data.maintenance);
-        console.log(`Auto-sync (Backend): ${tripsCount} trajets, ${maintCount.maintenance} maintenances.`);
+        const acctCount = processAccountingSpreadsheet(data.maintenance);
+        console.log(`Auto-sync (Backend): ${tripsCount} trajets, ${maintCount.maintenance} maintenances, ${acctCount} écritures comptables.`);
         setIsSyncing(false);
         setIsSyncingMaintenance(false);
         return;
@@ -1019,6 +1044,7 @@ export default function App() {
           
           processTripsData(tripsData);
           processMaintenanceData(maintenanceData);
+          processAccountingSpreadsheet(maintenanceData);
           console.log("Auto-sync (API Key) réussie.");
           setIsSyncing(false);
           setIsSyncingMaintenance(false);
@@ -1277,8 +1303,12 @@ export default function App() {
               )}
               {activeSection === "comptabilite" && (
                 <AccountingModule 
+                  transactions={accountingTransactions}
+                  setTransactions={rolePermissions.canEdit ? setAccountingTransactions : null}
                   invoices={invoices} 
                   setInvoices={rolePermissions.canEdit ? setInvoices : null} 
+                  onSync={syncMaintenanceAndExpenses}
+                  isSyncing={isSyncingMaintenance}
                   formatCurrency={formatCurrency} 
                   formatTonnage={formatTonnage} 
                   canWrite={rolePermissions.canEdit} 
