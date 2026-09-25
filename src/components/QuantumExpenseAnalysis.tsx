@@ -4,8 +4,7 @@ import {
   Pie, 
   Cell, 
   ResponsiveContainer, 
-  Tooltip,
-  Sector
+  Tooltip
 } from 'recharts';
 import { 
   Fuel, 
@@ -23,10 +22,17 @@ import {
   ArrowUpRight,
   Info,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  DollarSign
 } from 'lucide-react';
 
-// --- PALETTE DE COULEURS CLARIFIÉE & CONTRASTÉE ---
+// --- PALETTE DE COULEURS HARMONISÉE & CONTRASTÉE ---
 export const QUANTUM_PALETTE = {
   // Par Nature de Frais
   fuel: { color: "#00F2FF", light: "#A5F3FC", bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-400" },
@@ -45,28 +51,79 @@ export const QUANTUM_PALETTE = {
   }
 };
 
+export const TRUCKS_CONFIG = [
+  { key: "AMARA", label: "AMARA TRUCK 76", shortName: "AMARA", unit: "76", plate: "AA-672-PS", color: "#3B82F6" },
+  { key: "BRAHIMA", label: "BRAHIMA TRUCK 45", shortName: "BRAHIMA", unit: "45", plate: "AA-736-PK", color: "#10B981" },
+  { key: "SORO", label: "SORO TRUCK 52", shortName: "SORO", unit: "52", plate: "AA-579-PJ", color: "#CF5D56" }
+];
+
 type QuantumProps = {
   data: any[];
   maintenanceTotal: number;
-  formatCurrency: (val: number, curr?: string) => string;
+  maintenanceRecords?: any[];
+  allMaintenanceRecords?: any[];
+  formatCurrency?: (val: number, curr?: string) => string;
   currency?: string;
   t?: any;
   records?: any[];
   allTrips?: any[];
 };
 
+// Helper pour calculer le numéro de semaine ISO
+function getWeekInfo(dateStr: string) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - dayNr);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const startStr = `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')}`;
+  const endStr = `${sunday.getDate().toString().padStart(2, '0')}/${(sunday.getMonth() + 1).toString().padStart(2, '0')}`;
+
+  return {
+    year: d.getFullYear(),
+    week,
+    key: `${d.getFullYear()}-W${String(week).padStart(2, '0')}`,
+    label: `Semaine ${week} (${startStr} - ${endStr})`
+  };
+}
+
 export function QuantumExpenseAnalysis({ 
   data = [], 
   maintenanceTotal = 0, 
+  maintenanceRecords = [],
+  allMaintenanceRecords = [],
   formatCurrency, 
   currency = "CFA",
   t, 
   records = [],
   allTrips = []
 }: QuantumProps) {
-  // Mode de perspective : "nature" (par type de coût) ou "driver" (par véhicule)
-  const [perspective, setPerspective] = useState<"nature" | "driver">("nature");
-  // Index de la tranche survolée pour le centre dynamique
+  // Mode de vue : "driver" (par camion) par défaut ou "nature" (par type de coût)
+  const [perspective, setPerspective] = useState<"driver" | "nature">("driver");
+  // Granularité temporelle : "global" | "year" | "month" | "week" | "day"
+  const [timeScale, setTimeScale] = useState<"global" | "year" | "month" | "week" | "day">("global");
+  
+  // Période sélectionnée dans le sélecteur contextuel
+  const [selectedYear, setSelectedYear] = useState<string>("2026");
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const [selectedDay, setSelectedDay] = useState<string>("");
+  
+  // Accordéon / détail étendu par camion
+  const [expandedTruck, setExpandedTruck] = useState<string | null>(null);
+  // Tranche survolée sur le Donut
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const formatMoney = (val: number) => {
@@ -74,306 +131,494 @@ export function QuantumExpenseAnalysis({
     return `${new Intl.NumberFormat('fr-FR').format(Math.round(val))} ${currency}`;
   };
 
-  // --- 1. CALCULS ANALYTIQUES GLOBAUX ---
-  const stats = useMemo(() => {
-    // Calcul des totaux opérationnels en une seule passe
-    const sums = data.reduce((acc, row) => ({
-      fuel: acc.fuel + (Number(row.fuel_cost_cfa) || 0),
-      road: acc.road + (Number(row.road_fees_cfa) || 0),
-      police: acc.police + (Number(row.police_fees_cfa) || 0),
-      food: acc.food + (Number(row.food_fees_cfa) || 0),
-      extra: acc.extra + (Number(row.other_expenses_cfa) || 0),
-      gross: acc.gross + (Number(row.total_gross_cfa) || 0),
-      net: acc.net + (Number(row.total_net_cfa) || 0)
-    }), { fuel: 0, road: 0, police: 0, food: 0, extra: 0, gross: 0, net: 0 });
+  const formatCompact = (val: number) => {
+    if (Math.abs(val) >= 1_000_000) return (val / 1_000_000).toFixed(1) + 'M';
+    if (Math.abs(val) >= 1_000) return (val / 1_000).toFixed(0) + 'k';
+    return String(Math.round(val));
+  };
 
-    const totalRouteExpenses = sums.fuel + sums.road + sums.police + sums.food + sums.extra;
-    const grandTotalExpense = totalRouteExpenses + maintenanceTotal;
-    const realNetProfit = sums.gross - grandTotalExpense;
-    const netMargin = sums.gross > 0 ? (realNetProfit / sums.gross) * 100 : 0;
+  // Base complète des trajets et de la maintenance
+  const sourceTrips = useMemo(() => {
+    return allTrips && allTrips.length > 0 ? allTrips : data;
+  }, [allTrips, data]);
 
-    // Ratio Carburant / CA
-    const fuelRatio = sums.gross > 0 ? (sums.fuel / sums.gross) * 100 : 0;
-    
-    // Coût moyen par rotation / voyage
-    const totalTripsCount = data.length || 1;
-    const avgCostPerTrip = Math.round(grandTotalExpense / totalTripsCount);
+  const sourceMaintenance = useMemo(() => {
+    return allMaintenanceRecords && allMaintenanceRecords.length > 0 ? allMaintenanceRecords : maintenanceRecords;
+  }, [allMaintenanceRecords, maintenanceRecords]);
 
-    // --- A. DONNÉES PAR NATURE DE FRAIS ---
-    const natureList = [
-      {
-        id: "fuel",
-        name: t?.fuel || "Gasoil",
-        value: sums.fuel,
-        color: QUANTUM_PALETTE.fuel.color,
-        lightColor: QUANTUM_PALETTE.fuel.light,
-        bg: QUANTUM_PALETTE.fuel.bg,
-        border: QUANTUM_PALETTE.fuel.border,
-        text: QUANTUM_PALETTE.fuel.text,
-        icon: Fuel,
-        desc: "Carburant moteur principal"
-      },
-      {
-        id: "maintenance",
-        name: t?.maintenance || "Maintenance Flotte",
-        value: maintenanceTotal,
-        color: QUANTUM_PALETTE.maintenance.color,
-        lightColor: QUANTUM_PALETTE.maintenance.light,
-        bg: QUANTUM_PALETTE.maintenance.bg,
-        border: QUANTUM_PALETTE.maintenance.border,
-        text: QUANTUM_PALETTE.maintenance.text,
-        icon: Wrench,
-        desc: "Atelier, vidanges & pièces"
-      },
-      {
-        id: "road",
-        name: t?.tolls || "Péages & Autoroute",
-        value: sums.road,
-        color: QUANTUM_PALETTE.road.color,
-        lightColor: QUANTUM_PALETTE.road.light,
-        bg: QUANTUM_PALETTE.road.bg,
-        border: QUANTUM_PALETTE.road.border,
-        text: QUANTUM_PALETTE.road.text,
-        icon: Anchor,
-        desc: "Droits de passage et ponts"
-      },
-      {
-        id: "police",
-        name: t?.police || "Contrôles / Police",
-        value: sums.police,
-        color: QUANTUM_PALETTE.police.color,
-        lightColor: QUANTUM_PALETTE.police.light,
-        bg: QUANTUM_PALETTE.police.bg,
-        border: QUANTUM_PALETTE.police.border,
-        text: QUANTUM_PALETTE.police.text,
-        icon: ShieldCheck,
-        desc: "Escortes & contrôles routiers"
-      },
-      {
-        id: "food",
-        name: t?.meals || "Frais Route & Repas",
-        value: sums.food,
-        color: QUANTUM_PALETTE.food.color,
-        lightColor: QUANTUM_PALETTE.food.light,
-        bg: QUANTUM_PALETTE.food.bg,
-        border: QUANTUM_PALETTE.food.border,
-        text: QUANTUM_PALETTE.food.text,
-        icon: Utensils,
-        desc: "Indemnités de mission chauffeur"
-      },
-      {
-        id: "extra",
-        name: t?.extras || "Divers & Extras",
-        value: sums.extra,
-        color: QUANTUM_PALETTE.extra.color,
-        lightColor: QUANTUM_PALETTE.extra.light,
-        bg: QUANTUM_PALETTE.extra.bg,
-        border: QUANTUM_PALETTE.extra.border,
-        text: QUANTUM_PALETTE.extra.text,
-        icon: PlusCircle,
-        desc: "Dépannages & imprévus"
+  // --- LISTES DES PÉRIODES DISPONIBLES POUR LE SÉLECTEUR ---
+  const timePeriods = useMemo(() => {
+    const yearsSet = new Set<string>();
+    const monthsMap = new Map<string, string>();
+    const weeksMap = new Map<string, string>();
+    const daysSet = new Set<string>();
+
+    sourceTrips.forEach(r => {
+      if (!r.date) return;
+      const d = new Date(r.date);
+      if (isNaN(d.getTime())) return;
+      
+      const y = String(d.getFullYear());
+      yearsSet.add(y);
+
+      const mKey = `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const mLabel = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+      monthsMap.set(mKey, mLabel);
+
+      const wInfo = getWeekInfo(r.date);
+      if (wInfo) {
+        weeksMap.set(wInfo.key, wInfo.label);
       }
-    ]
-      .filter(item => item.value > 0)
-      .map(item => ({
-        ...item,
-        percent: grandTotalExpense > 0 ? (item.value / grandTotalExpense) * 100 : 0
-      }));
 
-    // --- B. DONNÉES PAR VÉHICULE & CHAUFFEUR ---
-    const driverTotals: Record<string, { total: number; fuel: number; trips: number }> = {
-      AMARA: { total: 0, fuel: 0, trips: 0 },
-      BRAHIMA: { total: 0, fuel: 0, trips: 0 },
-      SORO: { total: 0, fuel: 0, trips: 0 }
-    };
-
-    data.forEach(r => {
-      const lbl = String(r.driverLabel || r.chauffeur || "").toUpperCase();
-      let key: "AMARA" | "BRAHIMA" | "SORO" | null = null;
-      if (lbl.includes("AMARA") || lbl.includes("76")) key = "AMARA";
-      else if (lbl.includes("BRAHIMA") || lbl.includes("45")) key = "BRAHIMA";
-      else if (lbl.includes("SORO") || lbl.includes("SORRO") || lbl.includes("52")) key = "SORO";
-
-      if (key) {
-        const fuel = Number(r.fuel_cost_cfa) || 0;
-        const exp = Number(r.total_expense_cfa) || (fuel + (Number(r.road_fees_cfa) || 0));
-        driverTotals[key].total += exp;
-        driverTotals[key].fuel += fuel;
-        driverTotals[key].trips += 1;
-      }
+      daysSet.add(r.date);
     });
 
-    const driverList = [
-      {
-        id: "AMARA",
-        name: "AMARA TRUCK 76",
-        shortName: "AMARA",
-        unit: "76",
-        value: driverTotals.AMARA.total,
-        color: QUANTUM_PALETTE.drivers.AMARA.color,
-        lightColor: QUANTUM_PALETTE.drivers.AMARA.light,
-        bg: QUANTUM_PALETTE.drivers.AMARA.bg,
-        border: QUANTUM_PALETTE.drivers.AMARA.border,
-        text: QUANTUM_PALETTE.drivers.AMARA.text,
-        icon: Truck,
-        desc: `${driverTotals.AMARA.trips} voyages enregistrés`
-      },
-      {
-        id: "BRAHIMA",
-        name: "BRAHIMA TRUCK 45",
-        shortName: "BRAHIMA",
-        unit: "45",
-        value: driverTotals.BRAHIMA.total,
-        color: QUANTUM_PALETTE.drivers.BRAHIMA.color,
-        lightColor: QUANTUM_PALETTE.drivers.BRAHIMA.light,
-        bg: QUANTUM_PALETTE.drivers.BRAHIMA.bg,
-        border: QUANTUM_PALETTE.drivers.BRAHIMA.border,
-        text: QUANTUM_PALETTE.drivers.BRAHIMA.text,
-        icon: Truck,
-        desc: `${driverTotals.BRAHIMA.trips} voyages enregistrés`
-      },
-      {
-        id: "SORO",
-        name: "SORO TRUCK 52",
-        shortName: "SORO",
-        unit: "52",
-        value: driverTotals.SORO.total,
-        color: QUANTUM_PALETTE.drivers.SORO.color,
-        lightColor: QUANTUM_PALETTE.drivers.SORO.light,
-        bg: QUANTUM_PALETTE.drivers.SORO.bg,
-        border: QUANTUM_PALETTE.drivers.SORO.border,
-        text: QUANTUM_PALETTE.drivers.SORO.text,
-        icon: Truck,
-        desc: `${driverTotals.SORO.trips} voyages enregistrés`
-      },
-      {
-        id: "FLOTTE",
-        name: "Maintenance Flotte (Atelier)",
-        shortName: "Maintenance",
-        unit: "ATELIER",
-        value: maintenanceTotal,
-        color: QUANTUM_PALETTE.drivers.FLOTTE.color,
-        lightColor: QUANTUM_PALETTE.drivers.FLOTTE.light,
-        bg: QUANTUM_PALETTE.drivers.FLOTTE.bg,
-        border: QUANTUM_PALETTE.drivers.FLOTTE.border,
-        text: QUANTUM_PALETTE.drivers.FLOTTE.text,
-        icon: Wrench,
-        desc: "Coûts centraux non affectés"
-      }
-    ]
-      .filter(item => item.value > 0)
-      .map(item => ({
-        ...item,
-        percent: grandTotalExpense > 0 ? (item.value / grandTotalExpense) * 100 : 0
-      }));
+    const years = Array.from(yearsSet).sort().reverse();
+    const months = Array.from(monthsMap.entries()).map(([k, label]) => ({ key: k, label })).sort((a, b) => b.key.localeCompare(a.key));
+    const weeks = Array.from(weeksMap.entries()).map(([k, label]) => ({ key: k, label })).sort((a, b) => b.key.localeCompare(a.key));
+    const days = Array.from(daysSet).sort().reverse();
 
-    // --- C. CALCUL ODOMÈTRE CERTIFIÉ ---
-    const kmData: Record<string, number> = {
-      AMARA: 117324,
-      BRAHIMA: 110593,
-      SORO: 110975
+    return { years, months, weeks, days };
+  }, [sourceTrips]);
+
+  // Initialisation par défaut des sélecteurs si non renseignés
+  useMemo(() => {
+    if (!selectedMonth && timePeriods.months.length > 0) {
+      setSelectedMonth(timePeriods.months[0].key);
+    }
+    if (!selectedWeek && timePeriods.weeks.length > 0) {
+      setSelectedWeek(timePeriods.weeks[0].key);
+    }
+    if (!selectedDay && timePeriods.days.length > 0) {
+      setSelectedDay(timePeriods.days[0]);
+    }
+  }, [timePeriods]);
+
+  // --- FILTRAGE DES TRAJETS ET MAINTENANCES SELON LE SÉLECTEUR TEMPOREL DU MODULE ---
+  const { scopedTrips, scopedMaintenance, periodLabel } = useMemo(() => {
+    if (timeScale === "global") {
+      return { 
+        scopedTrips: data, 
+        scopedMaintenance: maintenanceRecords,
+        periodLabel: "Période active du tableau de bord"
+      };
+    }
+
+    if (timeScale === "year") {
+      const trips = sourceTrips.filter(r => r.date && r.date.startsWith(selectedYear));
+      const maint = sourceMaintenance.filter(r => r.date && r.date.startsWith(selectedYear));
+      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: `Année ${selectedYear}` };
+    }
+
+    if (timeScale === "month") {
+      const trips = sourceTrips.filter(r => r.date && r.date.startsWith(selectedMonth));
+      const maint = sourceMaintenance.filter(r => r.date && r.date.startsWith(selectedMonth));
+      const label = timePeriods.months.find(m => m.key === selectedMonth)?.label || selectedMonth;
+      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: `Mois de ${label}` };
+    }
+
+    if (timeScale === "week") {
+      const trips = sourceTrips.filter(r => {
+        const w = getWeekInfo(r.date);
+        return w && w.key === selectedWeek;
+      });
+      const maint = sourceMaintenance.filter(r => {
+        const w = getWeekInfo(r.date);
+        return w && w.key === selectedWeek;
+      });
+      const label = timePeriods.weeks.find(w => w.key === selectedWeek)?.label || selectedWeek;
+      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: label };
+    }
+
+    if (timeScale === "day") {
+      const trips = sourceTrips.filter(r => r.date === selectedDay);
+      const maint = sourceMaintenance.filter(r => r.date === selectedDay);
+      const dayFormatted = selectedDay ? new Date(selectedDay).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : "";
+      return { scopedTrips: trips, scopedMaintenance: maint, periodLabel: dayFormatted };
+    }
+
+    return { scopedTrips: data, scopedMaintenance: maintenanceRecords, periodLabel: "Global" };
+  }, [timeScale, selectedYear, selectedMonth, selectedWeek, selectedDay, sourceTrips, sourceMaintenance, data, maintenanceRecords, timePeriods]);
+
+  // Navigation jour précédent / jour suivant
+  const handleDayStep = (delta: number) => {
+    const idx = timePeriods.days.indexOf(selectedDay);
+    if (idx === -1) return;
+    const nextIdx = idx - delta; // note: days is descending (0 is latest)
+    if (nextIdx >= 0 && nextIdx < timePeriods.days.length) {
+      setSelectedDay(timePeriods.days[nextIdx]);
+    }
+  };
+
+  // Helper pour attribuer la maintenance à un camion précis
+  const getMaintenanceTruck = (r: any): "AMARA" | "BRAHIMA" | "SORO" | "FLOTTE" => {
+    const v = String(r?.vehicle || r?.driverLabel || r?.description || "").toUpperCase();
+    if (v.includes("AMARA") || v.includes("76")) return "AMARA";
+    if (v.includes("BRAHIMA") || v.includes("45")) return "BRAHIMA";
+    if (v.includes("SORO") || v.includes("SORRO") || v.includes("52")) return "SORO";
+    return "FLOTTE";
+  };
+
+  // --- 2. CALCUL FINANCIER COMPLET PAR CAMION & PAR NATURE ---
+  const financialModel = useMemo(() => {
+    // A. Calcul de la maintenance allouée
+    let maintAmara = 0;
+    let maintBrahima = 0;
+    let maintSoro = 0;
+    let maintFlotte = 0;
+
+    scopedMaintenance.forEach(r => {
+      const cost = Number(r.cost || r.amount || 0);
+      const tKey = getMaintenanceTruck(r);
+      if (tKey === "AMARA") maintAmara += cost;
+      else if (tKey === "BRAHIMA") maintBrahima += cost;
+      else if (tKey === "SORO") maintSoro += cost;
+      else maintFlotte += cost;
+    });
+
+    // Répartition de la maintenance générale équitablement sur les 3 camions
+    const sharedMaintPerTruck = maintFlotte / 3;
+
+    // B. Initialisation des agrégats par camion
+    const trucksData = {
+      AMARA: {
+        ca: 0,
+        fuel: 0,
+        roadFees: 0, // péages + autoroute
+        policeFees: 0,
+        foodFees: 0,
+        extraFees: 0,
+        directMaintenance: maintAmara,
+        totalMaintenance: maintAmara + sharedMaintPerTruck,
+        sharedMaintenance: sharedMaintPerTruck,
+        tonnage: 0,
+        tripsCount: 0
+      },
+      BRAHIMA: {
+        ca: 0,
+        fuel: 0,
+        roadFees: 0,
+        policeFees: 0,
+        foodFees: 0,
+        extraFees: 0,
+        directMaintenance: maintBrahima,
+        totalMaintenance: maintBrahima + sharedMaintPerTruck,
+        sharedMaintenance: sharedMaintPerTruck,
+        tonnage: 0,
+        tripsCount: 0
+      },
+      SORO: {
+        ca: 0,
+        fuel: 0,
+        roadFees: 0,
+        policeFees: 0,
+        foodFees: 0,
+        extraFees: 0,
+        directMaintenance: maintSoro,
+        totalMaintenance: maintSoro + sharedMaintPerTruck,
+        sharedMaintenance: sharedMaintPerTruck,
+        tonnage: 0,
+        tripsCount: 0
+      }
     };
-    const sourceTrips = allTrips && allTrips.length > 0 ? allTrips : (records && records.length > 0 ? records : data);
-    sourceTrips.forEach(t => {
-      const lbl = String(t.driverLabel || t.chauffeur || "").toUpperCase();
+
+    scopedTrips.forEach(r => {
+      const lbl = String(r.driverLabel || r.chauffeur || "").toUpperCase();
       let key: "AMARA" | "BRAHIMA" | "SORO" | null = null;
       if (lbl.includes("AMARA") || lbl.includes("76")) key = "AMARA";
       else if (lbl.includes("BRAHIMA") || lbl.includes("45")) key = "BRAHIMA";
       else if (lbl.includes("SORO") || lbl.includes("SORRO") || lbl.includes("52")) key = "SORO";
       if (!key) return;
 
-      let kVal = Number(t.km || 0);
-      if (key === "SORO" && kVal === 712827) kVal = 71283;
-      if (key === "BRAHIMA" && kVal === 196266) kVal = 106266;
-      if (key === "BRAHIMA" && kVal === 10492) kVal = 107492;
-      if (key === "SORO" && kVal === 59757 && (t.date || "") < "2025-10-01") kVal = 50757;
-      if (kVal >= 20000 && kVal <= 200000) {
-        kmData[key] = Math.max(kmData[key], kVal);
-      }
+      const tObj = trucksData[key];
+      tObj.ca += Number(r.total_gross_cfa) || 0;
+      tObj.fuel += Number(r.fuel_cost_cfa) || 0;
+      tObj.roadFees += Number(r.road_fees_cfa) || 0;
+      tObj.policeFees += Number(r.police_fees_cfa) || 0;
+      tObj.foodFees += Number(r.food_fees_cfa) || 0;
+      tObj.extraFees += Number(r.other_expenses_cfa) || 0;
+      tObj.tonnage += Number(r.tonnage) || 0;
+      tObj.tripsCount += 1;
     });
 
+    // C. Synthèse détaillée des 3 camions avec les 5 métriques exigées
+    const detailedTrucks = TRUCKS_CONFIG.map(cfg => {
+      const raw = trucksData[cfg.key as keyof typeof trucksData];
+      const ca = raw.ca;
+      const fuel = raw.fuel;
+      const totalRouteExpenses = raw.roadFees + raw.policeFees + raw.foodFees + raw.extraFees;
+      const maintenance = raw.totalMaintenance;
+      const totalExpenses = fuel + totalRouteExpenses + maintenance;
+      const net = ca - totalExpenses;
+      const margin = ca > 0 ? (net / ca) * 100 : 0;
+
+      return {
+        ...cfg,
+        ca,
+        fuel,
+        totalRouteExpenses,
+        maintenance,
+        directMaintenance: raw.directMaintenance,
+        sharedMaintenance: raw.sharedMaintenance,
+        totalExpenses,
+        net,
+        margin,
+        tonnage: Math.round(raw.tonnage * 10) / 10,
+        tripsCount: raw.tripsCount,
+        subDetails: {
+          tolls: raw.roadFees,
+          police: raw.policeFees,
+          meals: raw.foodFees,
+          extras: raw.extraFees
+        }
+      };
+    });
+
+    // D. Totaux Flotte Globaux
+    const totalFleetCA = detailedTrucks.reduce((s, t) => s + t.ca, 0);
+    const totalFleetFuel = detailedTrucks.reduce((s, t) => s + t.fuel, 0);
+    const totalFleetRoute = detailedTrucks.reduce((s, t) => s + t.totalRouteExpenses, 0);
+    const totalFleetMaintenance = detailedTrucks.reduce((s, t) => s + t.maintenance, 0);
+    const totalFleetExpenses = totalFleetFuel + totalFleetRoute + totalFleetMaintenance;
+    const totalFleetNet = totalFleetCA - totalFleetExpenses;
+    const totalFleetMargin = totalFleetCA > 0 ? (totalFleetNet / totalFleetCA) * 100 : 0;
+    const totalFleetTrips = detailedTrucks.reduce((s, t) => s + t.tripsCount, 0);
+
+    // E. Données pour le Donut en perspective "driver" (par camion)
+    const donutDrivers = detailedTrucks.map(t => ({
+      id: t.key,
+      name: t.label,
+      shortName: t.shortName,
+      unit: t.unit,
+      value: t.totalExpenses,
+      color: t.color,
+      percent: totalFleetExpenses > 0 ? (t.totalExpenses / totalFleetExpenses) * 100 : 0,
+      net: t.net,
+      ca: t.ca
+    }));
+
+    // F. Données pour le Donut en perspective "nature" (par type de coût)
+    const totalTolls = detailedTrucks.reduce((s, t) => s + t.subDetails.tolls, 0);
+    const totalPolice = detailedTrucks.reduce((s, t) => s + t.subDetails.police, 0);
+    const totalMeals = detailedTrucks.reduce((s, t) => s + t.subDetails.meals, 0);
+    const totalExtras = detailedTrucks.reduce((s, t) => s + t.subDetails.extras, 0);
+
+    const donutNature = [
+      { id: "fuel", name: "Gasoil", value: totalFleetFuel, color: QUANTUM_PALETTE.fuel.color, icon: Fuel, desc: "Carburant moteur" },
+      { id: "maintenance", name: "Maintenance", value: totalFleetMaintenance, color: QUANTUM_PALETTE.maintenance.color, icon: Wrench, desc: "Atelier, révisions & pièces" },
+      { id: "road", name: "Péages & Autoroute", value: totalTolls, color: QUANTUM_PALETTE.road.color, icon: Anchor, desc: "Droits de passage & pesée" },
+      { id: "police", name: "Contrôles Police", value: totalPolice, color: QUANTUM_PALETTE.police.color, icon: ShieldCheck, desc: "Escortes & contrôles" },
+      { id: "food", name: "Repas & Route", value: totalMeals, color: QUANTUM_PALETTE.food.color, icon: Utensils, desc: "Indemnités de mission" },
+      { id: "extra", name: "Divers & Extras", value: totalExtras, color: QUANTUM_PALETTE.extra.color, icon: PlusCircle, desc: "Dépannages & imprévus" }
+    ]
+      .filter(item => item.value > 0)
+      .map(item => ({
+        ...item,
+        percent: totalFleetExpenses > 0 ? (item.value / totalFleetExpenses) * 100 : 0
+      }));
+
     return {
-      sums,
-      grandTotalExpense,
-      realNetProfit,
-      netMargin,
-      fuelRatio,
-      avgCostPerTrip,
-      natureList,
-      driverList,
-      kmData
+      detailedTrucks,
+      totalFleetCA,
+      totalFleetFuel,
+      totalFleetRoute,
+      totalFleetMaintenance,
+      totalFleetExpenses,
+      totalFleetNet,
+      totalFleetMargin,
+      totalFleetTrips,
+      donutDrivers,
+      donutNature
     };
-  }, [data, maintenanceTotal, records, allTrips, t]);
+  }, [scopedTrips, scopedMaintenance]);
 
   // Données de l'anneau actif selon la perspective choisie
-  const activeData = perspective === "nature" ? stats.natureList : stats.driverList;
-  const hoveredItem = activeIndex !== null && activeData[activeIndex] ? activeData[activeIndex] : null;
+  const activeDonutData = perspective === "driver" ? financialModel.donutDrivers : financialModel.donutNature;
+  const hoveredSlice = activeIndex !== null && activeDonutData[activeIndex] ? activeDonutData[activeIndex] : null;
 
   return (
-    <div className="w-full h-full flex flex-col gap-6">
+    <div className="w-full h-full flex flex-col gap-5">
       
-      {/* 1. EN-TÊTE DU MODULE AVEC COMMUTATEUR DE PERSPECTIVE */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              Contrôle des Coûts
-            </span>
-            <span className="text-xs text-white/40">•</span>
-            <span className="text-xs text-white/60 font-medium">Ventilation Globale</span>
+      {/* ======================================================== */}
+      {/* 1. BARRE DE COMMANDE & CONTRÔLE TEMPOREL MULTI-NIVEAUX */}
+      {/* ======================================================== */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-3xl bg-black/40 border border-white/8 shadow-xl">
+        
+        {/* Sélecteur de perspective (Par Camion vs Par Nature) */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-black/60 p-1 rounded-2xl border border-white/10">
+            <button
+              onClick={() => { setPerspective("driver"); setActiveIndex(null); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                perspective === "driver" 
+                  ? "bg-gradient-to-r from-blue-500 via-emerald-500 to-[#cf5d56] text-white shadow-lg" 
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
+              <Truck className="size-3.5" />
+              <span>Par Camion (Détail)</span>
+            </button>
+            <button
+              onClick={() => { setPerspective("nature"); setActiveIndex(null); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                perspective === "nature" 
+                  ? "bg-cyan-500 text-black shadow-lg shadow-cyan-500/20" 
+                  : "text-white/50 hover:text-white"
+              }`}
+            >
+              <Layers className="size-3.5" />
+              <span>Par Nature</span>
+            </button>
           </div>
+          
+          <span className="hidden sm:inline-block text-[11px] font-bold text-white/40 italic">
+            • {periodLabel}
+          </span>
         </div>
 
-        {/* Commutateur : Par Nature vs Par Véhicule */}
-        <div className="flex items-center bg-black/50 p-1 rounded-2xl border border-white/10 self-start sm:self-auto">
-          <button
-            onClick={() => { setPerspective("nature"); setActiveIndex(null); }}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-              perspective === "nature" 
-                ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-lg shadow-cyan-500/20" 
-                : "text-white/50 hover:text-white"
-            }`}
-          >
-            <Layers className="size-3" />
-            <span>Par Nature</span>
-          </button>
-          <button
-            onClick={() => { setPerspective("driver"); setActiveIndex(null); }}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-              perspective === "driver" 
-                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-black shadow-lg shadow-emerald-500/20" 
-                : "text-white/50 hover:text-white"
-            }`}
-          >
-            <Truck className="size-3" />
-            <span>Par Véhicule</span>
-          </button>
+        {/* Sélecteur de Granularité Temporelle (An, Mois, Semaine, Jour) */}
+        <div className="flex flex-wrap items-center gap-2">
+          
+          {/* Boutons de granularité */}
+          <div className="flex items-center bg-black/60 p-1 rounded-xl border border-white/10">
+            <button
+              onClick={() => setTimeScale("global")}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                timeScale === "global" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+              }`}
+            >
+              Global
+            </button>
+            <button
+              onClick={() => setTimeScale("year")}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                timeScale === "year" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+              }`}
+            >
+              Par An
+            </button>
+            <button
+              onClick={() => setTimeScale("month")}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                timeScale === "month" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+              }`}
+            >
+              Par Mois
+            </button>
+            <button
+              onClick={() => setTimeScale("week")}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                timeScale === "week" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+              }`}
+            >
+              Par Semaine
+            </button>
+            <button
+              onClick={() => setTimeScale("day")}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                timeScale === "day" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+              }`}
+            >
+              Par Jour
+            </button>
+          </div>
+
+          {/* Menus contextuels selon la granularité active */}
+          {timeScale === "year" && (
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-black/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none font-bold cursor-pointer"
+            >
+              {timePeriods.years.map(y => (
+                <option key={y} value={y}>Année {y}</option>
+              ))}
+            </select>
+          )}
+
+          {timeScale === "month" && (
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-black/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none font-bold cursor-pointer max-w-[180px]"
+            >
+              {timePeriods.months.map(m => (
+                <option key={m.key} value={m.key}>{m.label}</option>
+              ))}
+            </select>
+          )}
+
+          {timeScale === "week" && (
+            <select
+              value={selectedWeek}
+              onChange={(e) => setSelectedWeek(e.target.value)}
+              className="bg-black/80 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none font-bold cursor-pointer max-w-[210px]"
+            >
+              {timePeriods.weeks.map(w => (
+                <option key={w.key} value={w.key}>{w.label}</option>
+              ))}
+            </select>
+          )}
+
+          {timeScale === "day" && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleDayStep(-1)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                title="Jour précédent"
+              >
+                <ChevronLeft className="size-3.5" />
+              </button>
+              <select
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="bg-black/80 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none font-mono font-bold cursor-pointer"
+              >
+                {timePeriods.days.map(d => (
+                  <option key={d} value={d}>
+                    {new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleDayStep(1)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                title="Jour suivant"
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
+          )}
+
         </div>
+
       </div>
 
-      {/* 2. GRILLE PRINCIPALE : DONUT HAUTE RÉSOLUTION + GRILLE ANALYTIQUE */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-center">
+      {/* ======================================================== */}
+      {/* 2. ZONE DONUT COMPARATIF + SYNTHÈSE GLOBALE */}
+      {/* ======================================================== */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
         
-        {/* COLONNE GAUCHE (5 COLONNES) : LE DONUT AVEC CENTRE DYNAMIQUE INTERACTIF */}
-        <div className="xl:col-span-5 relative flex items-center justify-center min-h-[360px] w-full">
-          <div className="relative w-full h-[360px] max-w-[380px]">
+        {/* LE DONUT INTERACTIF (4 COLONNES) */}
+        <div className="xl:col-span-4 relative flex items-center justify-center min-h-[300px] w-full">
+          <div className="relative w-full h-[300px] max-w-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Tooltip content={() => null} />
                 <Pie 
-                  data={activeData} 
-                  innerRadius={105} 
-                  outerRadius={145} 
+                  data={activeDonutData} 
+                  innerRadius={85} 
+                  outerRadius={120} 
                   paddingAngle={3} 
                   dataKey="value" 
                   stroke="#1c1c1e"
                   strokeWidth={3}
                   animationBegin={0}
-                  animationDuration={1000}
+                  animationDuration={800}
                   onMouseEnter={(_, index) => setActiveIndex(index)}
                   onMouseLeave={() => setActiveIndex(null)}
                 >
-                  {activeData.map((entry, index) => {
+                  {activeDonutData.map((entry, index) => {
                     const isHovered = activeIndex === index;
                     return (
                       <Cell 
@@ -382,7 +627,7 @@ export function QuantumExpenseAnalysis({
                         opacity={activeIndex === null || isHovered ? 1 : 0.4}
                         className="transition-all duration-300 cursor-pointer"
                         style={{
-                          filter: isHovered ? `drop-shadow(0 0 12px ${entry.color})` : 'none',
+                          filter: isHovered ? `drop-shadow(0 0 10px ${entry.color})` : 'none',
                           transform: isHovered ? 'scale(1.03)' : 'scale(1)',
                           transformOrigin: 'center center'
                         }}
@@ -393,36 +638,36 @@ export function QuantumExpenseAnalysis({
               </PieChart>
             </ResponsiveContainer>
 
-            {/* CENTRE DYNAMIQUE INTERACTIF HAUTE RÉSOLUTION */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-6">
-              {hoveredItem ? (
-                <div className="animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <div className="size-2.5 rounded-full shadow-sm" style={{ backgroundColor: hoveredItem.color }} />
-                    <span className="text-[11px] font-black uppercase tracking-wider text-white truncate max-w-[170px]">
-                      {hoveredItem.name}
+            {/* CENTRE DYNAMIQUE DU DONUT */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+              {hoveredSlice ? (
+                <div className="animate-in fade-in zoom-in-95 duration-150 flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="size-2 rounded-full" style={{ backgroundColor: hoveredSlice.color }} />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-white truncate max-w-[150px]">
+                      {hoveredSlice.name}
                     </span>
                   </div>
-                  <p className="text-xl font-black font-mono text-white tracking-tight leading-tight">
-                    {formatMoney(hoveredItem.value)}
+                  <p className="text-lg font-black font-mono text-white tracking-tight leading-none my-1">
+                    {formatMoney(hoveredSlice.value)}
                   </p>
                   <span 
-                    className="inline-block mt-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono shadow-sm"
-                    style={{ backgroundColor: `${hoveredItem.color}25`, color: hoveredItem.color }}
+                    className="inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full font-mono"
+                    style={{ backgroundColor: `${hoveredSlice.color}25`, color: hoveredSlice.color }}
                   >
-                    {hoveredItem.percent.toFixed(1)}% du total
+                    {hoveredSlice.percent.toFixed(1)}% des coûts
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1 leading-none">
-                    {perspective === "driver" ? "Dépenses par Camion" : "Total Coûts Flotte"}
+                  <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] mb-1">
+                    {perspective === "driver" ? "Coûts Flotte Totaux" : "Dépenses Totales"}
                   </p>
-                  <span className="text-2xl font-black font-mono text-white tracking-tight drop-shadow-lg">
-                    {formatMoney(stats.grandTotalExpense)}
+                  <span className="text-xl font-black font-mono text-white tracking-tight drop-shadow-lg">
+                    {formatMoney(financialModel.totalFleetExpenses)}
                   </span>
-                  <span className="inline-block mt-1 text-[9px] font-bold text-white/40 uppercase tracking-widest">
-                    {activeData.length} catégories actives
+                  <span className="inline-block mt-1 text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                    {activeDonutData.length} entités actives
                   </span>
                 </div>
               )}
@@ -430,68 +675,282 @@ export function QuantumExpenseAnalysis({
           </div>
         </div>
 
-        {/* COLONNE DROITE (7 COLONNES) : GRILLE D'ANALYSE DÉTAILLÉE AVEC JAUGES */}
-        <div className="xl:col-span-7 flex flex-col gap-3">
-          <div className="flex items-center justify-between px-1 mb-1">
-            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest">
-              {perspective === "nature" ? "Postes de Coûts Analytiques" : "Ventilation par Véhicule"}
-            </h4>
-            <span className="text-[10px] font-bold text-white/30 font-mono">
-              100% = {formatMoney(stats.grandTotalExpense)}
+        {/* PANNEAU BILAN GLOBALE DE LA PÉRIODE (8 COLONNES) */}
+        <div className="xl:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/8 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">C.A. Global</span>
+            <p className="text-lg font-black font-mono text-white mt-2">
+              {formatMoney(financialModel.totalFleetCA)}
+            </p>
+            <span className="text-[9px] text-white/30 font-medium mt-1">Revenu total généré</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-cyan-500/[0.04] border border-cyan-500/20 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">Total Gasoil</span>
+            <p className="text-lg font-black font-mono text-cyan-300 mt-2">
+              {formatMoney(financialModel.totalFleetFuel)}
+            </p>
+            <span className="text-[9px] text-cyan-400/50 font-medium mt-1">
+              {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% du C.A.
             </span>
           </div>
 
-          {/* Grille des catégories avec couleurs vives & barres de progression */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {activeData.map((item, idx) => {
-              const isSelected = activeIndex === idx;
-              const IconComp = item.icon || Layers;
+          <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">Total Maintenance</span>
+            <p className="text-lg font-black font-mono text-amber-300 mt-2">
+              {formatMoney(financialModel.totalFleetMaintenance)}
+            </p>
+            <span className="text-[9px] text-amber-400/50 font-medium mt-1">Réparations & pièces</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/20 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">Bénéfice Net Flotte</span>
+            <p className={`text-lg font-black font-mono mt-2 ${
+              financialModel.totalFleetNet >= 0 ? "text-[#30D158]" : "text-red-400"
+            }`}>
+              {formatMoney(financialModel.totalFleetNet)}
+            </p>
+            <span className="text-[9px] text-emerald-400/60 font-bold mt-1">
+              Marge Nette : {financialModel.totalFleetMargin.toFixed(1)}%
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* ======================================================== */}
+      {/* 3. VUE PRINCIPALE : LES 3 CARTES DÉTAILLÉES PAR CAMION   */}
+      {/* ======================================================== */}
+      {perspective === "driver" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <Truck className="size-4 text-white/50" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                Détail Financier par Camion
+              </h4>
+            </div>
+            <span className="text-[10px] text-white/40">
+              Cliquez sur une carte pour voir les sous-détails des frais de route
+            </span>
+          </div>
+
+          {/* GRILLE DES 3 CAMIONS AVEC LES 5 INDICATEURS EXIGÉS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {financialModel.detailedTrucks.map(truck => {
+              const isExpanded = expandedTruck === truck.key;
 
               return (
                 <div 
-                  key={item.id} 
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                  className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
-                    isSelected 
-                      ? "bg-white/10 border-white/40 shadow-xl scale-[1.02]" 
-                      : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/15"
+                  key={truck.key}
+                  className={`rounded-3xl p-5 border transition-all duration-300 flex flex-col justify-between bg-[#141414] hover:border-white/20 ${
+                    truck.key === "AMARA" ? "border-blue-500/30 shadow-lg shadow-blue-500/5" :
+                    truck.key === "BRAHIMA" ? "border-emerald-500/30 shadow-lg shadow-emerald-500/5" :
+                    "border-[#cf5d56]/30 shadow-lg shadow-red-500/5"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                  <div>
+                    {/* En-tête Camion */}
+                    <div className="flex items-start justify-between pb-3 border-b border-white/8 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div 
+                          className="size-10 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-md"
+                          style={{ backgroundColor: truck.color }}
+                        >
+                          {truck.unit}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-white">{truck.label}</h4>
+                          <p className="text-[10px] font-mono text-white/40">{truck.plate}</p>
+                        </div>
+                      </div>
+
+                      {/* Badge Marge Nette */}
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black font-mono uppercase ${
+                        truck.margin >= 20 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+                        truck.margin >= 0 ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" :
+                        "bg-red-500/20 text-red-400 border border-red-500/30"
+                      }`}>
+                        {truck.margin.toFixed(1)}% Marge
+                      </span>
+                    </div>
+
+                    {/* LES 5 INDICATEURS FINANCIERS EXIGÉS */}
+                    <div className="space-y-2.5">
+                      
+                      {/* 1. CHIFFRE D'AFFAIRES */}
+                      <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="size-6 rounded-lg bg-white/10 flex items-center justify-center text-white">
+                            <DollarSign className="size-3.5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-white/70">Chiffre d'Affaires</span>
+                        </div>
+                        <span className="font-mono font-black text-sm text-white">
+                          {formatMoney(truck.ca)}
+                        </span>
+                      </div>
+
+                      {/* 2. TOTAL CARBURANT */}
+                      <div className="p-2.5 rounded-xl bg-cyan-500/[0.04] border border-cyan-500/15 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="size-6 rounded-lg bg-cyan-500/15 flex items-center justify-center text-cyan-400">
+                            <Fuel className="size-3.5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-cyan-300">Total Carburant</span>
+                        </div>
+                        <span className="font-mono font-black text-sm text-cyan-300">
+                          {formatMoney(truck.fuel)}
+                        </span>
+                      </div>
+
+                      {/* 3. TOTAL FRAIS DE ROUTE */}
                       <div 
-                        className="size-8 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-transform"
+                        onClick={() => setExpandedTruck(isExpanded ? null : truck.key)}
+                        className="p-2.5 rounded-xl bg-purple-500/[0.04] border border-purple-500/15 flex items-center justify-between cursor-pointer hover:bg-purple-500/10 transition-colors"
+                        title="Cliquez pour afficher le sous-détail"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="size-6 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400">
+                            <Route className="size-3.5" />
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-bold text-purple-300 block leading-tight">Total Frais de Route</span>
+                            <span className="text-[8px] text-purple-400/60 uppercase">Péages, Police, Repas, Extras</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-black text-sm text-purple-300">
+                            {formatMoney(truck.totalRouteExpenses)}
+                          </span>
+                          {isExpanded ? <ChevronUp className="size-3.5 text-purple-400" /> : <ChevronDown className="size-3.5 text-purple-400" />}
+                        </div>
+                      </div>
+
+                      {/* SOUS-DÉTAILS DES FRAIS DE ROUTE SI DÉPLIÉ */}
+                      {isExpanded && (
+                        <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5 text-xs animate-in fade-in">
+                          <div className="flex justify-between items-center text-white/60">
+                            <span className="flex items-center gap-1.5"><Anchor className="size-3 text-purple-400" /> Péages & Ponts :</span>
+                            <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.tolls)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-white/60">
+                            <span className="flex items-center gap-1.5"><ShieldCheck className="size-3 text-pink-400" /> Police & Contrôles :</span>
+                            <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.police)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-white/60">
+                            <span className="flex items-center gap-1.5"><Utensils className="size-3 text-emerald-400" /> Repas & Frais :</span>
+                            <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.meals)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-white/60">
+                            <span className="flex items-center gap-1.5"><PlusCircle className="size-3 text-orange-400" /> Extras & Divers :</span>
+                            <span className="font-mono font-bold text-white">{formatMoney(truck.subDetails.extras)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. TOTAL MAINTENANCE */}
+                      <div className="p-2.5 rounded-xl bg-amber-500/[0.04] border border-amber-500/15 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="size-6 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-400">
+                            <Wrench className="size-3.5" />
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-bold text-amber-300 block leading-tight">Total Maintenance</span>
+                            <span className="text-[8px] text-amber-400/60 uppercase">
+                              {truck.directMaintenance > 0 ? "Spécifique + Atelier" : "Part atelier"}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="font-mono font-black text-sm text-amber-300">
+                          {formatMoney(truck.maintenance)}
+                        </span>
+                      </div>
+
+                      {/* 5. LE BÉNÉFICE NET */}
+                      <div className="p-3 rounded-xl bg-black/60 border border-white/10 flex items-center justify-between mt-2">
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-white/40 block leading-tight">
+                            Bénéfice Net
+                          </span>
+                          <span className="text-[8px] text-white/30">C.A. - Tous coûts</span>
+                        </div>
+                        <span className={`font-mono font-black text-base ${
+                          truck.net >= 0 ? "text-[#30D158]" : "text-red-400"
+                        }`}>
+                          {formatMoney(truck.net)}
+                        </span>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Volume & Rotations du camion */}
+                  <div className="pt-3 border-t border-white/5 mt-4 flex items-center justify-between text-[10px] text-white/40 font-mono">
+                    <span>{truck.tonnage} Tonnes transportées</span>
+                    <span>{truck.tripsCount} voyages</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 4. VUE PAR NATURE (GRILLE DÉTAILLÉE DES POSTES DE COÛTS) */}
+      {/* ======================================================== */}
+      {perspective === "nature" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h4 className="text-xs font-black uppercase tracking-wider text-white">
+              Répartition par Nature de Frais
+            </h4>
+            <span className="text-[10px] text-white/40">
+              Total : {formatMoney(financialModel.totalFleetExpenses)}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {financialModel.donutNature.map((item, idx) => {
+              const IconComp = item.icon || Layers;
+              return (
+                <div 
+                  key={item.id}
+                  className="p-3.5 rounded-2xl bg-[#141414] border border-white/8 hover:border-white/20 transition-all flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div 
+                        className="size-8 rounded-xl flex items-center justify-center shrink-0 shadow-md"
                         style={{ backgroundColor: `${item.color}20`, color: item.color }}
                       >
                         <IconComp className="size-4" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-white truncate">{item.name}</p>
-                        <p className="text-[9px] text-white/40 truncate">{item.desc}</p>
+                      <div>
+                        <p className="text-xs font-black text-white">{item.name}</p>
+                        <p className="text-[9px] text-white/40">{item.desc}</p>
                       </div>
                     </div>
                     <span 
-                      className="text-xs font-black font-mono shrink-0 px-2 py-0.5 rounded-lg"
+                      className="text-xs font-black font-mono px-2 py-0.5 rounded-lg"
                       style={{ backgroundColor: `${item.color}15`, color: item.color }}
                     >
                       {item.percent.toFixed(1)}%
                     </span>
                   </div>
 
-                  {/* Montant & Jauge de part */}
                   <div className="space-y-1">
-                    <div className="flex justify-between items-baseline text-[11px]">
+                    <div className="flex justify-between items-baseline text-xs">
                       <span className="text-[9px] font-bold text-white/40 uppercase">Montant</span>
                       <span className="font-mono font-black text-white">{formatMoney(item.value)}</span>
                     </div>
                     <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
                       <div 
                         className="h-full rounded-full transition-all duration-700"
-                        style={{ 
-                          width: `${Math.max(4, item.percent)}%`, 
-                          backgroundColor: item.color 
-                        }}
+                        style={{ width: `${Math.max(4, item.percent)}%`, backgroundColor: item.color }}
                       />
                     </div>
                   </div>
@@ -499,113 +958,8 @@ export function QuantumExpenseAnalysis({
               );
             })}
           </div>
-
-          {/* 3. RATIOS DE RENTABILITÉ & PERFORMANCE STRATÉGIQUE */}
-          <div className="mt-2 pt-3 border-t border-white/5 grid grid-cols-3 gap-2.5">
-            
-            {/* RATIO 1 : GASOIL / CA */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
-                  Ratio Gasoil / C.A.
-                </span>
-                <span className={`text-base font-black font-mono ${
-                  stats.fuelRatio <= 38 ? "text-emerald-400" : "text-amber-400"
-                }`}>
-                  {stats.fuelRatio.toFixed(1)}%
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-1">
-                {stats.fuelRatio <= 38 ? (
-                  <span className="text-[8px] font-bold text-emerald-400 flex items-center gap-0.5">
-                    <CheckCircle2 className="size-2.5" /> Optimal (&lt;38%)
-                  </span>
-                ) : (
-                  <span className="text-[8px] font-bold text-amber-400 flex items-center gap-0.5">
-                    <AlertCircle className="size-2.5" /> Vigilance (&gt;38%)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* RATIO 2 : COÛT MOYEN PAR VOYAGE */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
-                  Coût Moyen / Rotation
-                </span>
-                <span className="text-sm font-black font-mono text-white">
-                  {new Intl.NumberFormat('fr-FR').format(stats.avgCostPerTrip)} <span className="text-[9px] text-white/40 font-sans">{currency}</span>
-                </span>
-              </div>
-              <p className="mt-1 text-[8px] font-bold text-white/30 uppercase">
-                {data.length} voyages pris en compte
-              </p>
-            </div>
-
-            {/* RATIO 3 : MARGE NETTE RÉELLE (POST-MAINTENANCE) */}
-            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
-                  Marge Nette Réelle
-                </span>
-                <span className={`text-base font-black font-mono ${
-                  stats.netMargin >= 0 ? "text-[#30D158]" : "text-red-400"
-                }`}>
-                  {stats.netMargin.toFixed(1)}%
-                </span>
-              </div>
-              <p className="mt-1 text-[8px] font-bold text-white/30 font-mono truncate">
-                Net : {formatMoney(stats.realNetProfit)}
-              </p>
-            </div>
-
-          </div>
-
-          {/* 4. SUIVI ODOMÈTRE CERTIFIÉ (CYCLE VIDANGE) */}
-          <div className="p-3.5 rounded-2xl bg-black/30 border border-white/5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Route className="size-3.5 text-[#cf5d56]" />
-                <h5 className="text-[9px] font-black text-white/60 uppercase tracking-wider">
-                  Odomètres Certifiés & Cycle 10 000 KM
-                </h5>
-              </div>
-              <span className="text-[9px] font-bold text-white/30 font-mono">Dernier relevé Sept 2026</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              {Object.entries(stats.kmData).map(([driver, km]) => {
-                const numKm = Number(km);
-                const cycleProgress = ((numKm % 10000) / 10000) * 100;
-                const dConfig = QUANTUM_PALETTE.drivers[driver as keyof typeof QUANTUM_PALETTE.drivers] || { color: "#3B82F6" };
-
-                return (
-                  <div key={driver} className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px]">
-                      <span className="font-bold text-white/60 text-[9px]">{driver}</span>
-                      <span className="font-mono font-black text-white text-[10px]">
-                        {numKm.toLocaleString("fr-FR")} <span className="text-[8px] text-white/30 font-sans">KM</span>
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-1000" 
-                        style={{ 
-                          width: `${Math.min(100, Math.max(8, cycleProgress))}%`,
-                          backgroundColor: dConfig.color 
-                        }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
         </div>
-
-      </div>
+      )}
 
     </div>
   );

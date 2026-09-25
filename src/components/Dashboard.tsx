@@ -285,6 +285,8 @@ export function Dashboard({
                 <QuantumExpenseAnalysis 
                   data={syncFilteredData} 
                   maintenanceTotal={maintenanceTotal} 
+                  maintenanceRecords={filteredMaintenance}
+                  allMaintenanceRecords={maintenanceRecords}
                   formatCurrency={(v) => formatCurrency(v, currency)} 
                   currency={currency}
                   t={t} 
