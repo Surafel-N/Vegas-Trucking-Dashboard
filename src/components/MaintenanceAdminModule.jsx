@@ -6,6 +6,28 @@ import {
 } from 'lucide-react';
 import { ALL_CHAUFFEURS } from '../lib/dashboard';
 
+
+// Helper extraction Google Drive
+function getDriveId(link) {
+  if (!link) return null;
+  const matchD = link.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (matchD && matchD[1]) return matchD[1];
+  const matchId = link.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (matchId && matchId[1]) return matchId[1];
+  const matchFolder = link.match(/\/folders\/([a-zA-Z0-9_-]{20,})/);
+  if (matchFolder && matchFolder[1]) return matchFolder[1];
+  const fallback = link.match(/[-\w]{25,}/);
+  return fallback ? fallback[0] : null;
+}
+
+function getDriveEmbedUrl(link) {
+  if (!link) return null;
+  if (link.includes("/folders/")) return null;
+  const id = getDriveId(link);
+  if (!id) return null;
+  return `https://drive.google.com/file/d/${id}/preview`;
+}
+
 export function MaintenanceAdminModule({ 
   records = [], 
   setRecords, 
@@ -25,6 +47,22 @@ export function MaintenanceAdminModule({
   const [debugKey, setDebugKey] = useState('');
   const [pendingAI, setPendingAI] = useState([]);
   const [activeTab, setActiveTab] = useState('maintenance');
+
+  // Filtres fluides et recherche
+  const [selectedTruck, setSelectedTruck] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  // État du formulaire de saisie manuelle (évite tout crash ReferenceError)
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    vehicle: 'AMARA TRUCK 76',
+    description: '',
+    cost: '',
+    imageUrl: '',
+    workPhotos: []
+  });
 
   // Local state for oil change inputs to allow explicit saving
   const [oilChangeInputs, setOilChangeInputs] = useState({});
@@ -172,7 +210,41 @@ export function MaintenanceAdminModule({
 
   const vehicleOptions = drivers.map(d => `${d.name} ${d.sdv}`);
 
-  const displayRecords = activeTab === 'maintenance' ? records : expenseRecords;
+  const baseRecords = activeTab === 'maintenance' ? records : expenseRecords;
+
+  const filteredRecords = useMemo(() => {
+    return (baseRecords || []).filter(row => {
+      // Filtre camion
+      if (selectedTruck !== 'ALL') {
+        const v = String(row.vehicle || row.driverLabel || "").toUpperCase();
+        if (!v.includes(selectedTruck)) return false;
+      }
+      // Filtre catégorie
+      if (categoryFilter !== 'ALL') {
+        const desc = String(row.description || "").toLowerCase();
+        if (categoryFilter === 'vidange' && !desc.includes('vidange') && !desc.includes('huile')) return false;
+        if (categoryFilter === 'pneu' && !desc.includes('pneu') && !desc.includes('roue')) return false;
+        if (categoryFilter === 'mecanique' && !desc.includes('pièce') && !desc.includes('disque') && !desc.includes('frein') && !desc.includes('moteur') && !desc.includes('filtre')) return false;
+        if (categoryFilter === 'drive' && !row.driveLink && !row.imageUrl && (!row.workPhotos || row.workPhotos.length === 0)) return false;
+      }
+      // Filtre recherche
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const v = String(row.vehicle || row.driverLabel || "").toLowerCase();
+        const d = String(row.description || "").toLowerCase();
+        const cost = String(row.cost || row.amount || "");
+        const date = String(row.date || "");
+        if (!v.includes(q) && !d.includes(q) && !cost.includes(q) && !date.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [baseRecords, selectedTruck, categoryFilter, searchQuery]);
+
+  const totalCost = useMemo(() => {
+    return filteredRecords.reduce((sum, r) => sum + (Number(r.cost || r.amount) || 0), 0);
+  }, [filteredRecords]);
+
+  const displayRecords = filteredRecords;
 
   return (
     <div className="space-y-6">
@@ -317,6 +389,120 @@ export function MaintenanceAdminModule({
         ))}
       </section>
 
+      {/* KPI BANNER ATELIER & FINANCES */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Total Dépenses ({activeTab === 'maintenance' ? 'Atelier' : 'Dépenses'})</p>
+            <p className="text-xl font-black text-orange-400 mt-1">{totalCost.toLocaleString("fr-FR")} CFA</p>
+          </div>
+          <div className="size-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
+            <Wrench className="size-5" />
+          </div>
+        </div>
+        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Lignes Affichées</p>
+            <p className="text-xl font-black text-white mt-1">{filteredRecords.length} <span className="text-xs text-white/30 font-normal">/ {baseRecords.length}</span></p>
+          </div>
+          <div className="size-10 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+            <FileText className="size-5" />
+          </div>
+        </div>
+        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Filtre Actif</p>
+            <p className="text-sm font-black text-emerald-400 mt-1">{selectedTruck === 'ALL' ? 'Tous les camions' : selectedTruck}</p>
+          </div>
+          <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+            <Truck className="size-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* BARRE DE FILTRES & RECHERCHE FLUIDE */}
+      <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl space-y-3">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+          {/* SÉLECTEUR PAR CAMION */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+            <button
+              onClick={() => setSelectedTruck('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${selectedTruck === 'ALL' ? 'bg-white text-black shadow-md' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'}`}
+            >
+              Tous ({baseRecords.length})
+            </button>
+            <button
+              onClick={() => setSelectedTruck('76')}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '76' ? 'bg-[#3B82F6] text-white shadow-md shadow-[#3B82F6]/30' : 'bg-white/5 text-[#3B82F6] hover:bg-blue-500/10'}`}
+            >
+              <span className="size-2 rounded-full bg-[#3B82F6]" /> AMARA 76
+            </button>
+            <button
+              onClick={() => setSelectedTruck('45')}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '45' ? 'bg-[#10B981] text-white shadow-md shadow-[#10B981]/30' : 'bg-white/5 text-[#10B981] hover:bg-emerald-500/10'}`}
+            >
+              <span className="size-2 rounded-full bg-[#10B981]" /> BRAHIMA 45
+            </button>
+            <button
+              onClick={() => setSelectedTruck('52')}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '52' ? 'bg-[#CF5D56] text-white shadow-md shadow-[#CF5D56]/30' : 'bg-white/5 text-[#CF5D56] hover:bg-red-500/10'}`}
+            >
+              <span className="size-2 rounded-full bg-[#CF5D56]" /> SORO 52
+            </button>
+          </div>
+
+          {/* RECHERCHE INSTANTANÉE */}
+          <div className="relative w-full md:w-64">
+            <input
+              type="text"
+              placeholder="Rechercher pièce, date, CFA..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-9 bg-black/40 border border-white/10 rounded-xl pl-8 pr-3 text-xs text-white placeholder:text-white/20 outline-none focus:border-orange-500/50"
+            />
+            <span className="absolute left-2.5 top-2.5 text-white/30 text-xs">🔍</span>
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-2 text-white/30 hover:text-white text-xs">✕</button>
+            )}
+          </div>
+        </div>
+
+        {/* CHIPS CATÉGORIES RAPIDES */}
+        <div className="flex items-center gap-2 overflow-x-auto text-[10px] font-bold text-white/60 pt-1">
+          <span className="text-white/30 uppercase tracking-widest text-[9px] mr-1">Type :</span>
+          <button
+            onClick={() => setCategoryFilter('ALL')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'ALL' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'hover:bg-white/5'}`}
+          >
+            Toutes
+          </button>
+          <button
+            onClick={() => setCategoryFilter('vidange')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'vidange' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'hover:bg-white/5'}`}
+          >
+            🛢️ Vidanges & Huiles
+          </button>
+          <button
+            onClick={() => setCategoryFilter('mecanique')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'mecanique' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' : 'hover:bg-white/5'}`}
+          >
+            ⚙️ Pièces & Réparations
+          </button>
+          <button
+            onClick={() => setCategoryFilter('pneu')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'pneu' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/40' : 'hover:bg-white/5'}`}
+          >
+            🛞 Pneus & Roues
+          </button>
+          <button
+            onClick={() => setCategoryFilter('drive')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'drive' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-white/5'}`}
+          >
+            📁 Justificatifs Drive
+          </button>
+        </div>
+      </div>
+
       <section className="panel-enter rounded-[30px] border border-white/7 bg-[#111] overflow-hidden shadow-xl">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -345,35 +531,15 @@ export function MaintenanceAdminModule({
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     {(row.imageUrl || row.driveLink) && (
-                      <div className="flex items-center gap-2">
-                        {(row.driveLink?.includes('google.com') && (row.driveLink?.includes('view') || row.driveLink?.includes('id='))) ? (
-                          <div className="relative group/img size-10 rounded-lg overflow-hidden border border-white/10 bg-black/40">
-                             <img 
-                               src={`https://drive.google.com/thumbnail?id=${row.driveLink.match(/[-\w]{25,}/)}&sz=w400`}
-                               className="size-full object-cover"
-                               onError={(e) => { e.target.style.display = 'none'; }}
-                             />
-                             <a 
-                               href={row.driveLink} 
-                               target="_blank" 
-                               rel="noreferrer"
-                               className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all"
-                             >
-                               <ExternalLink className="size-3 text-white" />
-                             </a>
-                          </div>
-                        ) : (
-                          <a 
-                            href={row.imageUrl || row.driveLink} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            className="size-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center hover:bg-blue-500/20 border border-blue-500/20"
-                            title="Voir la preuve"
-                          >
-                            <ExternalLink className="size-4" />
-                          </a>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(row)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-all text-[11px] font-bold"
+                        title="Aperçu direct du justificatif"
+                      >
+                        <Eye className="size-3.5" />
+                        <span>Preuve</span>
+                      </button>
                     )}
                     {row.workPhotos?.length > 0 && (
                       <div className="flex -space-x-2">
@@ -429,6 +595,77 @@ export function MaintenanceAdminModule({
           </section>
         </div>
       )}
-    </div>
+    
+      {/* MODAL APERÇU DIRECT DRIVE / JUSTIFICATIF */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#181818] border border-white/10 rounded-[32px] w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="p-4 px-6 border-b border-white/5 flex items-center justify-between bg-black/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                  <Eye className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">{previewDoc.description || 'Justificatif Atelier & Finances'}</h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase">{previewDoc.vehicle || previewDoc.driverLabel} • {previewDoc.date} • {Number(previewDoc.cost || previewDoc.amount || 0).toLocaleString()} CFA</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {(previewDoc.driveLink || previewDoc.imageUrl) && (
+                  <a
+                    href={previewDoc.driveLink || previewDoc.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
+                  >
+                    <ExternalLink className="size-3.5" /> Ouvrir Drive
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-2 text-white/40 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-all"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-black/60 p-4 flex items-center justify-center overflow-hidden">
+              {getDriveEmbedUrl(previewDoc.driveLink) ? (
+                <iframe
+                  src={getDriveEmbedUrl(previewDoc.driveLink)}
+                  className="w-full h-full rounded-2xl border border-white/5"
+                  title="Aperçu Google Drive"
+                  allow="autoplay"
+                />
+              ) : previewDoc.imageUrl ? (
+                <img
+                  src={previewDoc.imageUrl}
+                  alt="Preuve"
+                  className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl"
+                />
+              ) : previewDoc.driveLink ? (
+                <div className="text-center p-8 space-y-4">
+                  <FolderOpen className="size-16 text-blue-400 mx-auto" />
+                  <div>
+                    <p className="text-sm font-bold text-white">Dossier Google Drive</p>
+                    <p className="text-xs text-white/40 max-w-md mx-auto mt-1">Ce lien correspond à un dossier de photos ou de documents multiples.</p>
+                  </div>
+                  <a
+                    href={previewDoc.driveLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    <ExternalLink className="size-4" /> Explorer le dossier sur Drive
+                  </a>
+                </div>
+              ) : (
+                <p className="text-sm text-white/40 font-bold">Aucun aperçu disponible.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 }
