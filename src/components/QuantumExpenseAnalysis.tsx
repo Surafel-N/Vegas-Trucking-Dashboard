@@ -1,219 +1,614 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip,
+  Sector
 } from 'recharts';
 import { 
-  Fuel, ShieldCheck, Utensils, Anchor, PlusCircle, 
-  Wallet, Target, Truck, Wrench, Route
+  Fuel, 
+  ShieldCheck, 
+  Utensils, 
+  Anchor, 
+  PlusCircle, 
+  Wallet, 
+  Truck, 
+  Wrench, 
+  Route,
+  TrendingUp,
+  Percent,
+  Layers,
+  ArrowUpRight,
+  Info,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
-const COLORS = {
-  fuel: "#00F2FF", 
-  frais: "#FF375F", 
-  maintenance: "#FF9F0A", // Orange Apple pour la maintenance
-  drivers: ["#00F2FF", "#00A2FF", "#006AFF"],
-  categories: {
-    péages: "#FF9F0A",
-    police: "#5E5CE6",
-    repas: "#30D158",
-    extra: "#FF375F",
-    maintenance: "#FF9F0A"
+// --- PALETTE DE COULEURS CLARIFIÉE & CONTRASTÉE ---
+export const QUANTUM_PALETTE = {
+  // Par Nature de Frais
+  fuel: { color: "#00F2FF", light: "#A5F3FC", bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-400" },
+  maintenance: { color: "#F59E0B", light: "#FDE68A", bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400" },
+  road: { color: "#8B5CF6", light: "#DDD6FE", bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400" },
+  police: { color: "#EC4899", light: "#FBCFE8", bg: "bg-pink-500/10", border: "border-pink-500/30", text: "text-pink-400" },
+  food: { color: "#10B981", light: "#A7F3D0", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" },
+  extra: { color: "#F97316", light: "#FED7AA", bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400" },
+
+  // Par Véhicule / Chauffeur
+  drivers: {
+    AMARA: { color: "#3B82F6", light: "#93C5FD", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" },
+    BRAHIMA: { color: "#10B981", light: "#6EE7B7", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" },
+    SORO: { color: "#CF5D56", light: "#FCA5A5", bg: "bg-[#cf5d56]/10", border: "border-[#cf5d56]/30", text: "text-[#cf5d56]" },
+    FLOTTE: { color: "#A855F7", light: "#E9D5FF", bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400" }
   }
 };
 
 type QuantumProps = {
   data: any[];
   maintenanceTotal: number;
-  formatCurrency: (val: number) => string;
-  t: any;
-  records: any[]; // Pour le calcul des KM
+  formatCurrency: (val: number, curr?: string) => string;
+  currency?: string;
+  t?: any;
+  records?: any[];
+  allTrips?: any[];
 };
 
-export function QuantumExpenseAnalysis({ data, maintenanceTotal, formatCurrency, t, records }: QuantumProps) {
-  
+export function QuantumExpenseAnalysis({ 
+  data = [], 
+  maintenanceTotal = 0, 
+  formatCurrency, 
+  currency = "CFA",
+  t, 
+  records = [],
+  allTrips = []
+}: QuantumProps) {
+  // Mode de perspective : "nature" (par type de coût) ou "driver" (par véhicule)
+  const [perspective, setPerspective] = useState<"nature" | "driver">("nature");
+  // Index de la tranche survolée pour le centre dynamique
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const formatMoney = (val: number) => {
+    if (formatCurrency) return formatCurrency(val, currency);
+    return `${new Intl.NumberFormat('fr-FR').format(Math.round(val))} ${currency}`;
+  };
+
+  // --- 1. CALCULS ANALYTIQUES GLOBAUX ---
   const stats = useMemo(() => {
-    const drivers = ["AMARA", "BRAHIMA", "SORO"];
+    // Calcul des totaux opérationnels en une seule passe
+    const sums = data.reduce((acc, row) => ({
+      fuel: acc.fuel + (Number(row.fuel_cost_cfa) || 0),
+      road: acc.road + (Number(row.road_fees_cfa) || 0),
+      police: acc.police + (Number(row.police_fees_cfa) || 0),
+      food: acc.food + (Number(row.food_fees_cfa) || 0),
+      extra: acc.extra + (Number(row.other_expenses_cfa) || 0),
+      gross: acc.gross + (Number(row.total_gross_cfa) || 0),
+      net: acc.net + (Number(row.total_net_cfa) || 0)
+    }), { fuel: 0, road: 0, police: 0, food: 0, extra: 0, gross: 0, net: 0 });
+
+    const totalRouteExpenses = sums.fuel + sums.road + sums.police + sums.food + sums.extra;
+    const grandTotalExpense = totalRouteExpenses + maintenanceTotal;
+    const realNetProfit = sums.gross - grandTotalExpense;
+    const netMargin = sums.gross > 0 ? (realNetProfit / sums.gross) * 100 : 0;
+
+    // Ratio Carburant / CA
+    const fuelRatio = sums.gross > 0 ? (sums.fuel / sums.gross) * 100 : 0;
     
-    // Calcul des KM (Logique extraite de FleetTrackerWidget)
+    // Coût moyen par rotation / voyage
+    const totalTripsCount = data.length || 1;
+    const avgCostPerTrip = Math.round(grandTotalExpense / totalTripsCount);
+
+    // --- A. DONNÉES PAR NATURE DE FRAIS ---
+    const natureList = [
+      {
+        id: "fuel",
+        name: t?.fuel || "Gasoil",
+        value: sums.fuel,
+        color: QUANTUM_PALETTE.fuel.color,
+        lightColor: QUANTUM_PALETTE.fuel.light,
+        bg: QUANTUM_PALETTE.fuel.bg,
+        border: QUANTUM_PALETTE.fuel.border,
+        text: QUANTUM_PALETTE.fuel.text,
+        icon: Fuel,
+        desc: "Carburant moteur principal"
+      },
+      {
+        id: "maintenance",
+        name: t?.maintenance || "Maintenance Flotte",
+        value: maintenanceTotal,
+        color: QUANTUM_PALETTE.maintenance.color,
+        lightColor: QUANTUM_PALETTE.maintenance.light,
+        bg: QUANTUM_PALETTE.maintenance.bg,
+        border: QUANTUM_PALETTE.maintenance.border,
+        text: QUANTUM_PALETTE.maintenance.text,
+        icon: Wrench,
+        desc: "Atelier, vidanges & pièces"
+      },
+      {
+        id: "road",
+        name: t?.tolls || "Péages & Autoroute",
+        value: sums.road,
+        color: QUANTUM_PALETTE.road.color,
+        lightColor: QUANTUM_PALETTE.road.light,
+        bg: QUANTUM_PALETTE.road.bg,
+        border: QUANTUM_PALETTE.road.border,
+        text: QUANTUM_PALETTE.road.text,
+        icon: Anchor,
+        desc: "Droits de passage et ponts"
+      },
+      {
+        id: "police",
+        name: t?.police || "Contrôles / Police",
+        value: sums.police,
+        color: QUANTUM_PALETTE.police.color,
+        lightColor: QUANTUM_PALETTE.police.light,
+        bg: QUANTUM_PALETTE.police.bg,
+        border: QUANTUM_PALETTE.police.border,
+        text: QUANTUM_PALETTE.police.text,
+        icon: ShieldCheck,
+        desc: "Escortes & contrôles routiers"
+      },
+      {
+        id: "food",
+        name: t?.meals || "Frais Route & Repas",
+        value: sums.food,
+        color: QUANTUM_PALETTE.food.color,
+        lightColor: QUANTUM_PALETTE.food.light,
+        bg: QUANTUM_PALETTE.food.bg,
+        border: QUANTUM_PALETTE.food.border,
+        text: QUANTUM_PALETTE.food.text,
+        icon: Utensils,
+        desc: "Indemnités de mission chauffeur"
+      },
+      {
+        id: "extra",
+        name: t?.extras || "Divers & Extras",
+        value: sums.extra,
+        color: QUANTUM_PALETTE.extra.color,
+        lightColor: QUANTUM_PALETTE.extra.light,
+        bg: QUANTUM_PALETTE.extra.bg,
+        border: QUANTUM_PALETTE.extra.border,
+        text: QUANTUM_PALETTE.extra.text,
+        icon: PlusCircle,
+        desc: "Dépannages & imprévus"
+      }
+    ]
+      .filter(item => item.value > 0)
+      .map(item => ({
+        ...item,
+        percent: grandTotalExpense > 0 ? (item.value / grandTotalExpense) * 100 : 0
+      }));
+
+    // --- B. DONNÉES PAR VÉHICULE & CHAUFFEUR ---
+    const driverTotals: Record<string, { total: number; fuel: number; trips: number }> = {
+      AMARA: { total: 0, fuel: 0, trips: 0 },
+      BRAHIMA: { total: 0, fuel: 0, trips: 0 },
+      SORO: { total: 0, fuel: 0, trips: 0 }
+    };
+
+    data.forEach(r => {
+      const lbl = String(r.driverLabel || r.chauffeur || "").toUpperCase();
+      let key: "AMARA" | "BRAHIMA" | "SORO" | null = null;
+      if (lbl.includes("AMARA") || lbl.includes("76")) key = "AMARA";
+      else if (lbl.includes("BRAHIMA") || lbl.includes("45")) key = "BRAHIMA";
+      else if (lbl.includes("SORO") || lbl.includes("SORRO") || lbl.includes("52")) key = "SORO";
+
+      if (key) {
+        const fuel = Number(r.fuel_cost_cfa) || 0;
+        const exp = Number(r.total_expense_cfa) || (fuel + (Number(r.road_fees_cfa) || 0));
+        driverTotals[key].total += exp;
+        driverTotals[key].fuel += fuel;
+        driverTotals[key].trips += 1;
+      }
+    });
+
+    const driverList = [
+      {
+        id: "AMARA",
+        name: "AMARA TRUCK 76",
+        shortName: "AMARA",
+        unit: "76",
+        value: driverTotals.AMARA.total,
+        color: QUANTUM_PALETTE.drivers.AMARA.color,
+        lightColor: QUANTUM_PALETTE.drivers.AMARA.light,
+        bg: QUANTUM_PALETTE.drivers.AMARA.bg,
+        border: QUANTUM_PALETTE.drivers.AMARA.border,
+        text: QUANTUM_PALETTE.drivers.AMARA.text,
+        icon: Truck,
+        desc: `${driverTotals.AMARA.trips} voyages enregistrés`
+      },
+      {
+        id: "BRAHIMA",
+        name: "BRAHIMA TRUCK 45",
+        shortName: "BRAHIMA",
+        unit: "45",
+        value: driverTotals.BRAHIMA.total,
+        color: QUANTUM_PALETTE.drivers.BRAHIMA.color,
+        lightColor: QUANTUM_PALETTE.drivers.BRAHIMA.light,
+        bg: QUANTUM_PALETTE.drivers.BRAHIMA.bg,
+        border: QUANTUM_PALETTE.drivers.BRAHIMA.border,
+        text: QUANTUM_PALETTE.drivers.BRAHIMA.text,
+        icon: Truck,
+        desc: `${driverTotals.BRAHIMA.trips} voyages enregistrés`
+      },
+      {
+        id: "SORO",
+        name: "SORO TRUCK 52",
+        shortName: "SORO",
+        unit: "52",
+        value: driverTotals.SORO.total,
+        color: QUANTUM_PALETTE.drivers.SORO.color,
+        lightColor: QUANTUM_PALETTE.drivers.SORO.light,
+        bg: QUANTUM_PALETTE.drivers.SORO.bg,
+        border: QUANTUM_PALETTE.drivers.SORO.border,
+        text: QUANTUM_PALETTE.drivers.SORO.text,
+        icon: Truck,
+        desc: `${driverTotals.SORO.trips} voyages enregistrés`
+      },
+      {
+        id: "FLOTTE",
+        name: "Maintenance Flotte (Atelier)",
+        shortName: "Maintenance",
+        unit: "ATELIER",
+        value: maintenanceTotal,
+        color: QUANTUM_PALETTE.drivers.FLOTTE.color,
+        lightColor: QUANTUM_PALETTE.drivers.FLOTTE.light,
+        bg: QUANTUM_PALETTE.drivers.FLOTTE.bg,
+        border: QUANTUM_PALETTE.drivers.FLOTTE.border,
+        text: QUANTUM_PALETTE.drivers.FLOTTE.text,
+        icon: Wrench,
+        desc: "Coûts centraux non affectés"
+      }
+    ]
+      .filter(item => item.value > 0)
+      .map(item => ({
+        ...item,
+        percent: grandTotalExpense > 0 ? (item.value / grandTotalExpense) * 100 : 0
+      }));
+
+    // --- C. CALCUL ODOMÈTRE CERTIFIÉ ---
     const kmData: Record<string, number> = {
       AMARA: 117324,
       BRAHIMA: 110593,
       SORO: 110975
     };
-    const sortedRecords = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    sortedRecords.forEach(t => {
-      if (!t.driverLabel) return;
-      const labelUpper = t.driverLabel.toUpperCase();
-      let driverKey: "AMARA" | "BRAHIMA" | "SORO" | null = null;
-      if (labelUpper.includes("AMARA")) driverKey = "AMARA";
-      else if (labelUpper.includes("BRAHIMA")) driverKey = "BRAHIMA";
-      else if (labelUpper.includes("SORO") || labelUpper.includes("SORRO")) driverKey = "SORO";
-      else return;
-      let kmValue = Number(t.km || t.distanceKm || 0);
-      if (driverKey === "SORO" && kmValue === 712827) kmValue = 71283;
-      if (driverKey === "BRAHIMA" && kmValue === 196266) kmValue = 106266;
-      if (driverKey === "BRAHIMA" && kmValue === 10492) kmValue = 107492;
-      if (driverKey === "SORO" && kmValue === 59757 && (t.date || "") < "2025-10-01") kmValue = 50757;
-      if (kmValue >= 20000 && kmValue < 200000) {
-        kmData[driverKey] = Math.max(kmData[driverKey], kmValue);
+    const sourceTrips = allTrips && allTrips.length > 0 ? allTrips : (records && records.length > 0 ? records : data);
+    sourceTrips.forEach(t => {
+      const lbl = String(t.driverLabel || t.chauffeur || "").toUpperCase();
+      let key: "AMARA" | "BRAHIMA" | "SORO" | null = null;
+      if (lbl.includes("AMARA") || lbl.includes("76")) key = "AMARA";
+      else if (lbl.includes("BRAHIMA") || lbl.includes("45")) key = "BRAHIMA";
+      else if (lbl.includes("SORO") || lbl.includes("SORRO") || lbl.includes("52")) key = "SORO";
+      if (!key) return;
+
+      let kVal = Number(t.km || 0);
+      if (key === "SORO" && kVal === 712827) kVal = 71283;
+      if (key === "BRAHIMA" && kVal === 196266) kVal = 106266;
+      if (key === "BRAHIMA" && kVal === 10492) kVal = 107492;
+      if (key === "SORO" && kVal === 59757 && (t.date || "") < "2025-10-01") kVal = 50757;
+      if (kVal >= 20000 && kVal <= 200000) {
+        kmData[key] = Math.max(kmData[key], kVal);
       }
     });
 
-    const sums = data.reduce((acc, row) => ({
-      fuel: acc.fuel + (row.fuel_cost_cfa || 0),
-      road: acc.road + (row.road_fees_cfa || 0),
-      police: acc.police + (row.police_fees_cfa || 0),
-      food: acc.food + (row.food_fees_cfa || 0),
-      extra: acc.extra + (row.other_expenses_cfa || 0),
-      total: acc.total + (row.total_expense_cfa || 0),
-      gross: acc.gross + (row.total_gross_cfa || 0),
-      net: acc.net + (row.total_net_cfa || 0)
-    }), { fuel: 0, road: 0, police: 0, food: 0, extra: 0, total: 0, gross: 0, net: 0 });
+    return {
+      sums,
+      grandTotalExpense,
+      realNetProfit,
+      netMargin,
+      fuelRatio,
+      avgCostPerTrip,
+      natureList,
+      driverList,
+      kmData
+    };
+  }, [data, maintenanceTotal, records, allTrips, t]);
 
-    // Ajout de la maintenance au total
-    const grandTotalExpense = sums.total + maintenanceTotal;
-    const realNetProfit = sums.gross - grandTotalExpense;
-
-    // Anneau Interne : GASOIL vs LOGISTIQUE vs MAINTENANCE
-    const innerData = [
-      { name: t?.fuel || "Gasoil", value: sums.fuel, color: COLORS.fuel },
-      { name: t?.logistics || "Logistique", value: sums.road + sums.police + sums.food + sums.extra, color: COLORS.frais },
-      { name: t?.maintenance || "Maintenance", value: maintenanceTotal, color: COLORS.maintenance }
-    ].filter(d => d.value > 0);
-
-    // Anneau Externe : DÉTAIL COMPLET
-    const outerData = [
-      ...drivers.map((name, i) => ({
-        name: `${t?.fuel || 'Gasoil'} ${name}`,
-        value: data.filter(t => t.chauffeur === name).reduce((s, r) => s + (r.fuel_cost_cfa || 0), 0),
-        color: COLORS.drivers[i],
-        icon: Truck
-      })),
-      { name: t?.tolls || "Péages", value: sums.road, color: COLORS.categories.péages, icon: Anchor },
-      { name: t?.police || "Police", value: sums.police, color: COLORS.categories.police, icon: ShieldCheck },
-      { name: t?.meals || "Repas", value: sums.food, color: COLORS.categories.repas, icon: Utensils },
-      { name: t?.maintenance || "Maintenance", value: maintenanceTotal, color: COLORS.maintenance, icon: Wrench },
-      { name: t?.extras || "Extras", value: sums.extra, color: COLORS.categories.extra, icon: PlusCircle }
-    ].filter(d => d.value > 0);
-
-    return { sums, innerData, outerData, grandTotalExpense, realNetProfit, kmData };
-  }, [data, maintenanceTotal, records, t]);
-
-  const infographicCards = [
-    { label: t?.fuel || "Gasoil", value: stats.sums.fuel, icon: Fuel, color: "text-[#00F2FF]", bg: "bg-[#00F2FF]/10" },
-    { label: t?.maintenance || "Maintenance", value: maintenanceTotal, icon: Wrench, color: "text-[#FF9F0A]", bg: "bg-[#FF9F0A]/10" },
-    { label: t?.totalExpenses || "Total Frais", value: stats.grandTotalExpense, icon: Wallet, color: "text-[#FF375F]", bg: "bg-[#FF375F]/10" },
-  ];
+  // Données de l'anneau actif selon la perspective choisie
+  const activeData = perspective === "nature" ? stats.natureList : stats.driverList;
+  const hoveredItem = activeIndex !== null && activeData[activeIndex] ? activeData[activeIndex] : null;
 
   return (
-    <div className="w-full h-full flex flex-col xl:flex-row items-center gap-10">
+    <div className="w-full h-full flex flex-col gap-6">
       
-      {/* DONUT COLUMN */}
-      <div className="relative w-full xl:w-[60%] h-[450px]">
-        <ResponsiveContainer width="100%" height={450}>
-          <PieChart>
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#1c1c1e', border: 'none', borderRadius: '12px', fontSize: '12px' }} 
-              itemStyle={{ color: '#fff' }} 
-              formatter={(value: number) => formatCurrency(value)}
-            />
-            {/* INNER RING: CATEGORIES OVERVIEW */}
-            <Pie 
-              data={stats.innerData} 
-              innerRadius={80} 
-              outerRadius={110} 
-              paddingAngle={5} 
-              dataKey="value" 
-              stroke="none"
-              animationBegin={0}
-              animationDuration={1500}
-            >
-              {stats.innerData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-            </Pie>
+      {/* 1. EN-TÊTE DU MODULE AVEC COMMUTATEUR DE PERSPECTIVE */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              Contrôle des Coûts
+            </span>
+            <span className="text-xs text-white/40">•</span>
+            <span className="text-xs text-white/60 font-medium">Ventilation Globale</span>
+          </div>
+        </div>
 
-            {/* OUTER RING: DETAILED BREAKDOWN */}
-            <Pie 
-              data={stats.outerData} 
-              innerRadius={125} 
-              outerRadius={150} 
-              paddingAngle={2} 
-              dataKey="value" 
-              stroke="none"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              labelLine={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
-              minAngle={5}
-              animationBegin={200}
-              animationDuration={1800}
-            >
-              {stats.outerData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{t?.totalExpenses || "Total Dépenses"}</p>
-          <span className="text-2xl font-black text-white tracking-tighter drop-shadow-lg">{formatCurrency(stats.grandTotalExpense)}</span>
+        {/* Commutateur : Par Nature vs Par Véhicule */}
+        <div className="flex items-center bg-black/50 p-1 rounded-2xl border border-white/10 self-start sm:self-auto">
+          <button
+            onClick={() => { setPerspective("nature"); setActiveIndex(null); }}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+              perspective === "nature" 
+                ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-lg shadow-cyan-500/20" 
+                : "text-white/50 hover:text-white"
+            }`}
+          >
+            <Layers className="size-3" />
+            <span>Par Nature</span>
+          </button>
+          <button
+            onClick={() => { setPerspective("driver"); setActiveIndex(null); }}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+              perspective === "driver" 
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-black shadow-lg shadow-emerald-500/20" 
+                : "text-white/50 hover:text-white"
+            }`}
+          >
+            <Truck className="size-3" />
+            <span>Par Véhicule</span>
+          </button>
         </div>
       </div>
 
-      {/* INFOGRAPHICS COLUMN */}
-      <div className="w-full xl:w-[40%] flex flex-col gap-3">
-        <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 px-1">{t?.analyticalRecap || "Récapitulatif Analytique"}</h4>
-        {infographicCards.map((card, i) => (
-          <div key={i} className="p-3 rounded-[20px] bg-white/[0.02] border border-white/5 flex items-center justify-between group hover:bg-white/[0.04] transition-all">
-            <div className="flex items-center gap-3">
-              <div className={`size-8 rounded-xl ${card.bg} flex items-center justify-center transition-transform group-hover:scale-110`}>
-                <card.icon className={`size-4 ${card.color}`} />
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-none mb-0.5">{card.label}</p>
-                <p className="text-sm font-black text-white">{formatCurrency(card.value)}</p>
-              </div>
-            </div>
-            <span className="text-[9px] font-black text-white/10 uppercase">{((card.value / (stats.grandTotalExpense || 1)) * 100).toFixed(0)}%</span>
-          </div>
-        ))}
-
-        {/* KM MONITORING INTEGRATION */}
-        <div className="mt-4 p-4 rounded-[28px] bg-white/[0.03] border border-white/10 space-y-4">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <Route className="size-4 text-[#cf5d56]" />
-              <h5 className="text-[10px] font-black text-white/50 uppercase tracking-[0.1em]">{t?.mileageTracking || "Suivi Kilométrage"}</h5>
-            </div>
-            <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Odomètre Réel</span>
-          </div>
-          {Object.entries(stats.kmData).map(([driver, km]) => {
-            const numKm = Number(km);
-            const cycleProgress = ((numKm % 10000) / 10000) * 100;
-            return (
-              <div key={driver} className="space-y-1.5">
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="font-black text-white/50">{driver}</span>
-                  <span className="font-black font-mono text-white">{numKm.toLocaleString("fr-FR")} <span className="text-white/30 font-sans">KM</span></span>
-                </div>
-                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-[#cf5d56] opacity-80 rounded-full transition-all duration-1000" 
-                    style={{ width: `${Math.min(100, Math.max(8, cycleProgress))}%` }} 
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* 2. GRILLE PRINCIPALE : DONUT HAUTE RÉSOLUTION + GRILLE ANALYTIQUE */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-center">
         
-        {/* Performance Summary */}
-        <div className="mt-2 p-3 rounded-[20px] bg-[#30D158]/5 border border-[#30D158]/10 flex flex-col gap-1.5">
-            <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black text-[#30D158] uppercase">{t?.netMarginRev || "Marge Net / Revenu"}</span>
-                <span className="text-[10px] font-black text-white">{((stats.realNetProfit / (stats.sums.gross || 1)) * 100).toFixed(1)}%</span>
+        {/* COLONNE GAUCHE (5 COLONNES) : LE DONUT AVEC CENTRE DYNAMIQUE INTERACTIF */}
+        <div className="xl:col-span-5 relative flex items-center justify-center min-h-[360px] w-full">
+          <div className="relative w-full h-[360px] max-w-[380px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip content={() => null} />
+                <Pie 
+                  data={activeData} 
+                  innerRadius={105} 
+                  outerRadius={145} 
+                  paddingAngle={3} 
+                  dataKey="value" 
+                  stroke="#1c1c1e"
+                  strokeWidth={3}
+                  animationBegin={0}
+                  animationDuration={1000}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                >
+                  {activeData.map((entry, index) => {
+                    const isHovered = activeIndex === index;
+                    return (
+                      <Cell 
+                        key={entry.id} 
+                        fill={entry.color} 
+                        opacity={activeIndex === null || isHovered ? 1 : 0.4}
+                        className="transition-all duration-300 cursor-pointer"
+                        style={{
+                          filter: isHovered ? `drop-shadow(0 0 12px ${entry.color})` : 'none',
+                          transform: isHovered ? 'scale(1.03)' : 'scale(1)',
+                          transformOrigin: 'center center'
+                        }}
+                      />
+                    );
+                  })}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* CENTRE DYNAMIQUE INTERACTIF HAUTE RÉSOLUTION */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-6">
+              {hoveredItem ? (
+                <div className="animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <div className="size-2.5 rounded-full shadow-sm" style={{ backgroundColor: hoveredItem.color }} />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-white truncate max-w-[170px]">
+                      {hoveredItem.name}
+                    </span>
+                  </div>
+                  <p className="text-xl font-black font-mono text-white tracking-tight leading-tight">
+                    {formatMoney(hoveredItem.value)}
+                  </p>
+                  <span 
+                    className="inline-block mt-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono shadow-sm"
+                    style={{ backgroundColor: `${hoveredItem.color}25`, color: hoveredItem.color }}
+                  >
+                    {hoveredItem.percent.toFixed(1)}% du total
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1 leading-none">
+                    {perspective === "driver" ? "Dépenses par Camion" : "Total Coûts Flotte"}
+                  </p>
+                  <span className="text-2xl font-black font-mono text-white tracking-tight drop-shadow-lg">
+                    {formatMoney(stats.grandTotalExpense)}
+                  </span>
+                  <span className="inline-block mt-1 text-[9px] font-bold text-white/40 uppercase tracking-widest">
+                    {activeData.length} catégories actives
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-[#30D158] rounded-full transition-all duration-1000" style={{ width: `${Math.max(0, (stats.realNetProfit / (stats.sums.gross || 1)) * 100)}%` }} />
-            </div>
+          </div>
         </div>
+
+        {/* COLONNE DROITE (7 COLONNES) : GRILLE D'ANALYSE DÉTAILLÉE AVEC JAUGES */}
+        <div className="xl:col-span-7 flex flex-col gap-3">
+          <div className="flex items-center justify-between px-1 mb-1">
+            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest">
+              {perspective === "nature" ? "Postes de Coûts Analytiques" : "Ventilation par Véhicule"}
+            </h4>
+            <span className="text-[10px] font-bold text-white/30 font-mono">
+              100% = {formatMoney(stats.grandTotalExpense)}
+            </span>
+          </div>
+
+          {/* Grille des catégories avec couleurs vives & barres de progression */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {activeData.map((item, idx) => {
+              const isSelected = activeIndex === idx;
+              const IconComp = item.icon || Layers;
+
+              return (
+                <div 
+                  key={item.id} 
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  className={`p-3 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+                    isSelected 
+                      ? "bg-white/10 border-white/40 shadow-xl scale-[1.02]" 
+                      : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/15"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div 
+                        className="size-8 rounded-xl flex items-center justify-center shrink-0 shadow-md transition-transform"
+                        style={{ backgroundColor: `${item.color}20`, color: item.color }}
+                      >
+                        <IconComp className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-white truncate">{item.name}</p>
+                        <p className="text-[9px] text-white/40 truncate">{item.desc}</p>
+                      </div>
+                    </div>
+                    <span 
+                      className="text-xs font-black font-mono shrink-0 px-2 py-0.5 rounded-lg"
+                      style={{ backgroundColor: `${item.color}15`, color: item.color }}
+                    >
+                      {item.percent.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  {/* Montant & Jauge de part */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-baseline text-[11px]">
+                      <span className="text-[9px] font-bold text-white/40 uppercase">Montant</span>
+                      <span className="font-mono font-black text-white">{formatMoney(item.value)}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ 
+                          width: `${Math.max(4, item.percent)}%`, 
+                          backgroundColor: item.color 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 3. RATIOS DE RENTABILITÉ & PERFORMANCE STRATÉGIQUE */}
+          <div className="mt-2 pt-3 border-t border-white/5 grid grid-cols-3 gap-2.5">
+            
+            {/* RATIO 1 : GASOIL / CA */}
+            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+              <div>
+                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
+                  Ratio Gasoil / C.A.
+                </span>
+                <span className={`text-base font-black font-mono ${
+                  stats.fuelRatio <= 38 ? "text-emerald-400" : "text-amber-400"
+                }`}>
+                  {stats.fuelRatio.toFixed(1)}%
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1">
+                {stats.fuelRatio <= 38 ? (
+                  <span className="text-[8px] font-bold text-emerald-400 flex items-center gap-0.5">
+                    <CheckCircle2 className="size-2.5" /> Optimal (&lt;38%)
+                  </span>
+                ) : (
+                  <span className="text-[8px] font-bold text-amber-400 flex items-center gap-0.5">
+                    <AlertCircle className="size-2.5" /> Vigilance (&gt;38%)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* RATIO 2 : COÛT MOYEN PAR VOYAGE */}
+            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+              <div>
+                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
+                  Coût Moyen / Rotation
+                </span>
+                <span className="text-sm font-black font-mono text-white">
+                  {new Intl.NumberFormat('fr-FR').format(stats.avgCostPerTrip)} <span className="text-[9px] text-white/40 font-sans">{currency}</span>
+                </span>
+              </div>
+              <p className="mt-1 text-[8px] font-bold text-white/30 uppercase">
+                {data.length} voyages pris en compte
+              </p>
+            </div>
+
+            {/* RATIO 3 : MARGE NETTE RÉELLE (POST-MAINTENANCE) */}
+            <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+              <div>
+                <span className="text-[8px] font-black uppercase tracking-wider text-white/40 block mb-1">
+                  Marge Nette Réelle
+                </span>
+                <span className={`text-base font-black font-mono ${
+                  stats.netMargin >= 0 ? "text-[#30D158]" : "text-red-400"
+                }`}>
+                  {stats.netMargin.toFixed(1)}%
+                </span>
+              </div>
+              <p className="mt-1 text-[8px] font-bold text-white/30 font-mono truncate">
+                Net : {formatMoney(stats.realNetProfit)}
+              </p>
+            </div>
+
+          </div>
+
+          {/* 4. SUIVI ODOMÈTRE CERTIFIÉ (CYCLE VIDANGE) */}
+          <div className="p-3.5 rounded-2xl bg-black/30 border border-white/5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Route className="size-3.5 text-[#cf5d56]" />
+                <h5 className="text-[9px] font-black text-white/60 uppercase tracking-wider">
+                  Odomètres Certifiés & Cycle 10 000 KM
+                </h5>
+              </div>
+              <span className="text-[9px] font-bold text-white/30 font-mono">Dernier relevé Sept 2026</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {Object.entries(stats.kmData).map(([driver, km]) => {
+                const numKm = Number(km);
+                const cycleProgress = ((numKm % 10000) / 10000) * 100;
+                const dConfig = QUANTUM_PALETTE.drivers[driver as keyof typeof QUANTUM_PALETTE.drivers] || { color: "#3B82F6" };
+
+                return (
+                  <div key={driver} className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-white/60 text-[9px]">{driver}</span>
+                      <span className="font-mono font-black text-white text-[10px]">
+                        {numKm.toLocaleString("fr-FR")} <span className="text-[8px] text-white/30 font-sans">KM</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all duration-1000" 
+                        style={{ 
+                          width: `${Math.min(100, Math.max(8, cycleProgress))}%`,
+                          backgroundColor: dConfig.color 
+                        }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+
       </div>
+
     </div>
   );
 }
 
+export default QuantumExpenseAnalysis;
