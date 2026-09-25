@@ -8,8 +8,6 @@ import {
   BarChart, 
   Bar, 
   Cell,
-  AreaChart,
-  Area,
   LineChart,
   Line
 } from 'recharts';
@@ -19,10 +17,12 @@ import {
   Zap, 
   BarChart3, 
   Award, 
-  Scale, 
-  Truck,
+  Truck, 
+  Calendar,
+  Layers,
+  Activity,
   ArrowUpRight,
-  ChevronRight
+  Filter
 } from 'lucide-react';
 
 export type MiniChartsProps = {
@@ -89,6 +89,10 @@ export function MiniCharts({
   // États de sélection pour Performance Analytique
   const [metric, setMetric] = useState<"net" | "gross" | "tonnage">("net");
   const [viewMode, setViewMode] = useState<"compare" | "timeline">("compare");
+  
+  // Nouveaux états de clarté pour l'ÉVOLUTION
+  const [evolutionGranularity, setEvolutionGranularity] = useState<"month" | "week" | "day" | "cumulative">("month");
+  const [evolutionChartType, setEvolutionChartType] = useState<"bar" | "line">("bar");
   const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>("ALL");
 
   const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
@@ -168,13 +172,11 @@ export function MiniCharts({
       };
     });
 
-    // Détermination du meilleur performeur (top bénéfice net)
     const topNetDriver = [...perfList].sort((a, b) => b.net - a.net)[0]?.key;
-
     return { list: perfList, topNetDriver };
   }, [records]);
 
-  // Données pour le bar chart comparatif selon la métrique sélectionnée
+  // Données pour le bar chart comparatif
   const compareChartData = useMemo(() => {
     return driverPerformance.list.map(d => {
       let value = 0;
@@ -207,51 +209,187 @@ export function MiniCharts({
     });
   }, [driverPerformance, metric, currency]);
 
-  // --- 3. CALCULS MODULE ÉVOLUTION TEMPORELLE (TIMELINE PAR CHAUFFEUR) ---
-  const timelineData = useMemo(() => {
+  // --- 3. CALCULS MODULE ÉVOLUTION TEMPORELLE HAUTE LISIBILITÉ ---
+  const evolutionData = useMemo(() => {
     const sorted = [...records].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    const dates = Array.from(new Set(sorted.map(r => r.date).filter(Boolean)));
+    if (sorted.length === 0) return [];
 
-    return dates.map(d => {
-      const dayRecords = sorted.filter(r => r.date === d);
+    const getVal = (r: any) => {
+      if (metric === "net") return Number(r.total_net_cfa) || 0;
+      if (metric === "gross") return Number(r.total_gross_cfa) || 0;
+      return Number(r.tonnage) || 0;
+    };
 
-      const amaraTrips = dayRecords.filter(r => getDriverKey(r) === "AMARA");
-      const brahimaTrips = dayRecords.filter(r => getDriverKey(r) === "BRAHIMA");
-      const soroTrips = dayRecords.filter(r => getDriverKey(r) === "SORO");
+    // A. Évolution Mensuelle (Par Mois)
+    if (evolutionGranularity === "month") {
+      const monthMap = new Map<string, { label: string; periodTitle: string; AMARA: number; BRAHIMA: number; SORO: number; total: number }>();
+      
+      sorted.forEach(r => {
+        if (!r.date) return;
+        const d = new Date(r.date);
+        if (isNaN(d.getTime())) return;
+        const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const monthShort = d.toLocaleDateString(locale, { month: 'short' });
+        const label = `${monthShort.charAt(0).toUpperCase() + monthShort.slice(1)} ${String(d.getFullYear()).slice(-2)}`;
+        const periodTitle = d.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 
-      // Calcul des valeurs selon la métrique
-      const getValue = (trips: any[]) => {
-        if (metric === "net") return trips.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
-        if (metric === "gross") return trips.reduce((s, r) => s + (Number(r.total_gross_cfa) || 0), 0);
-        return trips.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
-      };
+        if (!monthMap.has(mKey)) {
+          monthMap.set(mKey, { label, periodTitle, AMARA: 0, BRAHIMA: 0, SORO: 0, total: 0 });
+        }
 
-      const amaraVal = getValue(amaraTrips);
-      const brahimaVal = getValue(brahimaTrips);
-      const soroVal = getValue(soroTrips);
+        const entry = monthMap.get(mKey)!;
+        const driverKey = getDriverKey(r);
+        const val = getVal(r);
+        if (driverKey === "AMARA") entry.AMARA += val;
+        else if (driverKey === "BRAHIMA") entry.BRAHIMA += val;
+        else if (driverKey === "SORO") entry.SORO += val;
+        entry.total += val;
+      });
 
-      return {
-        rawDate: d,
-        date: new Date(d).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' }),
-        AMARA: amaraVal,
-        BRAHIMA: brahimaVal,
-        SORO: soroVal,
-        total: amaraVal + brahimaVal + soroVal
-      };
-    });
-  }, [records, metric, locale]);
-
-  // Métrique courante : libellé et unité
-  const metricMeta = useMemo(() => {
-    switch (metric) {
-      case "net":
-        return { title: t?.netProfit || "Bénéfice Net", unit: currency, color: "#10B981" };
-      case "gross":
-        return { title: t?.revenue || "Chiffre d'Affaires", unit: currency, color: "#3B82F6" };
-      case "tonnage":
-        return { title: t?.tonnage || "Volume Transporté", unit: "T", color: "#F59E0B" };
+      return Array.from(monthMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => ({
+          key: k,
+          label: v.label,
+          periodTitle: v.periodTitle,
+          AMARA: Math.round(v.AMARA),
+          BRAHIMA: Math.round(v.BRAHIMA),
+          SORO: Math.round(v.SORO),
+          total: Math.round(v.total)
+        }));
     }
-  }, [metric, currency, t]);
+
+    // B. Évolution Hebdomadaire (Par Semaine)
+    if (evolutionGranularity === "week") {
+      const weekMap = new Map<string, { label: string; periodTitle: string; AMARA: number; BRAHIMA: number; SORO: number; total: number }>();
+
+      sorted.forEach(r => {
+        if (!r.date) return;
+        const d = new Date(r.date);
+        if (isNaN(d.getTime())) return;
+        
+        const target = new Date(d.valueOf());
+        const dayNr = (d.getDay() + 6) % 7;
+        target.setDate(target.getDate() - dayNr + 3);
+        const firstThursday = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) {
+          target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        }
+        const weekNo = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+        const wKey = `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+        
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - dayNr);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        const periodTitle = `Semaine ${weekNo} (${monday.getDate()}/${monday.getMonth()+1} - ${sunday.getDate()}/${sunday.getMonth()+1})`;
+
+        if (!weekMap.has(wKey)) {
+          weekMap.set(wKey, { label: `S${weekNo}`, periodTitle, AMARA: 0, BRAHIMA: 0, SORO: 0, total: 0 });
+        }
+
+        const entry = weekMap.get(wKey)!;
+        const driverKey = getDriverKey(r);
+        const val = getVal(r);
+        if (driverKey === "AMARA") entry.AMARA += val;
+        else if (driverKey === "BRAHIMA") entry.BRAHIMA += val;
+        else if (driverKey === "SORO") entry.SORO += val;
+        entry.total += val;
+      });
+
+      return Array.from(weekMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => ({
+          key: k,
+          label: v.label,
+          periodTitle: v.periodTitle,
+          AMARA: Math.round(v.AMARA),
+          BRAHIMA: Math.round(v.BRAHIMA),
+          SORO: Math.round(v.SORO),
+          total: Math.round(v.total)
+        }));
+    }
+
+    // C. Évolution Quotidienne (Par Date)
+    if (evolutionGranularity === "day") {
+      const dayMap = new Map<string, { label: string; periodTitle: string; AMARA: number; BRAHIMA: number; SORO: number; total: number }>();
+
+      sorted.forEach(r => {
+        if (!r.date) return;
+        const d = new Date(r.date);
+        if (isNaN(d.getTime())) return;
+        const dayKey = r.date;
+        const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const periodTitle = d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+        if (!dayMap.has(dayKey)) {
+          dayMap.set(dayKey, { label, periodTitle, AMARA: 0, BRAHIMA: 0, SORO: 0, total: 0 });
+        }
+
+        const entry = dayMap.get(dayKey)!;
+        const driverKey = getDriverKey(r);
+        const val = getVal(r);
+        if (driverKey === "AMARA") entry.AMARA += val;
+        else if (driverKey === "BRAHIMA") entry.BRAHIMA += val;
+        else if (driverKey === "SORO") entry.SORO += val;
+        entry.total += val;
+      });
+
+      return Array.from(dayMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => ({
+          key: k,
+          label: v.label,
+          periodTitle: v.periodTitle,
+          AMARA: Math.round(v.AMARA),
+          BRAHIMA: Math.round(v.BRAHIMA),
+          SORO: Math.round(v.SORO),
+          total: Math.round(v.total)
+        }));
+    }
+
+    // D. Progression Cumulée (Croissance au fil du temps)
+    let amaraRunning = 0;
+    let brahimaRunning = 0;
+    let soroRunning = 0;
+
+    const dayMap = new Map<string, { label: string; periodTitle: string; AMARA: number; BRAHIMA: number; SORO: number }>();
+    sorted.forEach(r => {
+      if (!r.date) return;
+      const d = new Date(r.date);
+      if (isNaN(d.getTime())) return;
+      const dayKey = r.date;
+      const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const periodTitle = d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, { label, periodTitle, AMARA: 0, BRAHIMA: 0, SORO: 0 });
+      }
+      const entry = dayMap.get(dayKey)!;
+      const driverKey = getDriverKey(r);
+      const val = getVal(r);
+      if (driverKey === "AMARA") entry.AMARA += val;
+      else if (driverKey === "BRAHIMA") entry.BRAHIMA += val;
+      else if (driverKey === "SORO") entry.SORO += val;
+    });
+
+    return Array.from(dayMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([k, v]) => {
+        amaraRunning += v.AMARA;
+        brahimaRunning += v.BRAHIMA;
+        soroRunning += v.SORO;
+        return {
+          key: k,
+          label: v.label,
+          periodTitle: `Cumul au ${v.periodTitle}`,
+          AMARA: Math.round(amaraRunning),
+          BRAHIMA: Math.round(brahimaRunning),
+          SORO: Math.round(soroRunning),
+          total: Math.round(amaraRunning + brahimaRunning + soroRunning)
+        };
+      });
+  }, [records, metric, evolutionGranularity, locale]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 w-full h-full">
@@ -261,7 +399,6 @@ export function MiniCharts({
       {/* ======================================================== */}
       <div className="xl:col-span-4 panel-enter rounded-[28px] border border-white/10 bg-[#1c1c1e] p-5 shadow-2xl flex flex-col justify-between">
         
-        {/* En-tête Volume Flotte */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
@@ -276,7 +413,6 @@ export function MiniCharts({
               </div>
             </div>
 
-            {/* Badge Total Flotte */}
             <div className="text-right">
               <span className="text-[9px] font-black uppercase text-white/40 block leading-tight">Total Flotte</span>
               <span className="text-sm font-black font-mono text-cyan-400">
@@ -285,7 +421,6 @@ export function MiniCharts({
             </div>
           </div>
 
-          {/* Graphique à Barres : Tonnage par Chauffeur avec Valeurs Visibles */}
           <div className="h-[170px] w-full min-w-0 mb-3">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={volumeData.list} margin={{ top: 22, right: 10, left: -20, bottom: 0 }}>
@@ -354,9 +489,7 @@ export function MiniCharts({
           </div>
         </div>
 
-        {/* Jauge Proportionnelle Segmentée & Ratios */}
         <div className="space-y-3 pt-3 border-t border-white/5">
-          {/* Barre segmentée horizontale */}
           <div>
             <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-white/40 mb-1.5">
               <span>Répartition de Charge</span>
@@ -367,17 +500,13 @@ export function MiniCharts({
                 <div 
                   key={d.key} 
                   className="h-full rounded-sm transition-all duration-1000"
-                  style={{ 
-                    width: `${d.share}%`, 
-                    backgroundColor: d.color 
-                  }}
+                  style={{ width: `${d.share}%`, backgroundColor: d.color }}
                   title={`${d.shortName}: ${d.share.toFixed(1)}%`}
                 />
               ))}
             </div>
           </div>
 
-          {/* Cartouches Chauffeurs avec % et Tonnage */}
           <div className="grid grid-cols-3 gap-2">
             {volumeData.list.map(d => (
               <div 
@@ -400,15 +529,14 @@ export function MiniCharts({
       </div>
 
       {/* ======================================================== */}
-      {/* 2. CARTE DROITE : PERFORMANCE ANALYTIQUE (MULTI-CHAUFFEURS) */}
+      {/* 2. CARTE DROITE : PERFORMANCE ANALYTIQUE (MULTI-VUES)     */}
       {/* ======================================================== */}
       <div className="xl:col-span-8 panel-enter rounded-[28px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col justify-between">
         
-        {/* En-tête & Contrôles Interactifs */}
         <div>
+          {/* En-tête Principal */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             
-            {/* Titre & Sous-titre */}
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <TrendingUp className="size-4" />
@@ -497,8 +625,73 @@ export function MiniCharts({
 
           </div>
 
+          {/* SOUS-BARRE DE CONTRÔLE D'ÉVOLUTION (SI EN MODE ÉVOLUTION) */}
+          {viewMode === "timeline" && (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-2xl bg-black/40 border border-white/5 mb-3 animate-in fade-in">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">Fréquence :</span>
+                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/5">
+                  <button
+                    onClick={() => setEvolutionGranularity("month")}
+                    className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      evolutionGranularity === "month" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    Par Mois
+                  </button>
+                  <button
+                    onClick={() => setEvolutionGranularity("week")}
+                    className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      evolutionGranularity === "week" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    Par Semaine
+                  </button>
+                  <button
+                    onClick={() => setEvolutionGranularity("day")}
+                    className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      evolutionGranularity === "day" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    Par Date
+                  </button>
+                  <button
+                    onClick={() => setEvolutionGranularity("cumulative")}
+                    className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      evolutionGranularity === "cumulative" ? "bg-cyan-500/20 text-cyan-300" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    Cumulatif
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/40 px-1">Format :</span>
+                <div className="flex items-center bg-white/5 p-0.5 rounded-lg border border-white/5">
+                  <button
+                    onClick={() => setEvolutionChartType("bar")}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      evolutionChartType === "bar" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    <BarChart3 className="size-2.5" /> Barres
+                  </button>
+                  <button
+                    onClick={() => setEvolutionChartType("line")}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      evolutionChartType === "line" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"
+                    }`}
+                  >
+                    <TrendingUp className="size-2.5" /> Courbes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ZONE DU GRAPHIQUE SELON LA VUE SÉLECTIONNÉE */}
-          <div className="h-[210px] w-full min-w-0 my-2">
+          <div className="h-[230px] w-full min-w-0 my-1">
             
             {/* VUE 1 : COMPARATIF PAR CHAUFFEUR (BAR CHART NET ET ÉPURÉ) */}
             {viewMode === "compare" && (
@@ -577,30 +770,16 @@ export function MiniCharts({
               </ResponsiveContainer>
             )}
 
-            {/* VUE 2 : ÉVOLUTION TEMPORELLE (3 COURBES DISTINCTES AVEC AXES VISIBLES) */}
-            {viewMode === "timeline" && (
+            {/* VUE 2 : ÉVOLUTION HAUTE LISIBILITÉ EN BARRES GROUPÉES */}
+            {viewMode === "timeline" && evolutionChartType === "bar" && (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineData} margin={{ top: 15, right: 20, left: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradAmara" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="gradBrahima" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="gradSoro" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#CF5D56" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#CF5D56" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <BarChart data={evolutionData} margin={{ top: 20, right: 15, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                   <XAxis 
-                    dataKey="date" 
+                    dataKey="label" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700 }}
+                    tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700 }}
                   />
                   <YAxis 
                     axisLine={false} 
@@ -609,48 +788,146 @@ export function MiniCharts({
                     tickFormatter={formatCompact}
                   />
                   <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(20, 20, 22, 0.96)', 
-                      border: '1px solid rgba(255,255,255,0.1)', 
-                      borderRadius: '16px', 
-                      fontSize: '11px' 
-                    }}
-                    formatter={(val: number, name: string) => {
-                      const formatted = metric === "tonnage" ? `${val} T` : formatMoney(val);
-                      return [formatted, name];
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const periodObj = payload[0]?.payload;
+                      return (
+                        <div className="bg-[#141414] border border-white/10 p-3.5 rounded-2xl shadow-2xl text-xs space-y-2 min-w-[210px]">
+                          <div className="pb-1.5 border-b border-white/10 flex items-center justify-between">
+                            <span className="font-black text-white">{periodObj?.periodTitle || label}</span>
+                            <span className="text-[10px] text-white/40 font-mono">
+                              Total: {metric === "tonnage" ? `${periodObj?.total} T` : formatCompact(periodObj?.total)}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {payload.map((p: any) => (
+                              <div key={p.dataKey} className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="size-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                                  <span className="text-white/80 font-bold">{p.name} :</span>
+                                </div>
+                                <span className="font-mono font-black text-white">
+                                  {metric === "tonnage" ? `${p.value} T` : formatMoney(p.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
                     }}
                   />
                   {(selectedDriverFilter === "ALL" || selectedDriverFilter === "AMARA") && (
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="AMARA" 
-                      name="AMARA TRUCK 76" 
-                      stroke="#3B82F6" 
-                      strokeWidth={2.5} 
-                      fill="url(#gradAmara)" 
+                      name="AMARA (76)" 
+                      fill="#3B82F6" 
+                      radius={[6, 6, 0, 0]} 
+                      maxBarSize={28}
                     />
                   )}
                   {(selectedDriverFilter === "ALL" || selectedDriverFilter === "BRAHIMA") && (
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="BRAHIMA" 
-                      name="BRAHIMA TRUCK 45" 
-                      stroke="#10B981" 
-                      strokeWidth={2.5} 
-                      fill="url(#gradBrahima)" 
+                      name="BRAHIMA (45)" 
+                      fill="#10B981" 
+                      radius={[6, 6, 0, 0]} 
+                      maxBarSize={28}
                     />
                   )}
                   {(selectedDriverFilter === "ALL" || selectedDriverFilter === "SORO") && (
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="SORO" 
-                      name="SORO TRUCK 52" 
-                      stroke="#CF5D56" 
-                      strokeWidth={2.5} 
-                      fill="url(#gradSoro)" 
+                      name="SORO (52)" 
+                      fill="#CF5D56" 
+                      radius={[6, 6, 0, 0]} 
+                      maxBarSize={28}
                     />
                   )}
-                </AreaChart>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+
+            {/* VUE 2 (BIS) : ÉVOLUTION HAUTE LISIBILITÉ EN COURBES NETTES SANS AIRS OPAQUES */}
+            {viewMode === "timeline" && evolutionChartType === "line" && (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={evolutionData} margin={{ top: 20, right: 20, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis 
+                    dataKey="label" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700 }}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9 }}
+                    tickFormatter={formatCompact}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const periodObj = payload[0]?.payload;
+                      return (
+                        <div className="bg-[#141414] border border-white/10 p-3.5 rounded-2xl shadow-2xl text-xs space-y-2 min-w-[210px]">
+                          <div className="pb-1.5 border-b border-white/10 flex items-center justify-between">
+                            <span className="font-black text-white">{periodObj?.periodTitle || label}</span>
+                            <span className="text-[10px] text-white/40 font-mono">
+                              Total: {metric === "tonnage" ? `${periodObj?.total} T` : formatCompact(periodObj?.total)}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {payload.map((p: any) => (
+                              <div key={p.dataKey} className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="size-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                                  <span className="text-white/80 font-bold">{p.name} :</span>
+                                </div>
+                                <span className="font-mono font-black text-white">
+                                  {metric === "tonnage" ? `${p.value} T` : formatMoney(p.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  {(selectedDriverFilter === "ALL" || selectedDriverFilter === "AMARA") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="AMARA" 
+                      name="AMARA (76)" 
+                      stroke="#3B82F6" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, fill: "#3B82F6", stroke: "#1c1c1e", strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: "#3B82F6", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {(selectedDriverFilter === "ALL" || selectedDriverFilter === "BRAHIMA") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="BRAHIMA" 
+                      name="BRAHIMA (45)" 
+                      stroke="#10B981" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, fill: "#10B981", stroke: "#1c1c1e", strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: "#10B981", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                  {(selectedDriverFilter === "ALL" || selectedDriverFilter === "SORO") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="SORO" 
+                      name="SORO (52)" 
+                      stroke="#CF5D56" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, fill: "#CF5D56", stroke: "#1c1c1e", strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: "#CF5D56", stroke: "#fff", strokeWidth: 2 }}
+                    />
+                  )}
+                </LineChart>
               </ResponsiveContainer>
             )}
 
@@ -716,14 +993,20 @@ export function MiniCharts({
           {/* Légende interactive pour la vue chronologique */}
           {viewMode === "timeline" && (
             <div className="flex items-center justify-between text-[10px] text-white/40 pt-2 px-1">
-              <span>Cliquez sur un chauffeur pour isoler sa courbe temporelle</span>
-              {selectedDriverFilter !== "ALL" && (
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-blue-500" /> AMARA
+                <span className="size-2 rounded-full bg-emerald-500 ml-2" /> BRAHIMA
+                <span className="size-2 rounded-full bg-[#cf5d56] ml-2" /> SORO
+              </span>
+              {selectedDriverFilter !== "ALL" ? (
                 <button 
                   onClick={() => setSelectedDriverFilter("ALL")}
                   className="text-cyan-400 hover:underline font-bold text-[10px]"
                 >
                   Afficher tous les chauffeurs
                 </button>
+              ) : (
+                <span>Cliquez sur une carte pour isoler un chauffeur</span>
               )}
             </div>
           )}
