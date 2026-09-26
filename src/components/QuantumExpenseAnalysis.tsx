@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   PieChart, 
   Pie, 
@@ -29,9 +29,46 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  DollarSign
+  DollarSign,
+  Edit2,
+  Trash2,
+  Save,
+  X,
+  ExternalLink,
+  Eye,
+  Plus,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
-import { type Language } from '../utils/i18n';
+import { type Language, translateComment } from '../utils/i18n';
+
+// Helper extraction Google Drive
+function getDriveId(link: string | null | undefined): string | null {
+  if (!link) return null;
+  const matchD = link.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (matchD && matchD[1]) return matchD[1];
+  const matchId = link.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (matchId && matchId[1]) return matchId[1];
+  const matchFolder = link.match(/\/folders\/([a-zA-Z0-9_-]{20,})/);
+  if (matchFolder && matchFolder[1]) return matchFolder[1];
+  const fallback = link.match(/[-\w]{25,}/);
+  return fallback ? fallback[0] : null;
+}
+
+function getDriveEmbedUrl(link: string | null | undefined): string | null {
+  if (!link) return null;
+  if (link.includes("/folders/")) return null;
+  const id = getDriveId(link);
+  if (!id) return null;
+  return `https://drive.google.com/file/d/${id}/preview`;
+}
+
+export const VEHICLE_OPTIONS = [
+  "AMARA TRUCK 76",
+  "BRAHIMA TRUCK 45",
+  "SORO TRUCK 52",
+  "FLOTTE / ATELIER GÉNÉRAL"
+];
 
 // --- PALETTE DE COULEURS HARMONISÉE & CONTRASTÉE ---
 export const QUANTUM_PALETTE = {
@@ -63,6 +100,7 @@ type QuantumProps = {
   maintenanceTotal: number;
   maintenanceRecords?: any[];
   allMaintenanceRecords?: any[];
+  setMaintenanceRecords?: React.Dispatch<React.SetStateAction<any[]>> | null;
   formatCurrency?: (val: number, curr?: string) => string;
   currency?: string;
   t?: any;
@@ -106,6 +144,7 @@ export function QuantumExpenseAnalysis({
   maintenanceTotal = 0, 
   maintenanceRecords = [],
   allMaintenanceRecords = [],
+  setMaintenanceRecords,
   formatCurrency, 
   currency = "CFA",
   t, 
@@ -129,6 +168,60 @@ export function QuantumExpenseAnalysis({
   // Tranche survolée sur le Donut
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
+  // --- ÉTATS POUR LE MODAL DE DÉTAIL & MODIFICATION DE LA MAINTENANCE PAR CAMION ---
+  const [selectedMaintTruck, setSelectedMaintTruck] = useState<"AMARA" | "BRAHIMA" | "SORO" | null>(null);
+  const [maintTab, setMaintTab] = useState<"all" | "direct" | "shared">("all");
+  const [localMaintenance, setLocalMaintenance] = useState<any[] | null>(null);
+  const [editingMaintId, setEditingMaintId] = useState<string | null>(null);
+  const [editMaintForm, setEditMaintForm] = useState<{
+    id: string;
+    date: string;
+    vehicle: string;
+    description: string;
+    cost: number | string;
+    driveLink: string;
+  }>({
+    id: "",
+    date: "",
+    vehicle: "AMARA TRUCK 76",
+    description: "",
+    cost: "",
+    driveLink: ""
+  });
+
+  const [isAddingMaint, setIsAddingMaint] = useState(false);
+  const [newMaintForm, setNewMaintForm] = useState<{
+    date: string;
+    vehicle: string;
+    description: string;
+    cost: number | string;
+    driveLink: string;
+  }>({
+    date: new Date().toISOString().split("T")[0],
+    vehicle: "AMARA TRUCK 76",
+    description: "",
+    cost: "",
+    driveLink: ""
+  });
+
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Nettoyage automatique du message de confirmation
+  useEffect(() => {
+    if (feedbackMsg) {
+      const timer = setTimeout(() => setFeedbackMsg(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [feedbackMsg]);
+
+  // Réinitialisation de l'override local si les données maîtresses changent
+  useEffect(() => {
+    if (allMaintenanceRecords && allMaintenanceRecords.length > 0) {
+      setLocalMaintenance(null);
+    }
+  }, [allMaintenanceRecords]);
+
   const formatMoney = (val: number) => {
     if (formatCurrency) return formatCurrency(val, currency);
     return `${new Intl.NumberFormat(language === 'EN' ? 'en-US' : 'fr-FR').format(Math.round(val))} ${currency}`;
@@ -140,14 +233,152 @@ export function QuantumExpenseAnalysis({
     return String(Math.round(val));
   };
 
-  // Base complète des trajets et de la maintenance
+  // Helper pour générer une clé stable de repérage pour chaque ligne
+  const getRecordKey = (r: any, idx?: number): string => {
+    if (r.id) return String(r.id);
+    return `maint-${r.date || ''}-${r.vehicle || r.driverLabel || ''}-${r.cost || r.amount || 0}-${(r.description || '').slice(0, 10)}-${idx ?? 0}`;
+  };
+
+  // Base complète des trajets et de la maintenance (avec support des modifications locales réactives)
   const sourceTrips = useMemo(() => {
     return allTrips && allTrips.length > 0 ? allTrips : data;
   }, [allTrips, data]);
 
   const sourceMaintenance = useMemo(() => {
+    if (localMaintenance) return localMaintenance;
     return allMaintenanceRecords && allMaintenanceRecords.length > 0 ? allMaintenanceRecords : maintenanceRecords;
-  }, [allMaintenanceRecords, maintenanceRecords]);
+  }, [localMaintenance, allMaintenanceRecords, maintenanceRecords]);
+
+  // Actions d'édition & ajout de maintenance
+  const handleStartEdit = (record: any, idx?: number) => {
+    const key = getRecordKey(record, idx);
+    const costVal = record.cost !== undefined ? record.cost : (record.amount !== undefined ? record.amount : 0);
+    setEditingMaintId(key);
+    setEditMaintForm({
+      id: key,
+      date: record.date || new Date().toISOString().split("T")[0],
+      vehicle: record.vehicle || record.driverLabel || "AMARA TRUCK 76",
+      description: record.description || "",
+      cost: costVal,
+      driveLink: record.driveLink || record.imageUrl || ""
+    });
+    setIsAddingMaint(false);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editMaintForm.description.trim()) {
+      alert(language === 'EN' ? "Please provide a description." : "Veuillez saisir une description.");
+      return;
+    }
+    const parsedCost = Number(editMaintForm.cost);
+    if (isNaN(parsedCost) || parsedCost < 0) {
+      alert(language === 'EN' ? "Please provide a valid cost." : "Veuillez saisir un coût valide.");
+      return;
+    }
+
+    const updated = (sourceMaintenance || []).map((r: any, idx: number) => {
+      const rKey = getRecordKey(r, idx);
+      if (rKey === editMaintForm.id) {
+        return {
+          ...r,
+          id: r.id || editMaintForm.id,
+          date: editMaintForm.date,
+          vehicle: editMaintForm.vehicle,
+          driverLabel: editMaintForm.vehicle,
+          description: editMaintForm.description,
+          cost: parsedCost,
+          amount: parsedCost,
+          driveLink: editMaintForm.driveLink.trim() || null
+        };
+      }
+      return r;
+    });
+
+    if (setMaintenanceRecords) {
+      setMaintenanceRecords(updated);
+    }
+    setLocalMaintenance(updated);
+    setEditingMaintId(null);
+    setFeedbackMsg({
+      type: 'success',
+      text: language === 'EN' 
+        ? "Maintenance record updated successfully!" 
+        : "Intervention de maintenance mise à jour avec succès !"
+    });
+  };
+
+  const handleSaveNew = () => {
+    if (!newMaintForm.description.trim()) {
+      alert(language === 'EN' ? "Please provide a description." : "Veuillez saisir une description.");
+      return;
+    }
+    const parsedCost = Number(newMaintForm.cost);
+    if (isNaN(parsedCost) || parsedCost <= 0) {
+      alert(language === 'EN' ? "Please provide a valid cost." : "Veuillez saisir un montant valide.");
+      return;
+    }
+
+    const newRecord = {
+      id: `maint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      date: newMaintForm.date || new Date().toISOString().split("T")[0],
+      vehicle: newMaintForm.vehicle,
+      driverLabel: newMaintForm.vehicle,
+      description: newMaintForm.description.trim(),
+      cost: parsedCost,
+      amount: parsedCost,
+      driveLink: newMaintForm.driveLink.trim() || null,
+      source: "manual",
+      status: "Completed"
+    };
+
+    const updated = [newRecord, ...(sourceMaintenance || [])];
+    if (setMaintenanceRecords) {
+      setMaintenanceRecords(updated);
+    }
+    setLocalMaintenance(updated);
+    setIsAddingMaint(false);
+    setNewMaintForm({
+      date: new Date().toISOString().split("T")[0],
+      vehicle: selectedMaintTruck ? (TRUCKS_CONFIG.find(t => t.key === selectedMaintTruck)?.label || "AMARA TRUCK 76") : "AMARA TRUCK 76",
+      description: "",
+      cost: "",
+      driveLink: ""
+    });
+    setFeedbackMsg({
+      type: 'success',
+      text: language === 'EN'
+        ? "New maintenance entry added successfully!"
+        : "Nouvelle intervention enregistrée avec succès !"
+    });
+  };
+
+  const handleDeleteRecord = (record: any, idx?: number) => {
+    const costVal = record.cost !== undefined ? record.cost : (record.amount !== undefined ? record.amount : 0);
+    const confirmText = language === 'EN'
+      ? `Are you sure you want to delete this maintenance: "${record.description}" (${Number(costVal).toLocaleString()} CFA)?`
+      : `Êtes-vous sûr de vouloir supprimer cette maintenance : "${record.description}" (${Number(costVal).toLocaleString()} CFA) ?`;
+    
+    if (!window.confirm(confirmText)) return;
+
+    const targetKey = getRecordKey(record, idx);
+    const updated = (sourceMaintenance || []).filter((r: any, i: number) => {
+      return getRecordKey(r, i) !== targetKey;
+    });
+
+    if (setMaintenanceRecords) {
+      setMaintenanceRecords(updated);
+    }
+    setLocalMaintenance(updated);
+    if (editingMaintId === targetKey) {
+      setEditingMaintId(null);
+    }
+    setFeedbackMsg({
+      type: 'success',
+      text: language === 'EN'
+        ? "Maintenance record deleted."
+        : "Intervention supprimée avec succès."
+    });
+  };
 
   // --- LISTES DES PÉRIODES DISPONIBLES POUR LE SÉLECTEUR ---
   const timePeriods = useMemo(() => {
@@ -930,26 +1161,55 @@ export function QuantumExpenseAnalysis({
                         </div>
                       )}
 
-                      {/* 4. TOTAL MAINTENANCE */}
-                      <div className="p-2.5 rounded-xl bg-amber-500/[0.04] border border-amber-500/15 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="size-6 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-400">
-                            <Wrench className="size-3.5" />
+                      {/* 4. TOTAL MAINTENANCE (CLIQUABLE & ÉDITABLE) */}
+                      <div 
+                        onClick={() => {
+                          setSelectedMaintTruck(truck.key as "AMARA" | "BRAHIMA" | "SORO");
+                          setMaintTab("all");
+                          setEditingMaintId(null);
+                          setIsAddingMaint(false);
+                          setFeedbackMsg(null);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            setSelectedMaintTruck(truck.key as "AMARA" | "BRAHIMA" | "SORO");
+                            setMaintTab("all");
+                          }
+                        }}
+                        className="p-2.5 rounded-xl bg-amber-500/[0.05] border border-amber-500/20 hover:border-amber-500/60 hover:bg-amber-500/15 transition-all duration-200 cursor-pointer group/maint shadow-sm hover:shadow-amber-500/10 active:scale-[0.99]"
+                        title={language === 'EN' ? "Click to view maintenance details and edit" : "Cliquer pour voir le détail de la maintenance et modifier"}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="size-6 rounded-lg bg-amber-500/20 group-hover/maint:bg-amber-500/30 flex items-center justify-center text-amber-400 transition-colors">
+                              <Wrench className="size-3.5 group-hover/maint:rotate-12 transition-transform" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-black text-amber-300 block leading-tight group-hover/maint:text-amber-200">
+                                  {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
+                                </span>
+                                <span className="text-[8px] px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-300 font-bold flex items-center gap-0.5 border border-amber-500/30">
+                                  <Edit2 className="size-2.5" />
+                                  <span>{language === 'EN' ? "Details / Edit" : "Détails & Édition"}</span>
+                                </span>
+                              </div>
+                              <span className="text-[8px] text-amber-400/60 uppercase group-hover/maint:text-amber-400/80">
+                                {truck.directMaintenance > 0 
+                                  ? (language === 'EN' ? "Specific + Workshop share (Click)" : "Spécifique + Part atelier (Cliquer)") 
+                                  : (language === 'EN' ? "Workshop share (Click)" : "Part atelier (Cliquer)")}
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-[11px] font-bold text-amber-300 block leading-tight">
-                              {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-black text-sm text-amber-300 group-hover/maint:text-amber-200">
+                              {formatMoney(truck.maintenance)}
                             </span>
-                            <span className="text-[8px] text-amber-400/60 uppercase">
-                              {truck.directMaintenance > 0 
-                                ? (language === 'EN' ? "Specific + Workshop" : "Spécifique + Atelier") 
-                                : (language === 'EN' ? "Workshop share" : "Part atelier")}
-                            </span>
+                            <ChevronRight className="size-3.5 text-amber-400/60 group-hover/maint:text-amber-300 group-hover/maint:translate-x-0.5 transition-all" />
                           </div>
                         </div>
-                        <span className="font-mono font-black text-sm text-amber-300">
-                          {formatMoney(truck.maintenance)}
-                        </span>
                       </div>
 
                       {/* 5. LE BÉNÉFICE NET */}
@@ -1044,6 +1304,607 @@ export function QuantumExpenseAnalysis({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL DE DÉTAIL & MODIFICATION DE LA MAINTENANCE PAR CAMION */}
+      {/* ======================================================== */}
+      {selectedMaintTruck && (() => {
+        const activeTruckCfg = TRUCKS_CONFIG.find(t => t.key === selectedMaintTruck) || TRUCKS_CONFIG[0];
+        const modalDirectRecords = scopedMaintenance.filter(r => getMaintenanceTruck(r) === selectedMaintTruck);
+        const modalSharedRecords = scopedMaintenance.filter(r => getMaintenanceTruck(r) === "FLOTTE");
+        const modalDirectCost = modalDirectRecords.reduce((s, r) => s + (Number(r.cost || r.amount) || 0), 0);
+        const modalSharedCost = modalSharedRecords.reduce((s, r) => s + (Number(r.cost || r.amount) || 0), 0);
+        const modalTruckSharedShare = Math.round(modalSharedCost / 3);
+        const modalGrandTotal = modalDirectCost + modalTruckSharedShare;
+
+        let displayItems: Array<{ record: any; isShared: boolean; idx: number }> = [];
+        if (maintTab === "all" || maintTab === "direct") {
+          modalDirectRecords.forEach((r, idx) => displayItems.push({ record: r, isShared: false, idx }));
+        }
+        if (maintTab === "all" || maintTab === "shared") {
+          modalSharedRecords.forEach((r, idx) => displayItems.push({ record: r, isShared: true, idx }));
+        }
+        displayItems.sort((a, b) => String(b.record.date || "").localeCompare(String(a.record.date || "")));
+
+        return (
+          <div className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="bg-[#121212] border border-white/10 rounded-[28px] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
+              
+              {/* HEADER DU MODAL */}
+              <div className="p-5 px-6 border-b border-white/5 flex items-center justify-between bg-black/40">
+                <div className="flex items-center gap-3.5">
+                  <div 
+                    className="size-11 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-lg shrink-0"
+                    style={{ backgroundColor: activeTruckCfg.color }}
+                  >
+                    {activeTruckCfg.unit}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-black text-white">
+                        {language === 'EN' ? `Maintenance Details - ${activeTruckCfg.label}` : `Détail Maintenance - ${activeTruckCfg.label}`}
+                      </h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-white/50 border border-white/10">
+                        {activeTruckCfg.plate}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-bold text-white/40 flex items-center gap-1.5 mt-0.5">
+                      <Calendar className="size-3 text-amber-400" />
+                      <span>{language === 'EN' ? "Active Period:" : "Période active :"} <span className="text-amber-300 font-mono font-semibold">{periodLabel}</span></span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsAddingMaint(!isAddingMaint);
+                      setEditingMaintId(null);
+                      setNewMaintForm({
+                        date: new Date().toISOString().split("T")[0],
+                        vehicle: activeTruckCfg.label,
+                        description: "",
+                        cost: "",
+                        driveLink: ""
+                      });
+                    }}
+                    className="h-9 px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-black text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>{language === 'EN' ? "Add Entry" : "Nouvelle Intervention"}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedMaintTruck(null);
+                      setEditingMaintId(null);
+                      setIsAddingMaint(false);
+                    }}
+                    className="size-9 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white flex items-center justify-center transition-all"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* MESSAGE DE NOTIFICATION / FEEDBACK */}
+              {feedbackMsg && (
+                <div className="mx-6 mt-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
+                  <CheckCircle2 className="size-4 shrink-0" />
+                  <span>{feedbackMsg.text}</span>
+                </div>
+              )}
+
+              {/* CONTENU DU MODAL (SCROLLABLE) */}
+              <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                
+                {/* CARTES KPI SYNTHÈSE */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-amber-500/[0.07] border border-amber-500/20">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/70">
+                      {language === 'EN' ? "Total Maintenance Charged" : "Total Maintenance Imputé"}
+                    </p>
+                    <p className="text-xl font-mono font-black text-amber-300 mt-1">
+                      {formatMoney(modalGrandTotal)}
+                    </p>
+                    <p className="text-[9px] text-white/40 mt-1">
+                      {language === 'EN' ? "Direct + 1/3 Shared Fleet share" : "Direct + 1/3 Part Atelier Partagée"}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/[0.05] border border-emerald-500/20">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400/70">
+                      {language === 'EN' ? "Direct Specific Cost (100%)" : "Dépenses Directes (100%)"}
+                    </p>
+                    <p className="text-xl font-mono font-black text-emerald-300 mt-1">
+                      {formatMoney(modalDirectCost)}
+                    </p>
+                    <p className="text-[9px] text-white/40 mt-1">
+                      {modalDirectRecords.length} {language === 'EN' ? "specific intervention(s)" : "intervention(s) dédiée(s)"}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-purple-500/[0.05] border border-purple-500/20">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-purple-400/70">
+                      {language === 'EN' ? "Workshop Fleet Overhead (1/3)" : "Quote-part Atelier (1/3)"}
+                    </p>
+                    <p className="text-xl font-mono font-black text-purple-300 mt-1">
+                      {formatMoney(modalTruckSharedShare)}
+                    </p>
+                    <p className="text-[9px] text-white/40 mt-1">
+                      {language === 'EN' ? `Total fleet: ${formatMoney(modalSharedCost)} (${modalSharedRecords.length} entries)` : `Sur total flotte : ${formatMoney(modalSharedCost)} (${modalSharedRecords.length} entrées)`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* BANDEAU D'EXPLICATION */}
+                <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-2.5 text-xs text-white/60">
+                  <Info className="size-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    {language === 'EN' 
+                      ? "This view displays all maintenance expenses allocated to this truck. You can directly edit the date, description, cost, vehicle assignment, or delete any erroneous entry. Changes update net profits instantly." 
+                      : "Cette vue détaille toutes les dépenses de maintenance affectées à ce camion. Vous pouvez directement modifier la date, le libellé, le montant, réaffecter le camion ou supprimer une entrée erronée. Tout ajustement recalcule immédiatement la comptabilité et le bénéfice net."}
+                  </p>
+                </div>
+
+                {/* FORMULAIRE D'AJOUT D'UNE NOUVELLE INTERVENTION */}
+                {isAddingMaint && (
+                  <div className="p-5 rounded-2xl bg-[#161616] border border-amber-500/30 space-y-4 shadow-xl animate-in slide-in-from-top-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                        <Plus className="size-4" />
+                        {language === 'EN' ? "Add Maintenance Record" : "Ajouter une Intervention de Maintenance"}
+                      </h4>
+                      <button
+                        onClick={() => setIsAddingMaint(false)}
+                        className="text-white/40 hover:text-white text-xs font-bold"
+                      >
+                        {language === 'EN' ? "Cancel" : "Annuler"}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                          {language === 'EN' ? "Date" : "Date"}
+                        </label>
+                        <input
+                          type="date"
+                          value={newMaintForm.date}
+                          onChange={(e) => setNewMaintForm({ ...newMaintForm, date: e.target.value })}
+                          className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                          {language === 'EN' ? "Vehicle / Assignment" : "Véhicule / Affectation"}
+                        </label>
+                        <select
+                          value={newMaintForm.vehicle}
+                          onChange={(e) => setNewMaintForm({ ...newMaintForm, vehicle: e.target.value })}
+                          className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-amber-300 font-bold outline-none focus:border-amber-500"
+                        >
+                          {VEHICLE_OPTIONS.map(v => (
+                            <option key={v} value={v} className="bg-[#181818] text-white">{v}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                          {language === 'EN' ? "Description / Work done" : "Description / Pièce ou Travail réalisé"}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={language === 'EN' ? "e.g. Front brake pads replacement..." : "ex: Changement plaquettes de frein avant..."}
+                          value={newMaintForm.description}
+                          onChange={(e) => setNewMaintForm({ ...newMaintForm, description: e.target.value })}
+                          className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                          {language === 'EN' ? "Cost (CFA)" : "Coût (CFA)"}
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="ex: 150000"
+                          value={newMaintForm.cost}
+                          onChange={(e) => setNewMaintForm({ ...newMaintForm, cost: e.target.value })}
+                          className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white font-mono font-bold outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                          {language === 'EN' ? "Drive / Image Proof Link (Optional)" : "Lien Preuve Drive / Photo (Optionnel)"}
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://drive.google.com/..."
+                          value={newMaintForm.driveLink}
+                          onChange={(e) => setNewMaintForm({ ...newMaintForm, driveLink: e.target.value })}
+                          className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        onClick={() => setIsAddingMaint(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 text-xs font-bold transition-all"
+                      >
+                        {language === 'EN' ? "Cancel" : "Annuler"}
+                      </button>
+                      <button
+                        onClick={handleSaveNew}
+                        className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all flex items-center gap-1.5"
+                      >
+                        <Save className="size-3.5" />
+                        <span>{language === 'EN' ? "Save Entry" : "Enregistrer l'Intervention"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SÉLECTEUR D'ONGLET / FILTRE */}
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setMaintTab("all")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        maintTab === "all" 
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" 
+                          : "text-white/40 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      {language === 'EN' ? "All" : "Toutes"} ({modalDirectRecords.length + modalSharedRecords.length})
+                    </button>
+                    <button
+                      onClick={() => setMaintTab("direct")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        maintTab === "direct" 
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
+                          : "text-white/40 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      {language === 'EN' ? "Specific" : "Spécifiques"} ({modalDirectRecords.length})
+                    </button>
+                    <button
+                      onClick={() => setMaintTab("shared")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        maintTab === "shared" 
+                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" 
+                          : "text-white/40 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      {language === 'EN' ? "Shared Fleet (1/3)" : "Part Atelier (1/3)"} ({modalSharedRecords.length})
+                    </button>
+                  </div>
+
+                  <span className="text-[11px] font-mono text-white/40">
+                    {displayItems.length} {language === 'EN' ? "records displayed" : "lignes affichées"}
+                  </span>
+                </div>
+
+                {/* LISTE DES LIGNES DE MAINTENANCE */}
+                <div className="space-y-2.5">
+                  {displayItems.length === 0 ? (
+                    <div className="p-10 text-center rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                      <Wrench className="size-8 text-white/20 mx-auto" />
+                      <p className="text-xs font-bold text-white/40">
+                        {language === 'EN' 
+                          ? "No maintenance records found for this truck in the selected period." 
+                          : "Aucune intervention de maintenance enregistrée pour ce camion sur la période sélectionnée."}
+                      </p>
+                    </div>
+                  ) : (
+                    displayItems.map(({ record: r, isShared, idx }) => {
+                      const itemKey = getRecordKey(r, idx);
+                      const isEditing = editingMaintId === itemKey;
+                      const costVal = Number(r.cost !== undefined ? r.cost : (r.amount !== undefined ? r.amount : 0));
+                      const shareCost = isShared ? Math.round(costVal / 3) : costVal;
+
+                      const formattedDate = r.date 
+                        ? new Date(r.date).toLocaleDateString(language === 'EN' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : "---";
+
+                      if (isEditing) {
+                        return (
+                          <div key={itemKey} className="p-4 rounded-2xl bg-[#1c1c1c] border border-amber-500/40 space-y-3 shadow-lg animate-in fade-in">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                              <span className="text-xs font-black uppercase text-amber-300 flex items-center gap-1.5">
+                                <Edit2 className="size-3.5" />
+                                {language === 'EN' ? "Edit Maintenance Entry" : "Modifier l'Intervention"}
+                              </span>
+                              <button onClick={() => setEditingMaintId(null)} className="text-white/40 hover:text-white">
+                                <X className="size-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                                  {language === 'EN' ? "Date" : "Date"}
+                                </label>
+                                <input
+                                  type="date"
+                                  value={editMaintForm.date}
+                                  onChange={(e) => setEditMaintForm({ ...editMaintForm, date: e.target.value })}
+                                  className="w-full h-9 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                                  {language === 'EN' ? "Vehicle / Assignment" : "Véhicule / Affectation"}
+                                </label>
+                                <select
+                                  value={editMaintForm.vehicle}
+                                  onChange={(e) => setEditMaintForm({ ...editMaintForm, vehicle: e.target.value })}
+                                  className="w-full h-9 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-amber-300 font-bold outline-none focus:border-amber-500"
+                                >
+                                  {VEHICLE_OPTIONS.map(v => (
+                                    <option key={v} value={v} className="bg-[#181818] text-white">{v}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                                  {language === 'EN' ? "Description" : "Description / Libellé"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editMaintForm.description}
+                                  onChange={(e) => setEditMaintForm({ ...editMaintForm, description: e.target.value })}
+                                  className="w-full h-9 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                                  {language === 'EN' ? "Amount (CFA)" : "Montant (CFA)"}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={editMaintForm.cost}
+                                  onChange={(e) => setEditMaintForm({ ...editMaintForm, cost: e.target.value })}
+                                  className="w-full h-9 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white font-mono font-bold outline-none focus:border-amber-500"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-white/40 block mb-1 uppercase">
+                                  {language === 'EN' ? "Proof URL" : "Lien Justificatif Drive"}
+                                </label>
+                                <input
+                                  type="url"
+                                  value={editMaintForm.driveLink}
+                                  onChange={(e) => setEditMaintForm({ ...editMaintForm, driveLink: e.target.value })}
+                                  className="w-full h-9 bg-black/50 border border-white/10 rounded-xl px-3 text-xs text-white outline-none focus:border-amber-500"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                              <button
+                                onClick={() => setEditingMaintId(null)}
+                                className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 text-xs font-bold transition-all"
+                              >
+                                {language === 'EN' ? "Cancel" : "Annuler"}
+                              </button>
+                              <button
+                                onClick={handleSaveEdit}
+                                className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all flex items-center gap-1.5"
+                              >
+                                <Save className="size-3.5" />
+                                <span>{language === 'EN' ? "Save Changes" : "Enregistrer"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div 
+                          key={itemKey}
+                          className="p-3.5 rounded-2xl bg-[#161616] border border-white/5 hover:border-white/15 transition-all group flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-mono text-white/50 flex items-center gap-1">
+                                <Calendar className="size-3 text-white/30" />
+                                {formattedDate}
+                              </span>
+
+                              {isShared ? (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                                  {language === 'EN' ? "Shared Workshop (1/3)" : "Part Atelier (1/3)"}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                  {language === 'EN' ? "Direct Specific" : "Spécifique Camion"}
+                                </span>
+                              )}
+
+                              <span className="text-[10px] font-bold text-white/40">
+                                {r.vehicle || r.driverLabel || activeTruckCfg.label}
+                              </span>
+
+                              {r.source === "Google Sheets" && (
+                                <span className="text-[9px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.2 rounded-full flex items-center gap-1">
+                                  <Sparkles className="size-2.5" /> GSheets
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs font-bold text-white">
+                              {translateComment(r.description, language)}
+                            </p>
+
+                            {(r.driveLink || r.imageUrl) && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewDoc(r)}
+                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-[10px] font-bold transition-all"
+                              >
+                                <Eye className="size-3" />
+                                <span>{language === 'EN' ? "View Proof / Receipt" : "Voir Justificatif"}</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
+                            <div className="text-right">
+                              <p className="font-mono font-black text-sm text-amber-300">
+                                {formatMoney(shareCost)}
+                              </p>
+                              {isShared && (
+                                <p className="text-[9px] text-white/30 font-mono">
+                                  {language === 'EN' ? `Total: ${formatMoney(costVal)}` : `Total atelier : ${formatMoney(costVal)}`}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleStartEdit(r, idx)}
+                                className="p-2 rounded-xl bg-white/5 hover:bg-amber-500/20 text-white/40 hover:text-amber-300 transition-all"
+                                title={language === 'EN' ? "Edit entry" : "Modifier l'intervention"}
+                              >
+                                <Edit2 className="size-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRecord(r, idx)}
+                                className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-all"
+                                title={language === 'EN' ? "Delete entry" : "Supprimer l'intervention"}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>
+
+              {/* PIED DU MODAL */}
+              <div className="p-4 px-6 border-t border-white/5 flex items-center justify-between bg-black/40">
+                <span className="text-[11px] text-white/40">
+                  {language === 'EN' 
+                    ? "✨ All modifications recalculate the truck's net profit in real time." 
+                    : "✨ Toute modification recalcule le bénéfice net du camion en temps réel."}
+                </span>
+                <button
+                  onClick={() => {
+                    setSelectedMaintTruck(null);
+                    setEditingMaintId(null);
+                    setIsAddingMaint(false);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-black transition-all"
+                >
+                  {language === 'EN' ? "Close" : "Fermer"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ======================================================== */}
+      {/* MODAL APERÇU DIRECT DU JUSTIFICATIF / GOOGLE DRIVE */}
+      {/* ======================================================== */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#181818] border border-white/10 rounded-[28px] w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="p-4 px-6 border-b border-white/5 flex items-center justify-between bg-black/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                  <Eye className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    {translateComment(previewDoc.description, language) || (language === 'EN' ? 'Maintenance Receipt' : 'Justificatif Maintenance')}
+                  </h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase">
+                    {previewDoc.vehicle || previewDoc.driverLabel} • {previewDoc.date} • {Number(previewDoc.cost || previewDoc.amount || 0).toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(previewDoc.driveLink || previewDoc.imageUrl) && (
+                  <a
+                    href={previewDoc.driveLink || previewDoc.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    <span>{language === 'EN' ? "Open Drive" : "Ouvrir Drive"}</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-2 text-white/40 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-all"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 bg-black/60 p-4 flex items-center justify-center overflow-hidden">
+              {(() => {
+                const targetUrl = previewDoc.driveLink || previewDoc.imageUrl;
+                const embedUrl = getDriveEmbedUrl(targetUrl);
+                if (embedUrl) {
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full h-full rounded-2xl border border-white/5"
+                      title="Preview"
+                      allow="autoplay"
+                    />
+                  );
+                }
+                if (targetUrl && (targetUrl.endsWith(".jpg") || targetUrl.endsWith(".png") || targetUrl.endsWith(".jpeg") || targetUrl.includes("drive.google.com/thumbnail"))) {
+                  return (
+                    <img 
+                      src={targetUrl} 
+                      className="max-h-full max-w-full object-contain rounded-2xl border border-white/5 shadow-2xl" 
+                      alt="Receipt" 
+                    />
+                  );
+                }
+                return (
+                  <div className="text-center space-y-3">
+                    <p className="text-xs text-white/40">
+                      {language === 'EN' ? "Preview not directly embeddable for this format." : "Aperçu direct non intégrable pour ce format."}
+                    </p>
+                    {targetUrl && (
+                      <a
+                        href={targetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl hover:bg-blue-600 transition-all"
+                      >
+                        <ExternalLink className="size-4" />
+                        <span>{language === 'EN' ? "Open document in new tab" : "Ouvrir le document dans un nouvel onglet"}</span>
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

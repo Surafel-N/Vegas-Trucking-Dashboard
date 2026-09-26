@@ -61,6 +61,7 @@ type DashboardProps = {
   calendarData: any[];
   filterProps?: any;
   maintenanceRecords: any[];
+  setMaintenanceRecords?: React.Dispatch<React.SetStateAction<any[]>> | null;
   allTrips: any[];
   oilChanges: any;
   setOilChanges?: React.Dispatch<React.SetStateAction<any>> | null;
@@ -81,6 +82,7 @@ export function Dashboard({
   calendarData = [],
   filterProps,
   maintenanceRecords = [],
+  setMaintenanceRecords,
   allTrips = [],
   oilChanges = {},
   setOilChanges,
@@ -292,6 +294,7 @@ export function Dashboard({
                   maintenanceTotal={maintenanceTotal} 
                   maintenanceRecords={filteredMaintenance}
                   allMaintenanceRecords={maintenanceRecords}
+                  setMaintenanceRecords={setMaintenanceRecords}
                   formatCurrency={(v) => formatCurrency(v, currency)} 
                   currency={currency} 
                   t={t} 

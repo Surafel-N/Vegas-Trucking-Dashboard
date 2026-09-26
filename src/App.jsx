@@ -882,7 +882,7 @@ export default function App() {
                    destinations: destinationOptions, destination, onDestinationChange: setDestination,
                    onReset: () => { setChauffeur(ALL_CHAUFFEURS); setMonth([ALL_MONTHS]); setSelectedDates([]); }
                  }}
-                 maintenanceRecords={maintenanceRecords} oilChanges={oilChanges} setOilChanges={rolePermissions.canEdit ? setOilChanges : null}
+                 maintenanceRecords={maintenanceRecords} setMaintenanceRecords={rolePermissions.canEdit ? setMaintenanceRecords : null} oilChanges={oilChanges} setOilChanges={rolePermissions.canEdit ? setOilChanges : null}
                  selectedDates={selectedDates}
                  googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
                  currency={currency}
