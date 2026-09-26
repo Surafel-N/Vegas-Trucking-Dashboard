@@ -37,6 +37,9 @@ import { QuantumExpenseAnalysis } from "./QuantumExpenseAnalysis";
 import { ActiveTrends } from "./ActiveTrends";
 import { FinancialTrends } from "./FinancialTrends";
 import { OilChangeGaugeWidget } from "./OilChangeGaugeWidget";
+import { FuelAdvanceDashboardWidget } from "./FuelAdvanceDashboardWidget";
+import { FuelAdvance, DEFAULT_FUEL_ADVANCES } from "../utils/fuelAdvanceTracker";
+import { INITIAL_ACCOUNTING_TRANSACTIONS } from "../utils/accountingInitialData";
 import {
   getDashboardMetrics,  formatCurrency, 
   formatCompactNumber, 
@@ -72,6 +75,10 @@ type DashboardProps = {
   t: any;
   language?: Language;
   allRecords: any[];
+  fuelAdvances?: FuelAdvance[];
+  setFuelAdvances?: React.Dispatch<React.SetStateAction<FuelAdvance[]>> | null;
+  accountingTransactions?: any[];
+  cashBalance?: number;
 };
 
 export function Dashboard({
@@ -94,7 +101,11 @@ export function Dashboard({
   currency = "CFA",
   t,
   language = "FR",
-  allRecords = []
+  allRecords = [],
+  fuelAdvances = DEFAULT_FUEL_ADVANCES,
+  setFuelAdvances,
+  accountingTransactions = INITIAL_ACCOUNTING_TRANSACTIONS,
+  cashBalance
 }: DashboardProps) {
 
   // --- ÉTATS PILOTES DU CALENDRIER ---
@@ -243,6 +254,21 @@ export function Dashboard({
           canEdit={!!setOilChanges} 
           t={t} 
           language={language}
+        />
+      </section>
+
+      {/* FUEL ADVANCES & CASH RECONCILIATION SECTION */}
+      <section>
+        <FuelAdvanceDashboardWidget 
+          advances={fuelAdvances}
+          transactions={accountingTransactions}
+          rawCashBalance={cashBalance}
+          onAddAdvance={setFuelAdvances ? (newAdv) => setFuelAdvances(prev => [newAdv, ...(prev || [])]) : undefined}
+          formatCurrency={formatCurrency}
+          currency={currency}
+          t={t}
+          language={language}
+          canEdit={!!setFuelAdvances}
         />
       </section>
 

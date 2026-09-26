@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { AccountingTransaction, AccountingCategory } from '../utils/accountingParser';
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from '../utils/accountingInitialData';
+import { FuelAdvance, FuelCashSummary, computeFuelReconciliation, DEFAULT_FUEL_ADVANCES } from '../utils/fuelAdvanceTracker';
 import { Language, translateCategory, translateComment, translateStatus, translatePaymentMethod, TRANSLATIONS } from '../utils/i18n';
 
 // Extraction de l'ID d'un fichier Google Drive
@@ -150,6 +151,8 @@ interface AccountingModuleProps {
   canWrite?: boolean;
   t?: any;
   language?: Language;
+  fuelAdvances?: FuelAdvance[];
+  setFuelAdvances?: React.Dispatch<React.SetStateAction<FuelAdvance[]>> | null;
 }
 
 // Configuration visuelle des catégories comptables
@@ -190,6 +193,8 @@ export function AccountingModule({
   canWrite = true,
   t,
   language = "FR",
+  fuelAdvances,
+  setFuelAdvances,
 }: AccountingModuleProps) {
   const isEn = language === "EN";
   const text = t || (isEn ? TRANSLATIONS.EN : TRANSLATIONS.FR);
@@ -201,8 +206,19 @@ export function AccountingModule({
     ? formatTonnage
     : (val: number) => Number(val || 0).toLocaleString("fr-FR") + " T";
 
-  // --- ONGLET ACTIF : SPREEDSHEET (GRAND LIVRE) vs FACTURES CLIENTS ---
-  const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices">("spreedsheet");
+  // --- ONGLET ACTIF : SPREEDSHEET vs FACTURES CLIENTS vs AVANCES CARBURANT ---
+  const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices" | "fuel_advances">("spreedsheet");
+
+  // États Dépôts & Avances Carburant
+  const [fuelStationFilter, setFuelStationFilter] = useState<string>("ALL");
+  const [fuelSearchQuery, setFuelSearchQuery] = useState<string>("");
+  const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
+  const [editingFuelAdvance, setEditingFuelAdvance] = useState<FuelAdvance | null>(null);
+  const [fuelFormDate, setFuelFormDate] = useState(new Date().toISOString().slice(0, 10));
+  const [fuelFormAmount, setFuelFormAmount] = useState("4000000");
+  const [fuelFormStation, setFuelFormStation] = useState("Shell San Pedro");
+  const [fuelFormPaymentMethod, setFuelFormPaymentMethod] = useState("Virement Bancaire");
+  const [fuelFormNotes, setFuelFormNotes] = useState("");
 
   // ==========================================
   // PARTIE 1 : DONNÉES SPREEDSHEET (GRAND LIVRE)
@@ -334,6 +350,116 @@ export function AccountingModule({
       driveCount
     };
   }, [filteredTransactions]);
+
+  // Calcul du résumé du décompte carburant et de la réconciliation de trésorerie
+  const fuelSummary: FuelCashSummary = useMemo(() => {
+    return computeFuelReconciliation(
+      fuelAdvances || DEFAULT_FUEL_ADVANCES,
+      allTx,
+      metrics.balance
+    );
+  }, [fuelAdvances, allTx, metrics.balance]);
+
+  // Avances filtrées par station et recherche
+  const filteredFuelAdvances = useMemo(() => {
+    const list = fuelSummary.recentAdvances;
+    return list.filter(adv => {
+      if (fuelStationFilter !== "ALL" && adv.station !== fuelStationFilter) return false;
+      if (fuelSearchQuery.trim()) {
+        const q = fuelSearchQuery.toLowerCase();
+        const matchStation = adv.station.toLowerCase().includes(q);
+        const matchNotes = (adv.notes || "").toLowerCase().includes(q);
+        const matchDate = adv.date.includes(q);
+        if (!matchStation && !matchNotes && !matchDate) return false;
+      }
+      return true;
+    });
+  }, [fuelSummary.recentAdvances, fuelStationFilter, fuelSearchQuery]);
+
+  // Handlers de gestion des avances carburant
+  const handleOpenAddFuelAdvance = () => {
+    setEditingFuelAdvance(null);
+    setFuelFormDate(new Date().toISOString().slice(0, 10));
+    setFuelFormAmount("4000000");
+    setFuelFormStation("Shell San Pedro");
+    setFuelFormPaymentMethod("Virement Bancaire");
+    setFuelFormNotes("");
+    setIsFuelModalOpen(true);
+  };
+
+  const handleOpenEditFuelAdvance = (adv: FuelAdvance) => {
+    setEditingFuelAdvance(adv);
+    setFuelFormDate(adv.date);
+    setFuelFormAmount(String(adv.amount));
+    setFuelFormStation(adv.station);
+    setFuelFormPaymentMethod(adv.paymentMethod || "Virement Bancaire");
+    setFuelFormNotes(adv.notes || "");
+    setIsFuelModalOpen(true);
+  };
+
+  const handleSaveFuelAdvance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!setFuelAdvances) return;
+    const amt = parseFloat(fuelFormAmount.replace(/\s/g, '')) || 0;
+    if (amt <= 0) return;
+
+    if (editingFuelAdvance) {
+      setFuelAdvances(prev => (prev || DEFAULT_FUEL_ADVANCES).map(item => {
+        if (item.id === editingFuelAdvance.id) {
+          return {
+            ...item,
+            date: fuelFormDate,
+            amount: amt,
+            station: fuelFormStation.trim() || "Shell San Pedro",
+            paymentMethod: fuelFormPaymentMethod,
+            notes: fuelFormNotes.trim()
+          };
+        }
+        return item;
+      }));
+    } else {
+      const newAdv: FuelAdvance = {
+        id: `adv-manual-${Date.now()}`,
+        date: fuelFormDate,
+        amount: amt,
+        station: fuelFormStation.trim() || "Shell San Pedro",
+        paymentMethod: fuelFormPaymentMethod,
+        notes: fuelFormNotes.trim(),
+        source: "manual",
+        status: "active"
+      };
+      setFuelAdvances(prev => [newAdv, ...(prev || DEFAULT_FUEL_ADVANCES)]);
+    }
+    setIsFuelModalOpen(false);
+  };
+
+  const handleDeleteFuelAdvance = (id: string) => {
+    if (!setFuelAdvances) return;
+    if (window.confirm(isEn ? "Are you sure you want to delete this fuel advance?" : "Confirmer la suppression de cette avance carburant ?")) {
+      setFuelAdvances(prev => (prev || DEFAULT_FUEL_ADVANCES).filter(a => a.id !== id));
+    }
+  };
+
+  const handleExportFuelDrawdownCSV = () => {
+    const headers = ["Date", "Station", "Commentaire / Ravitaillement", "Montant Carburant du Jour (CFA)", "Solde Avance Restant (CFA)", "Statut"];
+    const rows = fuelSummary.dailyDrawdownLedger.map(log => [
+      `"${log.date}"`,
+      `"${fuelSummary.activeStation}"`,
+      `"${(log.comment || '').replace(/"/g, '""')}"`,
+      log.amount,
+      log.remainingAdvanceBalance,
+      `"${log.status === 'covered' ? 'Couvert' : log.status === 'low_credit' ? 'Crédit Faible' : 'Dépassement / Reste à payer'}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `decompte_carburant_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Données mensuelles Recharts
   const monthlyChartData = useMemo(() => {
@@ -629,6 +755,18 @@ export function AccountingModule({
               <Receipt className="size-3.5" />
               <span>{isEn ? `Client Invoices (${safeInvoices.length})` : `Factures Clients (${safeInvoices.length})`}</span>
             </button>
+
+            <button
+              onClick={() => setViewTab("fuel_advances")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                viewTab === "fuel_advances"
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-black shadow-lg shadow-amber-500/25 font-black'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Fuel className="size-3.5 text-amber-400" />
+              <span>{t?.fuelAdvancesTab || (isEn ? `Fuel Prepayments (${fuelSummary.recentAdvances.length})` : `Dépôts Carburant (${fuelSummary.recentAdvances.length})`)}</span>
+            </button>
           </div>
 
           {onSync && (
@@ -718,7 +856,7 @@ export function AccountingModule({
               </div>
             </div>
 
-            {/* CARD 4: SOLDE DE TRÉSORERIE ACTUEL */}
+            {/* CARD 4: SOLDE DE TRÉSORERIE ACTUEL & VENTILATION DÉPÔT CARBURANT */}
             <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-5 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#F59E0B]/10 transition-all"></div>
               <div className="flex items-center justify-between">
@@ -730,11 +868,50 @@ export function AccountingModule({
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl lg:text-3xl font-black tracking-tight text-white">{formatMoney(metrics.balance)}</p>
-                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Cash & bank balance" : "Solde en caisse & banque"}</span>
-                  <span className="font-bold text-[#F59E0B] flex items-center gap-1">
-                    <Check className="size-3" /> {isEn ? "Certified Spreedsheet" : "Certifié Spreedsheet"}
+                <div className="flex items-baseline justify-between">
+                  <p className="text-2xl lg:text-3xl font-black tracking-tight text-white">{formatMoney(metrics.balance)}</p>
+                  <span className="text-[10px] font-bold text-[#F59E0B] bg-[#F59E0B]/10 px-2 py-0.5 rounded-full border border-[#F59E0B]/20">
+                    {isEn ? "Gross Balance" : "Solde Brut"}
+                  </span>
+                </div>
+
+                {/* VENTILATION DÉPÔT CARBURANT / NET DISPONIBLE */}
+                <div className="mt-3 pt-2.5 border-t border-white/10 space-y-1 text-xs">
+                  {fuelSummary.currentDepositBalance > 0 ? (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-amber-400 font-medium flex items-center gap-1">
+                        <Fuel className="size-3" /> {isEn ? "incl. fuel deposit:" : "dont dépôt carburant :"}
+                      </span>
+                      <span className="font-bold text-amber-300">-{formatMoney(fuelSummary.fuelDepositCommitted)}</span>
+                    </div>
+                  ) : fuelSummary.totalAmountDue > 0 ? (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-red-400 font-medium flex items-center gap-1">
+                        <Fuel className="size-3" /> {isEn ? "Due to fuel station:" : "Dette station à régler :"}
+                      </span>
+                      <span className="font-bold text-red-400">-{formatMoney(fuelSummary.totalAmountDue)}</span>
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <span className="text-[#00F2FF] font-black text-xs flex items-center gap-1">
+                      <Wallet className="size-3" /> {isEn ? "Net Free Cash:" : "Cash Libre Réel :"}
+                    </span>
+                    <span className="font-black text-[#00F2FF] text-sm">
+                      {formatMoney(fuelSummary.netAvailableCash)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between text-[10px] text-white/50">
+                  <button
+                    onClick={() => setViewTab("fuel_advances")}
+                    className="text-amber-400 hover:text-amber-300 font-bold underline decoration-amber-400/30 flex items-center gap-0.5 transition-colors"
+                  >
+                    <span>{isEn ? "Inspect prepayments →" : "Détails dépôts →"}</span>
+                  </button>
+                  <span className="font-bold text-white/60 flex items-center gap-1">
+                    <Check className="size-3 text-emerald-400" /> {isEn ? "Certified" : "Certifié"}
                   </span>
                 </div>
               </div>
@@ -1393,6 +1570,357 @@ export function AccountingModule({
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* VUE 3 : DÉPÔTS & AVANCES CARBURANT (DRAWDOWN & RÉCONCILIATION CASH)       */}
+      {/* ========================================================================= */}
+      {viewTab === "fuel_advances" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* BANDEAU TOP : 4 CARDS KPIS DÉPÔTS CARBURANT */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* CARD 1: TOTAL AVANCES VERSÉES */}
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all" />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {t?.totalAdvancesDeposited || (isEn ? "Total Advances Deposited" : "Total Avances Versées")}
+                </span>
+                <div className="size-8 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                  <Fuel className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black text-amber-400">{formatMoney(fuelSummary.totalAdvancesDeposited)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>{isEn ? "Recorded prepayments" : "Paiements stations enregistrés"}</span>
+                  <span className="font-bold text-white/80">
+                    {fuelSummary.recentAdvances.length} {isEn ? "advances" : "avances"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 2: CARBURANT CONSOMMÉ DÉCOMPTÉ */}
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-orange-500/10 transition-all" />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {t?.totalFuelConsumedDrawdown || (isEn ? "Fuel Consumed (Drawdown)" : "Carburant Consommé Décompté")}
+                </span>
+                <div className="size-8 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-400">
+                  <ArrowUpRight className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black text-white">{formatMoney(fuelSummary.totalFuelConsumedAgainstAdvances)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>{isEn ? "Fleet daily consumption" : "Conso journalière flotte"}</span>
+                  <span className="font-bold text-orange-300">
+                    ~{formatMoney(fuelSummary.burnRatePerDay)}/j
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 3: SOLDE RESTANT EN DÉPÔT / RESTE À RÉGLER */}
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl relative overflow-hidden group">
+              <div className={`absolute top-0 right-0 w-32 h-32 ${fuelSummary.totalAmountDue > 0 ? 'bg-red-500/5' : 'bg-emerald-500/5'} rounded-full blur-3xl pointer-events-none group-hover:opacity-100 transition-all`} />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {fuelSummary.totalAmountDue > 0 
+                    ? (t?.amountDueStation || (isEn ? "Amount Due to Station" : "Reste à Régler à la Station"))
+                    : (t?.fuelDepositBalance || (isEn ? "Remaining Deposit Balance" : "Solde Dépôt Restant"))}
+                </span>
+                <div className={`size-8 rounded-xl ${fuelSummary.totalAmountDue > 0 ? 'bg-red-500/10 border-red-500/25 text-red-400' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'} border flex items-center justify-center`}>
+                  {fuelSummary.totalAmountDue > 0 ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className={`text-2xl lg:text-3xl font-black ${fuelSummary.totalAmountDue > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {fuelSummary.totalAmountDue > 0 
+                    ? `-${formatMoney(fuelSummary.totalAmountDue)}` 
+                    : formatMoney(fuelSummary.currentDepositBalance)}
+                </p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>{isEn ? "Estimated fuel coverage" : "Autonomie carburant"}</span>
+                  <span className="font-bold text-amber-300">
+                    {fuelSummary.estimatedDaysCoverage} {isEn ? "days" : "jours"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD 4: TRÉSORERIE NETTE RÉELLE / NET FREE CASH */}
+            <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#00F2FF]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#00F2FF]/10 transition-all" />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
+                  {t?.netAvailableCash || (isEn ? "Net Available Free Cash" : "Cash Libre Réellement Disponible")}
+                </span>
+                <div className="size-8 rounded-xl bg-[#00F2FF]/10 border border-[#00F2FF]/25 flex items-center justify-center text-[#00F2FF]">
+                  <Wallet className="size-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl lg:text-3xl font-black text-[#00F2FF]">{formatMoney(fuelSummary.netAvailableCash)}</p>
+                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
+                  <span>{isEn ? "Account minus deposit" : "Solde compte déduit du dépôt"}</span>
+                  <span className="font-bold text-white/80">
+                    {formatMoney(fuelSummary.grossCashBalance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* BANDEAU PÉDAGOGIQUE RÉCONCILIATION CASH */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-white/3 to-[#00F2FF]/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm">
+                  {isEn ? "Treasury Reconciliation Principle" : "Principe de Réconciliation de Trésorerie"}
+                </p>
+                <p className="text-white/60 text-xs mt-0.5">
+                  {isEn ? (
+                    <>
+                      Account Balance ({formatMoney(fuelSummary.grossCashBalance)}) − Immobilized Fuel Deposit ({formatMoney(fuelSummary.fuelDepositCommitted)}) = <strong className="text-[#00F2FF]">{formatMoney(fuelSummary.netAvailableCash)}</strong> Net Free Cash.
+                    </>
+                  ) : (
+                    <>
+                      Solde en Compte ({formatMoney(fuelSummary.grossCashBalance)}) − Dépôt Carburant Immobilisé ({formatMoney(fuelSummary.fuelDepositCommitted)}) = <strong className="text-[#00F2FF]">{formatMoney(fuelSummary.netAvailableCash)}</strong> de Cash Libre Réel.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                onClick={handleExportFuelDrawdownCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+              >
+                <Download className="size-3.5" />
+                <span>{isEn ? "Export Drawdown CSV" : "Exporter Décompte CSV"}</span>
+              </button>
+              {canWrite && (
+                <button
+                  onClick={handleOpenAddFuelAdvance}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition-all shadow-lg shadow-amber-500/20 active:scale-95"
+                >
+                  <Plus className="size-3.5" />
+                  <span>{isEn ? "+ New Fuel Advance" : "+ Nouveau Dépôt Avance"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* TABLEAU 1 : LISTE DES AVANCES ENREGISTRÉES */}
+          <div className="rounded-[28px] border border-white/8 bg-[#181818] p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/8 pb-4">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <Fuel className="size-4 text-amber-400" />
+                  {isEn ? "Recorded Station Advances & Prepayments" : "Historique des Versements d'Avances Carburant"}
+                </h3>
+                <p className="text-xs text-white/50 mt-0.5">
+                  {isEn ? "Prepayments to fuel stations (Shell San Pedro, Total...)" : "Acomptes versés aux stations-service (Shell San Pedro, Total...)"}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Filtre Station */}
+                <select
+                  value={fuelStationFilter}
+                  onChange={(e) => setFuelStationFilter(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                >
+                  <option value="ALL">{t?.allStations || (isEn ? "All Stations" : "Toutes les stations")}</option>
+                  <option value="Shell San Pedro">Shell San Pedro</option>
+                  <option value="Total">Total</option>
+                  <option value="Petroci">Petroci</option>
+                </select>
+
+                {/* Recherche */}
+                <div className="relative">
+                  <Search className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={fuelSearchQuery}
+                    onChange={(e) => setFuelSearchQuery(e.target.value)}
+                    placeholder={isEn ? "Search advance, notes..." : "Rechercher avance, note..."}
+                    className="pl-8 pr-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-amber-400 w-48"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* TABLE DES AVANCES */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black tracking-wider">
+                    <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
+                    <th className="py-3 px-4">{isEn ? "Station" : "Station"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Advance Amount" : "Montant Avance"}</th>
+                    <th className="py-3 px-4">{isEn ? "Payment Method" : "Règlement"}</th>
+                    <th className="py-3 px-4">{isEn ? "Reference / Spreadsheet Note" : "Libellé / Note Spreedsheet"}</th>
+                    <th className="py-3 px-4 text-center">{isEn ? "Source" : "Source"}</th>
+                    {canWrite && <th className="py-3 px-4 text-center">{isEn ? "Actions" : "Actions"}</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredFuelAdvances.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-white/30 italic">
+                        {isEn ? "No fuel advances match your filters." : "Aucune avance carburant ne correspond à vos critères."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredFuelAdvances.map((adv) => (
+                      <tr key={adv.id} className="hover:bg-white/2 transition-colors">
+                        <td className="py-3 px-4 text-white font-mono text-[11px] whitespace-nowrap">
+                          {adv.date}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 font-bold text-[11px]">
+                            {adv.station}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-amber-400 text-sm whitespace-nowrap">
+                          {formatMoney(adv.amount)}
+                        </td>
+                        <td className="py-3 px-4 text-white/60 whitespace-nowrap">
+                          {adv.paymentMethod || "Virement Bancaire"}
+                        </td>
+                        <td className="py-3 px-4 text-white/70 max-w-md truncate">
+                          {adv.notes || (isEn ? "Fuel prepayment" : "Acompte carburant")}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            adv.source === 'spreadsheet' 
+                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}>
+                            {adv.source === 'spreadsheet' ? 'Spreedsheet' : 'Manuel'}
+                          </span>
+                        </td>
+                        {canWrite && (
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditFuelAdvance(adv)}
+                                className="size-7 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-all"
+                                title={isEn ? "Edit" : "Modifier"}
+                              >
+                                <Edit3 className="size-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFuelAdvance(adv.id)}
+                                className="size-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all"
+                                title={isEn ? "Delete" : "Supprimer"}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLEAU 2 : GRAND LIVRE DU DÉCOMPTE JOURNALIER (DAILY FUEL DRAWDOWN LEDGER) */}
+          <div className="rounded-[28px] border border-white/8 bg-[#181818] p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/8 pb-4">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <FileText className="size-4 text-[#00F2FF]" />
+                  {t?.fuelDrawdownLedger || (isEn ? "Daily Fuel Drawdown Ledger" : "Grand Livre du Décompte Journalier")}
+                </h3>
+                <p className="text-xs text-white/50 mt-0.5">
+                  {isEn 
+                    ? "Deduction of daily truck fuel consumption from prepaid station deposits"
+                    : "Déduction chronologique de chaque ravitaillement journalier sur l'avance en cours"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40 font-bold">
+                  {fuelSummary.dailyDrawdownLedger.length} {isEn ? "operations" : "ravitaillements"}
+                </span>
+              </div>
+            </div>
+
+            {/* TABLE DU DÉCOMPTE JOURNALIER */}
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto custom-scrollbar">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-[#181818] z-10">
+                  <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black tracking-wider">
+                    <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
+                    <th className="py-3 px-4">{isEn ? "Truck Refuel / Note" : "Ravitaillement / Commentaire"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Fuel Consumed (CFA)" : "Gasoil Consommé (CFA)"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Advance Balance" : "Solde de l'Avance"}</th>
+                    <th className="py-3 px-4 text-center">{isEn ? "Status" : "Statut"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {fuelSummary.dailyDrawdownLedger.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-white/30 italic">
+                        {isEn ? "No daily fuel logs recorded." : "Aucun ravitaillement journalier enregistré."}
+                      </td>
+                    </tr>
+                  ) : (
+                    fuelSummary.dailyDrawdownLedger.map((log) => (
+                      <tr key={log.id} className="hover:bg-white/2 transition-colors">
+                        <td className="py-3 px-4 text-white font-mono text-[11px] whitespace-nowrap">
+                          {log.date}
+                        </td>
+                        <td className="py-3 px-4 text-white/80 max-w-md truncate">
+                          {log.comment || (isEn ? "Fleet Fuel Refuel" : "Ravitaillement Carburant Flotte")}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-orange-400 whitespace-nowrap">
+                          -{formatMoney(log.amount)}
+                        </td>
+                        <td className={`py-3 px-4 text-right font-black text-sm whitespace-nowrap ${
+                          log.remainingAdvanceBalance > 500000 
+                            ? 'text-emerald-400' 
+                            : log.remainingAdvanceBalance >= 0 
+                            ? 'text-amber-400' 
+                            : 'text-red-400'
+                        }`}>
+                          {formatMoney(log.remainingAdvanceBalance)}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                            log.status === 'covered'
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : log.status === 'low_credit'
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              : 'bg-red-500/15 text-red-400 border border-red-500/30'
+                          }`}>
+                            {log.status === 'covered' 
+                              ? (isEn ? "Covered" : "Couvert") 
+                              : log.status === 'low_credit'
+                              ? (isEn ? "Low Credit" : "Crédit Faible")
+                              : (isEn ? "Overdrawn / Due" : "Dépassement / Reste à régler")}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL : VISUALISEUR JUSTIFICATIF GOOGLE DRIVE */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -1696,6 +2224,119 @@ export function AccountingModule({
                 </button>
                 <button type="submit" className="px-4 py-1.5 rounded-xl bg-[#CF5D56] text-white font-bold">
                   {isEn ? "Save" : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL : NOUVEAU / MODIFIER UN DÉPÔT D'AVANCE CARBURANT */}
+      {isFuelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg rounded-[28px] border border-white/10 bg-[#181818] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/8 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Fuel className="size-4" />
+                </div>
+                <h3 className="text-base font-black text-white">
+                  {editingFuelAdvance 
+                    ? (t?.editFuelAdvance || (isEn ? "Edit Fuel Advance" : "Modifier l'Avance Carburant"))
+                    : (t?.newFuelAdvance || (isEn ? "New Fuel Prepayment" : "Nouveau Dépôt / Paiement Avance"))}
+                </h3>
+              </div>
+              <button onClick={() => setIsFuelModalOpen(false)} className="text-white/40 hover:text-white">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFuelAdvance} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-white/50 font-bold block mb-1 uppercase text-[10px]">
+                    {isEn ? "Date" : "Date"}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={fuelFormDate}
+                    onChange={(e) => setFuelFormDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-medium focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 font-bold block mb-1 uppercase text-[10px]">
+                    {isEn ? "Advance Amount (CFA)" : "Montant Avance (CFA)"}
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="Ex: 4000000"
+                    value={fuelFormAmount}
+                    onChange={(e) => setFuelFormAmount(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-sm font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-white/50 font-bold block mb-1 uppercase text-[10px]">
+                    {isEn ? "Station" : "Station-Service"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Shell San Pedro"
+                    value={fuelFormStation}
+                    onChange={(e) => setFuelFormStation(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-medium focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/50 font-bold block mb-1 uppercase text-[10px]">
+                    {isEn ? "Payment Method" : "Mode de Règlement"}
+                  </label>
+                  <select
+                    value={fuelFormPaymentMethod}
+                    onChange={(e) => setFuelFormPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-medium focus:outline-none focus:border-amber-400"
+                  >
+                    <option value="Virement Bancaire">{isEn ? "Bank Wire Transfer" : "Virement Bancaire"}</option>
+                    <option value="Chèque">{isEn ? "Bank Cheque" : "Chèque Bancaire"}</option>
+                    <option value="Wave / Mobile Money">Wave / Mobile Money</option>
+                    <option value="Espèces (Cash)">{isEn ? "Cash" : "Espèces (Cash)"}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-white/50 font-bold block mb-1 uppercase text-[10px]">
+                  {isEn ? "Reference / Spreadsheet Note" : "Libellé / Note de Rapprochement"}
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder={isEn ? "Ex: 4000000 payed to san pedro Shell" : "Ex: Virement 4M pour approvisionnement Shell San Pedro"}
+                  value={fuelFormNotes}
+                  onChange={(e) => setFuelFormNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white font-medium focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/8">
+                <button
+                  type="button"
+                  onClick={() => setIsFuelModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-white/10 text-white/60 hover:text-white font-bold"
+                >
+                  {isEn ? "Cancel" : "Annuler"}
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider shadow-lg shadow-amber-500/20 active:scale-95"
+                >
+                  {isEn ? "Save Advance" : "Enregistrer l'Avance"}
                 </button>
               </div>
             </form>

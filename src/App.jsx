@@ -82,6 +82,7 @@ import AITicketValidationModule from "./components/AITicketValidationModule";
 import AccountingModule, { INITIAL_INVOICES } from "./components/AccountingModule";
 import { parseSpreadsheetAccounting } from "./utils/accountingParser";
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from "./utils/accountingInitialData";
+import { DEFAULT_FUEL_ADVANCES, extractFuelAdvancesFromTransactions } from "./utils/fuelAdvanceTracker";
 import { TRANSLATIONS, translateCategory, translateComment } from "./utils/i18n";
 
 const APP_STORAGE_KEYS = {
@@ -101,6 +102,7 @@ const APP_STORAGE_KEYS = {
   maintenance: "sdv_maintenance_v1",
   oil_changes: "sdv_oil_changes_v1",
   accounting_transactions: "sdv_accounting_transactions_v2",
+  fuel_advances: "sdv_fuel_advances_v1",
   language: "sdv_language_pref_v1"
 };
 
@@ -238,6 +240,11 @@ export default function App() {
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
   const [invoices, setInvoices] = useState(() => loadJson(APP_STORAGE_KEYS.invoices, INITIAL_INVOICES));
   const [accountingTransactions, setAccountingTransactions] = useState(() => loadJson(APP_STORAGE_KEYS.accounting_transactions, INITIAL_ACCOUNTING_TRANSACTIONS));
+  const [fuelAdvances, setFuelAdvances] = useState(() => {
+    const loaded = loadJson(APP_STORAGE_KEYS.fuel_advances, null);
+    if (loaded && Array.isArray(loaded) && loaded.length > 0) return loaded;
+    return DEFAULT_FUEL_ADVANCES;
+  });
 
   // Migration et assainissement au montage : extraire tout salaire de la maintenance vers les frais salariaux
   useEffect(() => {
@@ -274,6 +281,10 @@ export default function App() {
   useEffect(() => {
     saveJson(APP_STORAGE_KEYS.accounting_transactions, accountingTransactions);
   }, [accountingTransactions]);
+
+  useEffect(() => {
+    saveJson(APP_STORAGE_KEYS.fuel_advances, fuelAdvances);
+  }, [fuelAdvances]);
 
   useEffect(() => {
     saveFinanceRecords("expenses", expenseRecords);
@@ -701,6 +712,20 @@ export default function App() {
       const { transactions: parsedTx } = parseSpreadsheetAccounting(rowData);
       if (parsedTx && parsedTx.length > 0) {
         setAccountingTransactions(parsedTx);
+        // Extraction et fusion automatique des avances carburant détectées
+        const detectedAdvances = extractFuelAdvancesFromTransactions(parsedTx);
+        if (detectedAdvances.length > 0) {
+          setFuelAdvances(prev => {
+            const existingIds = new Set((prev || []).map(a => a.id));
+            const merged = [...(prev || [])];
+            detectedAdvances.forEach(adv => {
+              if (!existingIds.has(adv.id)) {
+                merged.push(adv);
+              }
+            });
+            return merged;
+          });
+        }
         return parsedTx.length;
       }
     } catch (err) {
@@ -974,6 +999,9 @@ export default function App() {
                  t={t}
                  language={language}
                  allRecords={manualTrips}
+                 fuelAdvances={fuelAdvances}
+                 setFuelAdvances={rolePermissions.canEdit ? setFuelAdvances : null}
+                 accountingTransactions={accountingTransactions}
                  />
                  )}
               {activeSection === "drivers" && (
@@ -1016,6 +1044,8 @@ export default function App() {
                   canWrite={rolePermissions.canEdit} 
                   t={t} 
                   language={language}
+                  fuelAdvances={fuelAdvances}
+                  setFuelAdvances={rolePermissions.canEdit ? setFuelAdvances : null}
                 />
               )}
               {activeSection === "depenses" && (
