@@ -49,6 +49,7 @@ import {
 import type { DashboardSummary } from "../utils/types";
 import { FilterBar } from "./FilterBar";
 import type { Language } from "../utils/i18n";
+import { isSalaryRecord } from "../utils/salaryFilter";
 
 type DashboardProps = {
   formatCurrency: (value: number, curr?: string) => string;
@@ -115,7 +116,9 @@ export function Dashboard({
   const filteredMaintenance = useMemo(() => {
     if (!maintenanceRecords || maintenanceRecords.length === 0) return [];
 
-    return maintenanceRecords.filter(r => {
+    return maintenanceRecords
+      .filter(r => !isSalaryRecord(r))
+      .filter(r => {
       const rDate = new Date(r.date);
       
       let dateMatch = false;

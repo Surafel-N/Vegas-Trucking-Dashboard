@@ -517,3 +517,5 @@ export function getLogisticsReport(records) {
     return a.month - b.month;
   });
 }
+
+export { isSalaryRecord, SALARY_PATTERNS } from '../utils/salaryFilter';

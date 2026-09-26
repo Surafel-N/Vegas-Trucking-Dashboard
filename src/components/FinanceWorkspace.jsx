@@ -105,7 +105,7 @@ export function FinanceWorkspace({
     ? expenseCategories
     : (Array.isArray(categories?.expense) && categories.expense.length > 0
         ? categories.expense
-        : ["Carburant", "Péage", "Police", "Repas", "Maintenance", "Autre"]);
+        : ["Carburant", "Péage", "Police", "Repas", "Maintenance", "Salaires & Rémunérations", "Autre"]);
 
   const safeIncomeCategories = (incomeCategories && incomeCategories.length > 0)
     ? incomeCategories

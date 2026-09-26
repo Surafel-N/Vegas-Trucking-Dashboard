@@ -41,6 +41,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { type Language, translateComment } from '../utils/i18n';
+import { isSalaryRecord } from '../utils/salaryFilter';
 
 // Helper extraction Google Drive
 function getDriveId(link: string | null | undefined): string | null {
@@ -245,8 +246,9 @@ export function QuantumExpenseAnalysis({
   }, [allTrips, data]);
 
   const sourceMaintenance = useMemo(() => {
-    if (localMaintenance) return localMaintenance;
-    return allMaintenanceRecords && allMaintenanceRecords.length > 0 ? allMaintenanceRecords : maintenanceRecords;
+    const raw = localMaintenance || (allMaintenanceRecords && allMaintenanceRecords.length > 0 ? allMaintenanceRecords : maintenanceRecords);
+    // Règle d'or : exclusion stricte de tout enregistrement salarial des frais de maintenance
+    return (raw || []).filter(r => !isSalaryRecord(r));
   }, [localMaintenance, allMaintenanceRecords, maintenanceRecords]);
 
   // Actions d'édition & ajout de maintenance
@@ -268,6 +270,12 @@ export function QuantumExpenseAnalysis({
   const handleSaveEdit = () => {
     if (!editMaintForm.description.trim()) {
       alert(language === 'EN' ? "Please provide a description." : "Veuillez saisir une description.");
+      return;
+    }
+    if (isSalaryRecord({ description: editMaintForm.description })) {
+      alert(language === 'EN' 
+        ? "Salaries must not be entered under maintenance, but under Salary Expenses (Frais Salariaux)." 
+        : "Les dépenses salariales ne doivent pas être enregistrées en maintenance, mais dans les Frais Salariaux (Salaires & Rémunérations).");
       return;
     }
     const parsedCost = Number(editMaintForm.cost);
@@ -310,6 +318,12 @@ export function QuantumExpenseAnalysis({
   const handleSaveNew = () => {
     if (!newMaintForm.description.trim()) {
       alert(language === 'EN' ? "Please provide a description." : "Veuillez saisir une description.");
+      return;
+    }
+    if (isSalaryRecord({ description: newMaintForm.description })) {
+      alert(language === 'EN' 
+        ? "Salaries must not be entered under maintenance, but under Salary Expenses (Frais Salariaux)." 
+        : "Les dépenses salariales ne doivent pas être enregistrées en maintenance, mais dans les Frais Salariaux (Salaires & Rémunérations).");
       return;
     }
     const parsedCost = Number(newMaintForm.cost);
@@ -433,7 +447,7 @@ export function QuantumExpenseAnalysis({
     if (timeScale === "global") {
       return { 
         scopedTrips: data, 
-        scopedMaintenance: maintenanceRecords,
+        scopedMaintenance: sourceMaintenance,
         periodLabel: language === 'EN' ? "Active dashboard period" : "Période active du tableau de bord"
       };
     }
@@ -481,10 +495,10 @@ export function QuantumExpenseAnalysis({
 
     return { 
       scopedTrips: data, 
-      scopedMaintenance: maintenanceRecords, 
+      scopedMaintenance: sourceMaintenance, 
       periodLabel: language === 'EN' ? "Global" : "Global" 
     };
-  }, [timeScale, selectedYear, selectedMonth, selectedWeek, selectedDay, sourceTrips, sourceMaintenance, data, maintenanceRecords, timePeriods, language]);
+  }, [timeScale, selectedYear, selectedMonth, selectedWeek, selectedDay, sourceTrips, sourceMaintenance, data, timePeriods, language]);
 
   // Navigation jour précédent / jour suivant
   const handleDayStep = (delta: number) => {

@@ -1005,6 +1005,12 @@ export const CATEGORY_TRANSLATIONS: Record<string, string> = {
   "Salaires & Rémunérations": "Salaries & Wages",
   "Salaires": "Salaries",
   "Salaire": "Salary",
+  "Frais Salariaux": "Salary Expenses",
+  "Frais Salariales": "Salary Expenses",
+  "Frais Salariale": "Salary Expense",
+  "Charges Salariales": "Payroll Expenses",
+  "Salaires Chauffeurs": "Driver Salaries",
+  "Salaires & Frais Salariaux": "Salaries & Payroll",
   "Rémunérations": "Wages",
   "Primes": "Bonuses",
   "Prime": "Bonus",
@@ -1101,7 +1107,7 @@ export function translateCategory(cat: string | null | undefined, lang: Language
   if (norm.includes("repas") || norm.includes("food") || norm.includes("nourriture")) {
     return "Meals & Per Diem";
   }
-  if (norm.includes("salaire") || norm.includes("remuneration") || norm.includes("paie")) {
+  if (norm.includes("salaire") || norm.includes("salarial") || norm.includes("remuneration") || norm.includes("paie") || norm.includes("salary") || norm.includes("wages")) {
     return "Salaries & Wages";
   }
   if (norm.includes("pneu") || norm.includes("roue") || norm.includes("tire")) {

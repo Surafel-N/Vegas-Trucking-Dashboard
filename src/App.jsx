@@ -48,6 +48,7 @@ import {
   loadSDVFiles,
 } from "./lib/dashboard";
 import { computeDashboard } from "./utils/computeDashboard";
+import { isSalaryRecord, MAINTENANCE_KEYWORDS } from "./utils/salaryFilter";
 import SmartBulkImporter from './components/SmartBulkImporter';
 import { MaintenanceAdminModule } from "./components/MaintenanceAdminModule.jsx";
 import {
@@ -196,7 +197,10 @@ export default function App() {
     return loaded;
   });
   const [manualTrips, setManualTrips] = useState(() => loadJson(APP_STORAGE_KEYS.trips, []));
-  const [maintenanceRecords, setMaintenanceRecords] = useState(() => loadJson(APP_STORAGE_KEYS.maintenance, []));
+  const [maintenanceRecords, setMaintenanceRecords] = useState(() => {
+    const loaded = loadJson(APP_STORAGE_KEYS.maintenance, []);
+    return (loaded || []).filter(r => !isSalaryRecord(r));
+  });
   const [oilChanges, setOilChanges] = useState(() => {
     const saved = loadJson(APP_STORAGE_KEYS.oil_changes, {});
     return {
@@ -208,12 +212,60 @@ export default function App() {
   });
   const [pendingTickets, setPendingTickets] = useState(() => loadJson(APP_STORAGE_KEYS.pending_ai_tickets, []));
   const [auditLogs, setAuditLogs] = useState(() => loadJson(APP_STORAGE_KEYS.audit, []));
-  const [categories, setCategories] = useState(() => loadJson(APP_STORAGE_KEYS.categories, { expense: ["Carburant", "Péage", "Police", "Repas"], income: ["Recette trajet"] }));
-  const [expenseRecords, setExpenseRecords] = useState(() => loadFinanceRecords("expenses"));
+  const [categories, setCategories] = useState(() => loadJson(APP_STORAGE_KEYS.categories, { 
+    expense: ["Carburant", "Péage", "Police", "Repas", "Maintenance", "Salaires & Rémunérations"], 
+    income: ["Recette trajet"] 
+  }));
+  const [expenseRecords, setExpenseRecords] = useState(() => {
+    const loadedExpenses = loadFinanceRecords("expenses") || [];
+    const loadedMaint = loadJson(APP_STORAGE_KEYS.maintenance, []) || [];
+    const salariesFromMaint = loadedMaint.filter(isSalaryRecord).map(r => ({
+      ...r,
+      category: "Salaires & Rémunérations",
+      subCategory: "Salaires & Rémunérations",
+      driverLabel: r.vehicle || r.driverLabel || "FLOTTE",
+      type: "out"
+    }));
+
+    if (salariesFromMaint.length > 0) {
+      const existingIds = new Set(loadedExpenses.map(e => e.id));
+      const toAdd = salariesFromMaint.filter(s => !existingIds.has(s.id));
+      return [...loadedExpenses, ...toAdd];
+    }
+    return loadedExpenses;
+  });
   const [incomeRecords, setIncomeRecords] = useState(() => loadFinanceRecords("incomes"));
   const [dailyClosings, setDailyClosings] = useState(() => loadJson(APP_STORAGE_KEYS.closings, []));
   const [invoices, setInvoices] = useState(() => loadJson(APP_STORAGE_KEYS.invoices, INITIAL_INVOICES));
   const [accountingTransactions, setAccountingTransactions] = useState(() => loadJson(APP_STORAGE_KEYS.accounting_transactions, INITIAL_ACCOUNTING_TRANSACTIONS));
+
+  // Migration et assainissement au montage : extraire tout salaire de la maintenance vers les frais salariaux
+  useEffect(() => {
+    const rawMaint = loadJson(APP_STORAGE_KEYS.maintenance, []);
+    const salaries = (rawMaint || []).filter(isSalaryRecord);
+    if (salaries.length > 0) {
+      const cleanMaint = (rawMaint || []).filter(r => !isSalaryRecord(r));
+      saveJson(APP_STORAGE_KEYS.maintenance, cleanMaint);
+      setMaintenanceRecords(cleanMaint);
+
+      setExpenseRecords(prev => {
+        const existingIds = new Set((prev || []).map(e => e.id));
+        const toAdd = salaries
+          .filter(s => !existingIds.has(s.id))
+          .map(r => ({
+            ...r,
+            category: "Salaires & Rémunérations",
+            subCategory: "Salaires & Rémunérations",
+            driverLabel: r.vehicle || r.driverLabel || "FLOTTE",
+            type: "out"
+          }));
+        if (toAdd.length === 0) return prev;
+        const updated = [...(prev || []), ...toAdd];
+        saveFinanceRecords("expenses", updated);
+        return updated;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     saveJson(APP_STORAGE_KEYS.invoices, invoices);
@@ -531,8 +583,16 @@ export default function App() {
       }
       if (!bestComment) return;
 
-      const maintenanceKeywords = ['tire', 'oil', 'repair', 'rod', 'maint', 'spare', 'change', 'garage', 'mechanic', 'mecanic', 'frein', 'brake', 'tube', 'labor', 'filter', 'battery', 'bearing', 'suspension', 'clutch', 'joint', 'gasket', 'alternator', 'starter', 'belt', 'pump', 'radiator', 'shock', 'rim', 'pneu', 'vidange', 'moteur', 'batterie', 'roulement', 'amortisseur', 'embrayage', 'boite', 'pont', 'transmission', 'alternateur', 'demarreur', 'courroie', 'pompe', 'radiateur', 'huil', 'entretien', 'révision', 'revision', 'facture', 'pièce', 'mecanicien', 'main d', 'lavage', 'graissage', 'parallélisme', 'équilibrage', 'valve', 'durite', 'soufflet', 'disque', 'plaquette', 'étrier', 'injecteur'];
-      const isMaintenance = maintenanceKeywords.some(keyword => fullRowContent.includes(keyword)) || fullRowContent.includes('km') || !!driveLink || fullRowContent.includes('http') || fullRowContent.includes('drive.google');
+      const isSalary = isSalaryRecord({
+        description: bestComment,
+        comment: fullRowContent,
+        rawText: fullRowContent
+      });
+
+      // Règle d'or : Tout ce qui est salaire ne doit pas entrer dans la maintenance mais dans les frais salariaux
+      const isMaintenance = !isSalary && (
+        MAINTENANCE_KEYWORDS.some(keyword => fullRowContent.includes(keyword))
+      );
 
       let isoDate = "2026-01-01";
       const p = dateRaw.toLowerCase().split(" ");
@@ -554,21 +614,46 @@ export default function App() {
         }
       });
 
-      const detectedRepairType = maintenanceKeywords.find(kw => fullRowContent.includes(kw)) || "Réparation";
+      const detectedRepairType = isMaintenance 
+        ? (MAINTENANCE_KEYWORDS.find(kw => fullRowContent.includes(kw)) || "Réparation") 
+        : "";
       const driveLinkRegex = /(https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+)/;
       const foundLink = fullRowContent.match(driveLinkRegex);
       const finalDriveLink = driveLink || (foundLink ? foundLink[0] : null);
 
       const payload = {
         id: `gs-${detectedDriver.c}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
-        date: isoDate, amount: amount, description: bestComment || `Maintenance ${detectedRepairType}`,
-        driveLink: finalDriveLink, source: "Google Sheets"
+        date: isoDate, 
+        amount: amount, 
+        description: bestComment || (isSalary ? "Salaires & Rémunérations" : (isMaintenance ? `Maintenance ${detectedRepairType}` : "Dépense Opérationnelle")),
+        driveLink: finalDriveLink, 
+        source: "Google Sheets"
       };
 
-      if (isMaintenance) {
-        maintenanceList.push({ ...payload, vehicle: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, cost: amount, status: "Completed", repairType: detectedRepairType });
+      if (isSalary) {
+        expensesList.push({ 
+          ...payload, 
+          driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, 
+          category: "Salaires & Rémunérations", 
+          subCategory: "Salaires & Rémunérations",
+          type: "out" 
+        });
+      } else if (isMaintenance) {
+        maintenanceList.push({ 
+          ...payload, 
+          vehicle: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, 
+          cost: amount, 
+          status: "Completed", 
+          repairType: detectedRepairType 
+        });
       } else {
-        expensesList.push({ ...payload, driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, category: "Dépense Opérationnelle", subCategory: "Sync Spreadsheet" });
+        expensesList.push({ 
+          ...payload, 
+          driverLabel: `${detectedDriver.c} TRUCK ${detectedDriver.s}`, 
+          category: "Dépense Opérationnelle", 
+          subCategory: "Sync Spreadsheet",
+          type: "out" 
+        });
       }
 
       // Détection automatique de vidange dans les commentaires Spreedsheet
@@ -605,8 +690,8 @@ export default function App() {
       }
     });
 
-    setMaintenanceRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...maintenanceList]);
-    setExpenseRecords(prev => [...prev.filter(r => r.source !== "Google Sheets"), ...expensesList]);
+    setMaintenanceRecords(prev => [...(prev || []).filter(r => r.source !== "Google Sheets" && !isSalaryRecord(r)), ...maintenanceList]);
+    setExpenseRecords(prev => [...(prev || []).filter(r => r.source !== "Google Sheets"), ...expensesList]);
     return { maintenance: maintenanceList.length, expenses: expensesList.length };
   };
 

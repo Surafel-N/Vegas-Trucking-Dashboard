@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ALL_CHAUFFEURS } from '../lib/dashboard';
 import { translateComment } from '../utils/i18n';
+import { isSalaryRecord } from '../utils/salaryFilter';
 
 
 // Helper extraction Google Drive
@@ -168,6 +169,12 @@ export function MaintenanceAdminModule({
   const approveAI = (id) => {
     const item = pendingAI.find(p => p.id === id);
     if (!item) return;
+    if (isSalaryRecord(item)) {
+      alert(language === 'EN' 
+        ? "This invoice is detected as a salary payment. It must be recorded under Expenses > Salaries & Wages, not under Workshop Maintenance." 
+        : "Cette facture correspond à une dépense salariale. Elle doit être enregistrée dans les Dépenses sous Salaires & Rémunérations, et non en Maintenance Atelier.");
+      return;
+    }
     setRecords([{
       id: `maint-${Date.now()}`,
       date: item.date,
@@ -184,6 +191,12 @@ export function MaintenanceAdminModule({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (activeTab === 'maintenance' && isSalaryRecord(formData)) {
+      alert(language === 'EN' 
+        ? "Salaries must not be entered under maintenance, but under Salary Expenses (Frais Salariaux)." 
+        : "Les dépenses salariales ne doivent pas être saisies en maintenance, mais dans les Frais Salariaux (Salaires & Rémunérations).");
+      return;
+    }
     const record = { ...formData, id: editingId || `maint-${Date.now()}`, cost: parseFloat(formData.cost) || 0 };
     if (editingId) { setRecords(records.map(r => r.id === editingId ? record : r)); setEditingId(null); }
     else { setRecords([record, ...records]); setIsAdding(false); }
@@ -212,7 +225,9 @@ export function MaintenanceAdminModule({
 
   const vehicleOptions = drivers.map(d => `${d.name} ${d.sdv}`);
 
-  const baseRecords = activeTab === 'maintenance' ? records : expenseRecords;
+  const baseRecords = activeTab === 'maintenance' 
+    ? (records || []).filter(r => !isSalaryRecord(r)) 
+    : expenseRecords;
 
   const filteredRecords = useMemo(() => {
     return (baseRecords || []).filter(row => {
@@ -224,6 +239,7 @@ export function MaintenanceAdminModule({
       // Filtre catégorie
       if (categoryFilter !== 'ALL') {
         const desc = String(row.description || "").toLowerCase();
+        if (categoryFilter === 'salaires' && !isSalaryRecord(row)) return false;
         if (categoryFilter === 'vidange' && !desc.includes('vidange') && !desc.includes('huile')) return false;
         if (categoryFilter === 'pneu' && !desc.includes('pneu') && !desc.includes('roue')) return false;
         if (categoryFilter === 'mecanique' && !desc.includes('pièce') && !desc.includes('disque') && !desc.includes('frein') && !desc.includes('moteur') && !desc.includes('filtre')) return false;
@@ -520,6 +536,12 @@ export function MaintenanceAdminModule({
             className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'drive' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-white/5'}`}
           >
             {language === 'EN' ? "📁 Drive Receipts" : "📁 Justificatifs Drive"}
+          </button>
+          <button
+            onClick={() => setCategoryFilter('salaires')}
+            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'salaires' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'hover:bg-white/5'}`}
+          >
+            {language === 'EN' ? "💼 Salaries & Payroll" : "💼 Salaires & Frais Salariaux"}
           </button>
         </div>
       </div>
