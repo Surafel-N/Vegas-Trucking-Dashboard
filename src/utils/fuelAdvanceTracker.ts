@@ -14,12 +14,22 @@ export interface FuelAdvance {
   status?: "active" | "exhausted" | "overdrawn";
 }
 
+export interface DirectFuelPaymentAnalysis {
+  directPayment: number;
+  reason: string | null;
+  isDirect: boolean;
+}
+
 export interface FuelDailyConsumptionLog {
   id: string;
   date: string;
   rawDate?: string;
   sourceRow?: number;
-  amount: number; // Montant carburant du jour
+  amount: number; // Montant carburant total enregistré (ex: 435 000 CFA)
+  directPaymentAmount: number; // Montant payé directement ailleurs par nous (ex: 297 250 CFA)
+  stationDrawdownAmount: number; // Montant réellement décompté de l'avance station (ex: 137 750 CFA)
+  isDirectPayment: boolean; // true si une partie ou totalité a été payée directement
+  directPaymentNote?: string | null; // e.g. "Payé directement à une autre station (297 250 CFA)"
   comment: string;
   cumulativeConsumed: number;
   remainingAdvanceBalance: number;
@@ -31,7 +41,9 @@ export interface FuelAdvanceReconciliation {
   periodStart: string;
   periodEnd: string;
   totalAdvanceAmount: number;
-  fuelConsumed: number;
+  totalFuelLogged: number; // Carburant total flotte
+  totalDirectPaid: number; // Dont payé directement hors station
+  fuelConsumed: number; // Carburant réellement décompté sur l'avance
   remainingCredit: number; // > 0 si solde positif disponible en station
   amountDue: number; // > 0 si consommation > avance (dette / reste à régler)
   percentUsed: number;
@@ -47,17 +59,19 @@ export interface FuelCashSummary {
 
   // Décompte de l'avance active
   advanceAmount: number; // Montant de l'avance ou cumul suivi (ex: 4 000 000 ou 6 500 000 CFA)
-  fuelConsumed: number; // Carburant décompté sur la période (ex: 3 335 000 CFA)
-  currentDepositBalance: number; // Solde crédit restant disponible en station (ex: 665 000 CFA)
+  totalFuelLogged: number; // Total brut carburant flotte enregistré (ex: 3 335 000 CFA)
+  totalDirectPaidFuel: number; // Part payée directement à une autre station (ex: 297 250 CFA)
+  fuelConsumed: number; // Carburant décompté sur l'avance station (ex: 3 037 750 CFA)
+  currentDepositBalance: number; // Solde crédit restant disponible en station (ex: 962 250 CFA)
   totalAmountDue: number; // Reste à régler à la station si dépassement (0 si couvert)
-  percentUsed: number; // Pourcentage décompté (ex: 83.4%)
+  percentUsed: number; // Pourcentage décompté (ex: 75.9%)
   hasDepositCredit: boolean;
   hasOverdraft: boolean;
 
-  // Réconciliation Trésorerie / Cash Balance (demande utilisateur : 4M en compte dont 2M en dépôt => 2M libre)
+  // Réconciliation Trésorerie / Cash Balance (demande utilisateur : 4M en compte dont solde dépôt => cash réel libre)
   grossCashBalance: number; // Solde brut en compte (ex: 4 032 276 CFA)
-  fuelDepositCommitted: number; // Part immobilisée / en dépôt carburant (ex: 665 000 ou 1 970 000 CFA)
-  netAvailableCash: number; // Cash liquide réellement disponible (ex: 3 367 276 CFA)
+  fuelDepositCommitted: number; // Part immobilisée / en dépôt carburant (ex: 962 250 CFA)
+  netAvailableCash: number; // Cash liquide réellement disponible (ex: 3 070 026 CFA)
 
   // Indicateurs opérationnels
   burnRatePerDay: number; // Consommation moyenne par jour d'activité (~435 000 CFA)
@@ -71,6 +85,93 @@ export interface FuelCashSummary {
 }
 
 export const RUNNING_ACCOUNT_ID = "running_account_september";
+
+/**
+ * Analyse intelligente des commentaires de la feuille Spreedsheet
+ * Détecte les règlements directs effectués par l'utilisateur à d'autres stations
+ * (ex: Ligne 471 : "297250Cfa this day's i payed direcly fuel for brahima and Soro(not from shell san pedro)")
+ * qui doivent être exclus du décompte de l'avance station.
+ */
+export function parseFuelCommentDirectPayment(
+  comment?: string, 
+  totalAmount: number = 0
+): DirectFuelPaymentAnalysis {
+  if (!comment) return { directPayment: 0, reason: null, isDirect: false };
+  const c = comment.trim();
+
+  // Exclure les versements d'avances eux-mêmes (ex: "4000000 payed to san pedro Shell")
+  if (
+    /payed to (?:san pedro|shell)|transfer of|deposit for oct/i.test(c) && 
+    !/not from shell|not at the same station|direc/i.test(c)
+  ) {
+    return { directPayment: 0, reason: null, isDirect: false };
+  }
+
+  // Cas 1 : Montant explicite avant 'payed direcly' / 'payé directement'
+  // Ex: "297250Cfa this day's i payed direcly fuel for brahima and Soro(not from shell san pedro)"
+  const m1 = c.match(/([0-9\s]{4,10})\s*(?:cfa|f)?\s*(?:this\s*day(?:'s)?\s*)?(?:i\s*)?(?:have\s*)?payed\s*direc/i);
+  if (m1) {
+    const val = parseFloat(m1[1].replace(/\s/g, ''));
+    if (val > 0 && (totalAmount === 0 || val <= totalAmount)) {
+      return { 
+        directPayment: val, 
+        reason: "Payé directement à une autre station (hors Shell)", 
+        isDirect: true 
+      };
+    }
+  }
+
+  // Cas 2 : Montant explicite après 'payed directly' / 'payé directement'
+  // Ex: "i payed directly 297 250 CFA fuel"
+  const m2 = c.match(/(?:payed|paid|payé)\s*(?:direc(?:t)?ly|directement)[^0-9]*([0-9\s]{4,10})\s*(?:cfa|f)?/i);
+  if (m2) {
+    const val = parseFloat(m2[1].replace(/\s/g, ''));
+    if (val > 0 && (totalAmount === 0 || val <= totalAmount)) {
+      return { 
+        directPayment: val, 
+        reason: "Payé directement à une autre station (hors Shell)", 
+        isDirect: true 
+      };
+    }
+  }
+
+  // Cas 3 : Montant explicite associé à 'not from shell' / 'hors station'
+  const m3 = c.match(/([0-9\s]{4,10})\s*(?:cfa|f)?.*?not\s*from\s*(?:shell|station)/i);
+  if (m3) {
+    const val = parseFloat(m3[1].replace(/\s/g, ''));
+    if (val > 0 && (totalAmount === 0 || val <= totalAmount)) {
+      return { 
+        directPayment: val, 
+        reason: "Payé directement à une autre station (hors Shell)", 
+        isDirect: true 
+      };
+    }
+  }
+
+  // Cas 4 : Mention de paiement direct sans montant découpé => la totalité de la ligne a été payée hors station
+  // Ex: "This day fuel payed by us not at the same station" (Lignes 425 & 426)
+  if (
+    /not at the same station|not from shell|payed by us not at the same station|autre station/i.test(c) ||
+    /(?:payed|paid|payé)\s*(?:direc(?:t)?ly|directement)/i.test(c)
+  ) {
+    return { 
+      directPayment: totalAmount, 
+      reason: "Payé directement hors station partenaire", 
+      isDirect: true 
+    };
+  }
+
+  // Cas 5 : Rupture carburant à la station partenaire (ex: Ligne 161)
+  if (/no fuel at the (?:gaz|gas) station|pas de carburant (?:à la|en) station/i.test(c)) {
+    return { 
+      directPayment: totalAmount, 
+      reason: "Plein payé directement (rupture station partenaire)", 
+      isDirect: true 
+    };
+  }
+
+  return { directPayment: 0, reason: null, isDirect: false };
+}
 
 /**
  * Extraction automatique certifiée des paiements d'avance carburant
@@ -210,6 +311,8 @@ export function computeFuelReconciliation(
   const isConsolidated = activeAdvanceId === RUNNING_ACCOUNT_ID;
 
   let advanceAmount = 0;
+  let totalFuelLogged = 0;
+  let totalDirectPaidFuel = 0;
   let fuelConsumed = 0;
   let currentDepositBalance = 0;
   let totalAmountDue = 0;
@@ -231,7 +334,6 @@ export function computeFuelReconciliation(
     activeStation = advancesToUse[0]?.station || "Shell San Pedro";
 
     const targetFuel = fuelTxs.filter(t => t.date >= earliestDate);
-    fuelConsumed = targetFuel.reduce((s, t) => s + t.amount, 0); // 3 335 000 CFA
 
     // Reconstruction du compte courant avec reports
     let runningBalance = 0;
@@ -241,12 +343,17 @@ export function computeFuelReconciliation(
     });
 
     targetFuel.forEach(t => {
+      totalFuelLogged += t.amount;
+      const directAnalysis = parseFuelCommentDirectPayment(t.comment, t.amount);
+      totalDirectPaidFuel += directAnalysis.directPayment;
+      const stationDrawdown = Math.max(0, t.amount - directAnalysis.directPayment);
+
       // Si un versement a eu lieu ce jour-là, on l'ajoute
       if (advMap.has(t.date)) {
         runningBalance += advMap.get(t.date)!;
         advMap.delete(t.date); // appliqué
       }
-      runningBalance -= t.amount;
+      runningBalance -= stationDrawdown;
 
       dailyDrawdownLedger.push({
         id: `drawdown-cons-${t.id}`,
@@ -254,13 +361,18 @@ export function computeFuelReconciliation(
         rawDate: t.rawDate,
         sourceRow: t.sourceRow,
         amount: t.amount,
+        directPaymentAmount: directAnalysis.directPayment,
+        stationDrawdownAmount: stationDrawdown,
+        isDirectPayment: directAnalysis.isDirect,
+        directPaymentNote: directAnalysis.reason,
         comment: t.comment || "Ravitaillement Carburant Flotte",
-        cumulativeConsumed: fuelConsumed,
+        cumulativeConsumed: totalFuelLogged,
         remainingAdvanceBalance: runningBalance,
         status: runningBalance > 500000 ? "covered" : runningBalance >= 0 ? "low_credit" : "overdrawn"
       });
     });
 
+    fuelConsumed = totalFuelLogged - totalDirectPaidFuel;
     currentDepositBalance = Math.max(0, runningBalance);
     totalAmountDue = Math.max(0, -runningBalance);
     percentUsed = advanceAmount > 0 ? Math.min(200, (fuelConsumed / advanceAmount) * 100) : 0;
@@ -279,11 +391,15 @@ export function computeFuelReconciliation(
 
       // Décompte chronologique de chaque ravitaillement depuis la date de l'avance
       const targetFuel = fuelTxs.filter(t => t.date >= activeSelectedAdv!.date);
-      let runningConsumed = 0;
+      let runningStationDrawdown = 0;
 
       targetFuel.forEach(t => {
-        runningConsumed += t.amount;
-        const rem = activeSelectedAdv!.amount - runningConsumed;
+        totalFuelLogged += t.amount;
+        const directAnalysis = parseFuelCommentDirectPayment(t.comment, t.amount);
+        totalDirectPaidFuel += directAnalysis.directPayment;
+        const stationDrawdown = Math.max(0, t.amount - directAnalysis.directPayment);
+        runningStationDrawdown += stationDrawdown;
+        const rem = activeSelectedAdv!.amount - runningStationDrawdown;
 
         dailyDrawdownLedger.push({
           id: `drawdown-${activeSelectedAdv!.id}-${t.id}`,
@@ -291,14 +407,18 @@ export function computeFuelReconciliation(
           rawDate: t.rawDate,
           sourceRow: t.sourceRow,
           amount: t.amount,
+          directPaymentAmount: directAnalysis.directPayment,
+          stationDrawdownAmount: stationDrawdown,
+          isDirectPayment: directAnalysis.isDirect,
+          directPaymentNote: directAnalysis.reason,
           comment: t.comment || "Ravitaillement Carburant Flotte",
-          cumulativeConsumed: runningConsumed,
+          cumulativeConsumed: runningStationDrawdown,
           remainingAdvanceBalance: rem,
           status: rem > 500000 ? "covered" : rem >= 0 ? "low_credit" : "overdrawn"
         });
       });
 
-      fuelConsumed = runningConsumed;
+      fuelConsumed = runningStationDrawdown;
       currentDepositBalance = Math.max(0, activeSelectedAdv.amount - fuelConsumed);
       totalAmountDue = Math.max(0, fuelConsumed - activeSelectedAdv.amount);
       percentUsed = activeSelectedAdv.amount > 0 ? Math.min(200, (fuelConsumed / activeSelectedAdv.amount) * 100) : 0;
@@ -329,19 +449,31 @@ export function computeFuelReconciliation(
   // Reconstruction de la liste de réconciliation par avance pour vue détaillée
   const reconciliations: FuelAdvanceReconciliation[] = safeAdvances.map(adv => {
     const cycleTxs = fuelTxs.filter(t => t.date >= adv.date);
-    const consumed = cycleTxs.reduce((s, t) => s + t.amount, 0);
-    const rem = Math.max(0, adv.amount - consumed);
-    const due = Math.max(0, consumed - adv.amount);
+    let totalCycleFuel = 0;
+    let totalCycleDirect = 0;
+    let stationConsumed = 0;
+
+    cycleTxs.forEach(t => {
+      totalCycleFuel += t.amount;
+      const d = parseFuelCommentDirectPayment(t.comment, t.amount);
+      totalCycleDirect += d.directPayment;
+      stationConsumed += Math.max(0, t.amount - d.directPayment);
+    });
+
+    const rem = Math.max(0, adv.amount - stationConsumed);
+    const due = Math.max(0, stationConsumed - adv.amount);
 
     return {
       advance: adv,
       periodStart: adv.date,
       periodEnd: cycleTxs[cycleTxs.length - 1]?.date || adv.date,
       totalAdvanceAmount: adv.amount,
-      fuelConsumed: consumed,
+      totalFuelLogged: totalCycleFuel,
+      totalDirectPaid: totalCycleDirect,
+      fuelConsumed: stationConsumed,
       remainingCredit: rem,
       amountDue: due,
-      percentUsed: adv.amount > 0 ? Math.min(200, (consumed / adv.amount) * 100) : 100,
+      percentUsed: adv.amount > 0 ? Math.min(200, (stationConsumed / adv.amount) * 100) : 100,
       status: due > 0 ? "overdrawn" : rem > 0 ? "active" : "exhausted",
       dailyLogs: []
     };
@@ -360,6 +492,8 @@ export function computeFuelReconciliation(
     selectedAdvance: activeSelectedAdv,
     isConsolidatedView: isConsolidated,
     advanceAmount,
+    totalFuelLogged,
+    totalDirectPaidFuel,
     fuelConsumed,
     currentDepositBalance,
     totalAmountDue,

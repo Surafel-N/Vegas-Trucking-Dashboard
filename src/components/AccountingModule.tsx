@@ -444,12 +444,23 @@ export function AccountingModule({
   };
 
   const handleExportFuelDrawdownCSV = () => {
-    const headers = ["Date", "Station", "Commentaire / Ravitaillement", "Montant Carburant du Jour (CFA)", "Solde Avance Restant (CFA)", "Statut"];
+    const headers = [
+      "Date", 
+      "Station", 
+      "Commentaire / Ravitaillement", 
+      "Gasoil Total Flotte (CFA)", 
+      "Payé Directement Hors Station (CFA)", 
+      "Décompté Avance Station (CFA)", 
+      "Solde Avance Restant (CFA)", 
+      "Statut"
+    ];
     const rows = fuelSummary.dailyDrawdownLedger.map(log => [
       `"${log.date}"`,
       `"${fuelSummary.activeStation}"`,
       `"${(log.comment || '').replace(/"/g, '""')}"`,
       log.amount,
+      log.directPaymentAmount,
+      log.stationDrawdownAmount,
       log.remainingAdvanceBalance,
       `"${log.status === 'covered' ? 'Couvert' : log.status === 'low_credit' ? 'Crédit Faible' : 'Dépassement / Reste à payer'}"`
     ]);
@@ -1659,10 +1670,16 @@ export function AccountingModule({
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black text-white">{formatMoney(fuelSummary.fuelConsumed)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Drawn down:" : "Consommé :"} {Math.round(fuelSummary.percentUsed)}%</span>
-                  <span className="font-bold text-orange-300">
-                    ~{formatMoney(fuelSummary.burnRatePerDay)}/j
-                  </span>
+                  <span>{isEn ? "Station drawdown:" : "Décompte station :"} {Math.round(fuelSummary.percentUsed)}%</span>
+                  {fuelSummary.totalDirectPaidFuel > 0 ? (
+                    <span className="font-bold text-emerald-400 text-[11px]">
+                      -{formatMoney(fuelSummary.totalDirectPaidFuel)} {isEn ? "direct" : "payé direct"}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-orange-300">
+                      ~{formatMoney(fuelSummary.burnRatePerDay)}/j
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1909,7 +1926,7 @@ export function AccountingModule({
                   <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black tracking-wider">
                     <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
                     <th className="py-3 px-4">{isEn ? "Truck Refuel / Note" : "Ravitaillement / Commentaire"}</th>
-                    <th className="py-3 px-4 text-right">{isEn ? "Fuel Consumed (CFA)" : "Gasoil Consommé (CFA)"}</th>
+                    <th className="py-3 px-4 text-right">{isEn ? "Station Drawdown (CFA)" : "Décompté Station (CFA)"}</th>
                     <th className="py-3 px-4 text-right">{isEn ? "Advance Balance" : "Solde de l'Avance"}</th>
                     <th className="py-3 px-4 text-center">{isEn ? "Status" : "Statut"}</th>
                   </tr>
@@ -1927,11 +1944,27 @@ export function AccountingModule({
                         <td className="py-3 px-4 text-white font-mono text-[11px] whitespace-nowrap">
                           {log.date}
                         </td>
-                        <td className="py-3 px-4 text-white/80 max-w-md truncate">
-                          {log.comment || (isEn ? "Fleet Fuel Refuel" : "Ravitaillement Carburant Flotte")}
+                        <td className="py-3 px-4 max-w-md">
+                          <p className="text-white/80 truncate">
+                            {log.comment || (isEn ? "Fleet Fuel Refuel" : "Ravitaillement Carburant Flotte")}
+                          </p>
+                          {log.isDirectPayment && (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                                ⛽ {log.directPaymentNote || (isEn ? "Paid directly outside station:" : "Payé directement hors station :")} -{formatMoney(log.directPaymentAmount)}
+                              </span>
+                            </div>
+                          )}
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-orange-400 whitespace-nowrap">
-                          -{formatMoney(log.amount)}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="font-bold text-orange-400">
+                            -{formatMoney(log.stationDrawdownAmount)}
+                          </div>
+                          {log.isDirectPayment && (
+                            <div className="text-[10px] text-white/40">
+                              ({isEn ? "Total:" : "Total :"} {formatMoney(log.amount)})
+                            </div>
+                          )}
                         </td>
                         <td className={`py-3 px-4 text-right font-black text-sm whitespace-nowrap ${
                           log.remainingAdvanceBalance > 500000 
@@ -1944,13 +1977,21 @@ export function AccountingModule({
                         </td>
                         <td className="py-3 px-4 text-center whitespace-nowrap">
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            log.status === 'covered'
+                            log.isDirectPayment && log.stationDrawdownAmount === 0
+                              ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                              : log.isDirectPayment
+                              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                              : log.status === 'covered'
                               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                               : log.status === 'low_credit'
                               ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                               : 'bg-red-500/15 text-red-400 border border-red-500/30'
                           }`}>
-                            {log.status === 'covered' 
+                            {log.isDirectPayment && log.stationDrawdownAmount === 0
+                              ? (isEn ? "100% Direct (0 station)" : "100% Direct (0 station)")
+                              : log.isDirectPayment
+                              ? (isEn ? "Partially Direct" : "Partiel Station")
+                              : log.status === 'covered' 
                               ? (isEn ? "Covered" : "Couvert") 
                               : log.status === 'low_credit'
                               ? (isEn ? "Low Credit" : "Crédit Faible")

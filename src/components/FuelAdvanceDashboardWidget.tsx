@@ -237,7 +237,7 @@ export function FuelAdvanceDashboardWidget({
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center justify-between text-[11px] text-white/60">
                 <span>
-                  {t?.drawdownProgress || (isEn ? "Drawdown consumed:" : "Décompte consommé :")}{" "}
+                  {t?.drawdownProgress || (isEn ? "Station drawdown:" : "Décompte station :")}{" "}
                   <strong className="text-white">{formatMoney(summary.fuelConsumed)}</strong> / {formatMoney(summary.advanceAmount)}
                 </span>
                 <span className="font-bold text-white">{Math.round(summary.percentUsed)}%</span>
@@ -250,6 +250,14 @@ export function FuelAdvanceDashboardWidget({
                   style={{ width: `${Math.min(100, summary.percentUsed)}%` }}
                 />
               </div>
+              {summary.totalDirectPaidFuel > 0 && (
+                <div className="flex items-center justify-between text-[10px] text-emerald-400/90 pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <span>⛽</span> {isEn ? "Direct payments outside station:" : "Payé directement hors station :"}
+                  </span>
+                  <span className="font-bold">+{formatMoney(summary.totalDirectPaidFuel)} (déduit)</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -507,22 +515,30 @@ export function FuelAdvanceDashboardWidget({
             )}
 
             {/* BANDEAU SYNTHÈSE DU DÉCOMPTE SÉLECTIONNÉ */}
-            <div className="p-4 rounded-2xl bg-white/3 border border-white/5 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-4 rounded-2xl bg-white/3 border border-white/5 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Advance Amount" : "Montant Avance"}</p>
                 <p className="text-lg font-black text-amber-400">{formatMoney(summary.advanceAmount)}</p>
+                <p className="text-[9px] text-white/30">{summary.activeStation}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Consumed Fuel" : "Carburant Décompté"}</p>
-                <p className="text-lg font-black text-white">{formatMoney(summary.fuelConsumed)}</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Total Fleet Fuel" : "Gasoil Total Flotte"}</p>
+                <p className="text-lg font-black text-white">{formatMoney(summary.totalFuelLogged)}</p>
+                <p className="text-[9px] text-white/30">{isEn ? "Total recorded" : "Consommation brute"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">{isEn ? "Paid Directly" : "Payé Directement"}</p>
+                <p className="text-lg font-black text-emerald-400">-{formatMoney(summary.totalDirectPaidFuel)}</p>
+                <p className="text-[9px] text-emerald-400/60">{isEn ? "Excluded from station" : "Exclu de l'avance Shell"}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold text-white/40 uppercase">
-                  {isOverdrawn ? (isEn ? "Remaining Due" : "Reste à Régler") : (isEn ? "Available Balance" : "Solde Restant")}
+                  {isOverdrawn ? (isEn ? "Remaining Due" : "Reste à Régler") : (isEn ? "Available Balance" : "Solde Dépôt Restant")}
                 </p>
                 <p className={`text-lg font-black ${isOverdrawn ? 'text-red-400' : 'text-emerald-400'}`}>
                   {isOverdrawn ? `-${formatMoney(summary.totalAmountDue)}` : `+${formatMoney(summary.currentDepositBalance)}`}
                 </p>
+                <p className="text-[9px] text-white/30">{summary.estimatedDaysCoverage} {isEn ? "days reserve" : "j autonomie"}</p>
               </div>
             </div>
 
@@ -533,8 +549,8 @@ export function FuelAdvanceDashboardWidget({
                   <thead className="sticky top-0 bg-[#161618] z-10">
                     <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black">
                       <th className="py-2.5 px-3">{isEn ? "Date" : "Date"}</th>
-                      <th className="py-2.5 px-3">{isEn ? "Refuel Description" : "Ravitaillement Flotte"}</th>
-                      <th className="py-2.5 px-3 text-right">{isEn ? "Daily Fuel" : "Gasoil du Jour"}</th>
+                      <th className="py-2.5 px-3">{isEn ? "Refuel Description / Analysis" : "Ravitaillement Flotte / Analyse"}</th>
+                      <th className="py-2.5 px-3 text-right">{isEn ? "Station Drawdown" : "Décompté Station"}</th>
                       <th className="py-2.5 px-3 text-right">{isEn ? "Advance Balance" : "Solde de l'Avance"}</th>
                       <th className="py-2.5 px-3 text-center">{isEn ? "Status" : "Statut"}</th>
                     </tr>
@@ -550,9 +566,25 @@ export function FuelAdvanceDashboardWidget({
                       summary.dailyDrawdownLedger.map((log) => (
                         <tr key={log.id} className="hover:bg-white/2 transition-colors">
                           <td className="py-2.5 px-3 text-white/70 font-mono text-[11px] whitespace-nowrap">{log.date}</td>
-                          <td className="py-2.5 px-3 text-white/80 max-w-sm truncate">{log.comment}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-orange-400 whitespace-nowrap">
-                            -{formatMoney(log.amount)}
+                          <td className="py-2.5 px-3 max-w-sm">
+                            <p className="text-white/80 truncate">{log.comment}</p>
+                            {log.isDirectPayment && (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                                  ⛽ {log.directPaymentNote || (isEn ? "Paid directly outside station:" : "Payé directement hors station :")} -{formatMoney(log.directPaymentAmount)}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <div className="font-bold text-orange-400">
+                              -{formatMoney(log.stationDrawdownAmount)}
+                            </div>
+                            {log.isDirectPayment && (
+                              <div className="text-[9px] text-white/40">
+                                ({isEn ? "Total:" : "Total :"} {formatMoney(log.amount)})
+                              </div>
+                            )}
                           </td>
                           <td className={`py-2.5 px-3 text-right font-black whitespace-nowrap ${
                             log.remainingAdvanceBalance >= 0 ? 'text-emerald-400' : 'text-red-400'
@@ -561,13 +593,21 @@ export function FuelAdvanceDashboardWidget({
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              log.status === 'covered' 
+                              log.isDirectPayment && log.stationDrawdownAmount === 0
+                                ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                : log.isDirectPayment
+                                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                                : log.status === 'covered' 
                                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                : log.status === 'low_credit'
-                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                : log.status === 'low_credit' 
+                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' 
                                 : 'bg-red-500/15 text-red-400 border border-red-500/30'
                             }`}>
-                              {log.status === 'covered' 
+                              {log.isDirectPayment && log.stationDrawdownAmount === 0
+                                ? (isEn ? "100% Direct" : "100% Direct")
+                                : log.isDirectPayment
+                                ? (isEn ? "Partially Direct" : "Partiel Station")
+                                : log.status === 'covered' 
                                 ? (isEn ? "Covered" : "Couvert") 
                                 : log.status === 'low_credit' 
                                 ? (isEn ? "Low Credit" : "Crédit Faible") 
