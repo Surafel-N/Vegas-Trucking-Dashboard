@@ -9,13 +9,14 @@ import {
   PieChart as PieIcon, BarChart2, Layers, CheckSquare,
   HelpCircle, ChevronRight, Hash, Clock
 } from 'lucide-react';
+import { WalletIcon } from './WalletIcon';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   CartesianGrid, Legend, Cell 
 } from 'recharts';
 import { AccountingTransaction, AccountingCategory } from '../utils/accountingParser';
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from '../utils/accountingInitialData';
-import { FuelAdvance, FuelCashSummary, computeFuelReconciliation, DEFAULT_FUEL_ADVANCES } from '../utils/fuelAdvanceTracker';
+import { FuelAdvance, FuelCashSummary, computeFuelReconciliation, DEFAULT_FUEL_ADVANCES, RUNNING_ACCOUNT_ID } from '../utils/fuelAdvanceTracker';
 import { Language, translateCategory, translateComment, translateStatus, translatePaymentMethod, TRANSLATIONS } from '../utils/i18n';
 
 // Extraction de l'ID d'un fichier Google Drive
@@ -210,6 +211,7 @@ export function AccountingModule({
   const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices" | "fuel_advances">("spreedsheet");
 
   // États Dépôts & Avances Carburant
+  const [selectedFuelAdvanceId, setSelectedFuelAdvanceId] = useState<string>("adv-auto-465");
   const [fuelStationFilter, setFuelStationFilter] = useState<string>("ALL");
   const [fuelSearchQuery, setFuelSearchQuery] = useState<string>("");
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
@@ -356,9 +358,10 @@ export function AccountingModule({
     return computeFuelReconciliation(
       fuelAdvances || DEFAULT_FUEL_ADVANCES,
       allTx,
-      metrics.balance
+      metrics.balance,
+      selectedFuelAdvanceId
     );
-  }, [fuelAdvances, allTx, metrics.balance]);
+  }, [fuelAdvances, allTx, metrics.balance, selectedFuelAdvanceId]);
 
   // Avances filtrées par station et recherche
   const filteredFuelAdvances = useMemo(() => {
@@ -895,7 +898,7 @@ export function AccountingModule({
 
                   <div className="flex items-center justify-between pt-1 border-t border-white/5">
                     <span className="text-[#00F2FF] font-black text-xs flex items-center gap-1">
-                      <Wallet className="size-3" /> {isEn ? "Net Free Cash:" : "Cash Libre Réel :"}
+                      <WalletIcon className="size-3" /> {isEn ? "Net Free Cash:" : "Cash Libre Réel :"}
                     </span>
                     <span className="font-black text-[#00F2FF] text-sm">
                       {formatMoney(fuelSummary.netAvailableCash)}
@@ -1575,25 +1578,68 @@ export function AccountingModule({
       {/* ========================================================================= */}
       {viewTab === "fuel_advances" && (
         <div className="space-y-8 animate-in fade-in duration-300">
+          {/* SÉLECTEUR DE L'AVANCE À DÉCOMPTER */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-[#141414] border border-white/8">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Fuel className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">
+                  {t?.fuelAdvancesTab || (isEn ? "Fuel Advances & Drawdown Tracker" : "Dépôts & Avances Carburant")}
+                </h3>
+                <p className="text-xs text-white/50">
+                  {isEn ? "Day-by-day deduction of fleet fuel vs prepaid station advances" : "Décompte au jour le jour du carburant flotte face aux acomptes versés"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/50 font-bold whitespace-nowrap">{t?.selectAdvanceToTrack || (isEn ? "Tracked Advance:" : "Avance Suivie :")}</span>
+              <select
+                value={selectedFuelAdvanceId}
+                onChange={(e) => setSelectedFuelAdvanceId(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-amber-500/30 text-amber-300 font-bold text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="adv-auto-465" className="bg-[#1c1c1e] text-white">
+                  ⭐ {isEn ? "Advance 4,000,000 CFA — Shell San Pedro (15/09/2026)" : "Avance 4 000 000 CFA — Shell San Pedro (15/09/2026)"}
+                </option>
+                <option value="adv-auto-472" className="bg-[#1c1c1e] text-white">
+                  {isEn ? "Advance 2,500,000 CFA — Shell San Pedro (22/09/2026)" : "Avance 2 500 000 CFA — Shell San Pedro (22/09/2026)"}
+                </option>
+                <option value={RUNNING_ACCOUNT_ID} className="bg-[#1c1c1e] text-white">
+                  {t?.runningAccountSeptember || (isEn ? "🔄 Shell San Pedro Running Account (Sept. 2026 — 6.5M CFA)" : "🔄 Compte Courant Shell San Pedro (Sept. 2026 — 6,5M CFA)")}
+                </option>
+                {fuelSummary.recentAdvances
+                  .filter(a => a.id !== "adv-auto-465" && a.id !== "adv-auto-472")
+                  .map(a => (
+                    <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
+                      {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
           {/* BANDEAU TOP : 4 CARDS KPIS DÉPÔTS CARBURANT */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {/* CARD 1: TOTAL AVANCES VERSÉES */}
+            {/* CARD 1: MONTANT AVANCE SUIVIE */}
             <div className="rounded-[24px] border border-white/8 bg-[#181818] p-5 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all" />
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-wider text-white/40">
-                  {t?.totalAdvancesDeposited || (isEn ? "Total Advances Deposited" : "Total Avances Versées")}
+                  {isEn ? "Tracked Advance" : "Avance Suivie"}
                 </span>
                 <div className="size-8 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
                   <Fuel className="size-4" />
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl lg:text-3xl font-black text-amber-400">{formatMoney(fuelSummary.totalAdvancesDeposited)}</p>
+                <p className="text-2xl lg:text-3xl font-black text-amber-400">{formatMoney(fuelSummary.advanceAmount)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Recorded prepayments" : "Paiements stations enregistrés"}</span>
+                  <span>{fuelSummary.activeStation}</span>
                   <span className="font-bold text-white/80">
-                    {fuelSummary.recentAdvances.length} {isEn ? "advances" : "avances"}
+                    {fuelSummary.selectedAdvance?.date || (isEn ? "Sept. 2026" : "Sept. 2026")}
                   </span>
                 </div>
               </div>
@@ -1611,9 +1657,9 @@ export function AccountingModule({
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl lg:text-3xl font-black text-white">{formatMoney(fuelSummary.totalFuelConsumedAgainstAdvances)}</p>
+                <p className="text-2xl lg:text-3xl font-black text-white">{formatMoney(fuelSummary.fuelConsumed)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Fleet daily consumption" : "Conso journalière flotte"}</span>
+                  <span>{isEn ? "Drawn down:" : "Consommé :"} {Math.round(fuelSummary.percentUsed)}%</span>
                   <span className="font-bold text-orange-300">
                     ~{formatMoney(fuelSummary.burnRatePerDay)}/j
                   </span>
@@ -1638,7 +1684,7 @@ export function AccountingModule({
                 <p className={`text-2xl lg:text-3xl font-black ${fuelSummary.totalAmountDue > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                   {fuelSummary.totalAmountDue > 0 
                     ? `-${formatMoney(fuelSummary.totalAmountDue)}` 
-                    : formatMoney(fuelSummary.currentDepositBalance)}
+                    : `+${formatMoney(fuelSummary.currentDepositBalance)}`}
                 </p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
                   <span>{isEn ? "Estimated fuel coverage" : "Autonomie carburant"}</span>
@@ -1657,13 +1703,13 @@ export function AccountingModule({
                   {t?.netAvailableCash || (isEn ? "Net Available Free Cash" : "Cash Libre Réellement Disponible")}
                 </span>
                 <div className="size-8 rounded-xl bg-[#00F2FF]/10 border border-[#00F2FF]/25 flex items-center justify-center text-[#00F2FF]">
-                  <Wallet className="size-4" />
+                  <WalletIcon className="size-4" />
                 </div>
               </div>
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black text-[#00F2FF]">{formatMoney(fuelSummary.netAvailableCash)}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Account minus deposit" : "Solde compte déduit du dépôt"}</span>
+                  <span>{isEn ? "Gross ledger balance" : "Solde brut en compte"}</span>
                   <span className="font-bold text-white/80">
                     {formatMoney(fuelSummary.grossCashBalance)}
                   </span>

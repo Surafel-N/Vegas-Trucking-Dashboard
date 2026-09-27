@@ -12,7 +12,6 @@ import {
   Utensils, 
   Anchor, 
   PlusCircle, 
-  Wallet, 
   Truck, 
   Wrench, 
   Route,

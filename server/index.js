@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 import { google } from "googleapis";
 
 const app = express();
-// ... (rest of constants)
+const port = process.env.PORT || 8787;
 
 // GOOGLE SHEETS API CONFIG
 const spreadsheetId = process.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
@@ -122,10 +122,17 @@ app.post("/api/analyze-invoice", upload.single("file"), async (req, res) => {
 
 // SERVIR LE FRONTEND (PRODUCTION)
 const distPath = path.join(__dirname, "../dist");
-app.use(express.static(distPath));
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  next();
+});
+app.use(express.static(distPath, { etag: false, maxAge: 0 }));
 
 app.use((req, res, next) => {
   if (req.method === "GET" && !req.path.startsWith("/api")) {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.sendFile(path.join(distPath, "index.html"));
   } else {
     next();

@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { 
   Banknote, 
-  Wallet, 
   TrendingUp, 
   Percent, 
   ArrowUpRight, 
   Coins
 } from 'lucide-react';
+import { WalletIcon } from './WalletIcon';
 
 type FinancialTrendsProps = {
   records: any[];
@@ -40,7 +40,7 @@ export function FinancialTrends({ records, formatCurrency, t }: FinancialTrendsP
     {
       label: t?.totalExpenses || "Total Dépenses",
       value: formatCurrency(stats.expenses),
-      icon: Wallet,
+      icon: WalletIcon,
       color: "text-[#FF375F]",
       bg: "bg-[#FF375F]/10",
       desc: t?.totalOpCosts || "Coûts opérationnels totaux"

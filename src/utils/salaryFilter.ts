@@ -76,3 +76,4 @@ export const MAINTENANCE_KEYWORDS = [
   'revision', 'pièce', 'mecanicien', 'lavage', 'graissage', 'parallélisme', 'équilibrage',
   'valve', 'durite', 'soufflet', 'disque', 'plaquette', 'étrier', 'injecteur'
 ];
+

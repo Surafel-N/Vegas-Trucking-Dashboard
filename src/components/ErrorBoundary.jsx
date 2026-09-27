@@ -28,7 +28,12 @@ export class ErrorBoundary extends React.Component {
   handleReset = () => {
     try {
       window.localStorage.clear();
-      window.location.reload();
+      window.sessionStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+      }
+      const targetUrl = window.location.origin + window.location.pathname + '?v=' + Date.now();
+      window.location.replace(targetUrl);
     } catch (e) {
       window.location.reload();
     }

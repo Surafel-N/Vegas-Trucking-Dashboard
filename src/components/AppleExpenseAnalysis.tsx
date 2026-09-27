@@ -4,8 +4,9 @@ import {
 } from 'recharts';
 import { 
   Fuel, ShieldCheck, Utensils, Anchor, PlusCircle, 
-  Wallet, TrendingUp, Zap, ChevronRight 
+  TrendingUp, Zap, ChevronRight 
 } from 'lucide-react';
+import { WalletIcon } from './WalletIcon';
 
 // Palette "iOS System Colors" - Mode Sombre
 const IOS_COLORS = {
@@ -114,7 +115,7 @@ export function AppleExpenseAnalysis({ data, formatCurrency }: AppleExpenseProps
           {/* Cœur du Graphique (iOS Style) */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <div className="size-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
-              <Wallet className="size-6 text-white/20" />
+              <WalletIcon className="size-6 text-white/20" />
             </div>
             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Total Frais</span>
             <span className="text-2xl font-black text-white tracking-tighter mt-1 drop-shadow-lg">

@@ -8,7 +8,6 @@ import {
   Plus, 
   Search, 
   Trash2, 
-  Wallet,
   CheckCircle2,
   AlertCircle,
   Link as LinkIcon,
@@ -21,6 +20,7 @@ import {
   XCircle,
   Settings2
 } from 'lucide-react';
+import { WalletIcon } from './WalletIcon';
 import { ALL_CHAUFFEURS, ALL_MONTHS } from '../lib/dashboard';
 import { translateComment, translateCategory } from '../utils/i18n';
 
@@ -236,7 +236,7 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#181818]/50 p-6 rounded-[30px] border border-white/5 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <div className="size-14 rounded-2xl bg-[#cf5d56]/10 flex items-center justify-center border border-[#cf5d56]/20">
-            <Wallet className="size-8 text-[#cf5d56]" />
+            <WalletIcon className="size-8 text-[#cf5d56]" />
           </div>
           <div>
             <h2 className="text-3xl font-black tracking-tighter flex items-center gap-3 uppercase">

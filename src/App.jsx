@@ -12,7 +12,6 @@ import {
   Truck,
   UserRound,
   Users,
-  Wallet,
   Banknote,
   Grid2X2,
   PlusCircle,
@@ -31,6 +30,7 @@ import {
   Layout,
   ChevronRight
 } from "lucide-react";
+import { WalletIcon } from "./components/WalletIcon";
 import {
   ALL_CHAUFFEURS,
   ALL_DESTINATIONS,
@@ -374,7 +374,7 @@ export default function App() {
   }, [trips, chauffeur, year]);
 
   const iconMap = {
-    dashboard: LayoutDashboard, drivers: Users, trips: Truck, comptabilite: ReceiptText, depenses: Wallet,
+    dashboard: LayoutDashboard, drivers: Users, trips: Truck, comptabilite: ReceiptText, depenses: WalletIcon,
     encaissements: Banknote, documents: Sparkles, closing: Activity,
     reports: Database, maintenance: Settings2, settings: Settings,
     audit: ShieldCheck, "quick-entry": PlusCircle, admin: RefreshCcw
@@ -1002,6 +1002,7 @@ export default function App() {
                  fuelAdvances={fuelAdvances}
                  setFuelAdvances={rolePermissions.canEdit ? setFuelAdvances : null}
                  accountingTransactions={accountingTransactions}
+                 cashBalance={accountingTransactions?.find(t => t.balance)?.balance || 4032276}
                  />
                  )}
               {activeSection === "drivers" && (

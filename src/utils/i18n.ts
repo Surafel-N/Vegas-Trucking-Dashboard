@@ -369,6 +369,13 @@ export const TRANSLATIONS = {
     coveredStatus: "Couvert par l'avance",
     lowCreditStatus: "Crédit faible",
     overdrawnStatus: "Dépassement / À régler",
+    selectAdvanceToTrack: "Avance suivie :",
+    runningAccountSeptember: "🔄 Compte Courant Shell San Pedro (Sept. 2026 — 6,5M CFA)",
+    activeAdvanceBadge: "Avance Active",
+    drawdownProgress: "Décompte consommé :",
+    treasuryReality: "Réalité de Trésorerie :",
+    freeCashSummaryText: "Solde en compte ({gross}) dont {deposit} en dépôt carburant => réellement {net} disponibles.",
+    dueToStationSummaryText: "Solde en compte ({gross}) avec {due} restant à régler à la station => réellement {net} disponibles.",
 
     // Maintenance / Atelier & Finances
     workshopFinances: "Atelier & Finances",
@@ -829,6 +836,13 @@ export const TRANSLATIONS = {
     coveredStatus: "Covered by advance",
     lowCreditStatus: "Low credit",
     overdrawnStatus: "Overdrawn / Due",
+    selectAdvanceToTrack: "Tracked advance:",
+    runningAccountSeptember: "🔄 Shell San Pedro Running Account (Sept. 2026 — 6.5M CFA)",
+    activeAdvanceBadge: "Active Advance",
+    drawdownProgress: "Drawdown consumed:",
+    treasuryReality: "Treasury Reality:",
+    freeCashSummaryText: "Account balance ({gross}) incl. {deposit} fuel deposit => truly {net} free cash.",
+    dueToStationSummaryText: "Account balance ({gross}) minus {due} due to station => truly {net} free cash.",
 
     // Maintenance / Workshop & Finances
     workshopFinances: "Workshop & Finances",

@@ -5,8 +5,8 @@ import {
   ReceiptText,
   Search,
   Trash2,
-  Wallet,
 } from "lucide-react";
+import { WalletIcon } from "./WalletIcon";
 import { useMemo, useRef, useState } from "react";
 import { buildFinanceTimeline, validateUploadFile } from "../utils/financeRecords";
 import { translateCategory } from "../utils/i18n";
@@ -277,7 +277,7 @@ export function FinanceWorkspace({
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className={`rounded-[30px] bg-[linear-gradient(180deg,#171717_0%,#101010_100%)] p-5 text-white ${cardFocusClass("depenses")}`}>
-          <SectionTitle icon={Wallet} title={isEn ? "Expenses" : "Depenses"} description={isEn ? "File expense invoices with amount and receipt." : "Deposer les factures depensees avec montant et justificatif."} />
+          <SectionTitle icon={WalletIcon} title={isEn ? "Expenses" : "Depenses"} description={isEn ? "File expense invoices with amount and receipt." : "Deposer les factures depensees avec montant et justificatif."} />
           <form className="mt-4 space-y-3" onSubmit={submitExpense}>
             <input
               value={expenseReference}
