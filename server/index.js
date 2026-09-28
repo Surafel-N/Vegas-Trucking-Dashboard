@@ -42,9 +42,9 @@ app.get("/api/gsheets", async (req, res) => {
     // On récupère tout en une fois
     // Note: Pour les liens hypertexte (maintenance), on utilise get avec fields
     const ranges = [
-      "'AMARA TRUCK 76'!A2:O", 
-      "'BRAHIMA TRUCK 45'!A2:O", 
-      "'SORO TRUCK 52'!A2:O",
+      "'AMARA TRUCK 76'!A2:Z", 
+      "'BRAHIMA TRUCK 45'!A2:Z", 
+      "'SORO TRUCK 52'!A2:Z",
       "'Spreedsheet'!A2:Z"
     ];
 

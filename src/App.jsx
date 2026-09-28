@@ -552,9 +552,20 @@ export default function App() {
     });
 
     setManualTrips(prev => {
+      const isGoogleSheetsTrip = (t) => 
+        t?.tripType === "Google Sheets" || 
+        String(t?.id || "").startsWith("gs-") || 
+        String(t?.comments || "").includes("Synchronisé");
+
+      // 1. Conserver uniquement les saisies manuelles ou tickets IA locaux
+      const manualOnly = (prev || []).filter(t => !isGoogleSheetsTrip(t));
+
+      // 2. Dédupliquer les saisies manuelles locales si le trajet existe désormais dans le spreadsheet
       const newImportKeys = new Set(imported.map(t => `${t.date}-${t.chauffeur}`));
-      const filteredPrev = prev.filter(t => !newImportKeys.has(`${t.date}-${t.chauffeur}`));
-      return [...filteredPrev, ...imported];
+      const preservedManual = manualOnly.filter(t => !newImportKeys.has(`${t.date}-${t.chauffeur}`));
+
+      // 3. Remplacer tous les trajets Google Sheets par l'état exact et actuel du Spreadsheet (les suppressions sont ainsi appliquées)
+      return [...preservedManual, ...imported];
     });
     return imported.length;
   };
@@ -701,8 +712,24 @@ export default function App() {
       }
     });
 
-    setMaintenanceRecords(prev => [...(prev || []).filter(r => r.source !== "Google Sheets" && !isSalaryRecord(r)), ...maintenanceList]);
-    setExpenseRecords(prev => [...(prev || []).filter(r => r.source !== "Google Sheets"), ...expensesList]);
+    const isSpreadsheetRecord = (r) => {
+      if (!r) return false;
+      return (
+        r.source === "Google Sheets" ||
+        String(r.id || "").startsWith("gs-") ||
+        r.subCategory === "Sync Spreadsheet" ||
+        String(r.description || "").includes("(Spreedsheet)")
+      );
+    };
+
+    setMaintenanceRecords(prev => [
+      ...(prev || []).filter(r => !isSpreadsheetRecord(r) && !isSalaryRecord(r)), 
+      ...maintenanceList
+    ]);
+    setExpenseRecords(prev => [
+      ...(prev || []).filter(r => !isSpreadsheetRecord(r)), 
+      ...expensesList
+    ]);
     return { maintenance: maintenanceList.length, expenses: expensesList.length };
   };
 
@@ -710,22 +737,17 @@ export default function App() {
     if (!rowData) return 0;
     try {
       const { transactions: parsedTx } = parseSpreadsheetAccounting(rowData);
-      if (parsedTx && parsedTx.length > 0) {
+      if (parsedTx) {
         setAccountingTransactions(parsedTx);
-        // Extraction et fusion automatique des avances carburant détectées
+        // Extraction et mise à jour des avances carburant détectées depuis le spreadsheet
         const detectedAdvances = extractFuelAdvancesFromTransactions(parsedTx);
-        if (detectedAdvances.length > 0) {
-          setFuelAdvances(prev => {
-            const existingIds = new Set((prev || []).map(a => a.id));
-            const merged = [...(prev || [])];
-            detectedAdvances.forEach(adv => {
-              if (!existingIds.has(adv.id)) {
-                merged.push(adv);
-              }
-            });
-            return merged;
-          });
-        }
+        const isSpreadsheetAdvance = (a) => a?.source === "spreadsheet" || String(a?.id || "").startsWith("adv-auto-");
+
+        setFuelAdvances(prev => {
+          // Conserver uniquement les avances manuelles ajoutées localement
+          const manualOnly = (prev || []).filter(a => !isSpreadsheetAdvance(a));
+          return [...detectedAdvances, ...manualOnly];
+        });
         return parsedTx.length;
       }
     } catch (err) {
@@ -844,10 +866,20 @@ export default function App() {
           if (tr.access_token) {
             try {
               const spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || "1KPYlBT30GdzFMPsYjvWwZzsGU6p30o5JanLPB6_HyuY";
-              const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:O&ranges='BRAHIMA TRUCK 45'!A2:O&ranges='SORO TRUCK 52'!A2:O`, { headers: { 'Authorization': `Bearer ${tr.access_token}` } });
+              const res = await fetch(
+                `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges='AMARA TRUCK 76'!A2:Z&ranges='BRAHIMA TRUCK 45'!A2:Z&ranges='SORO TRUCK 52'!A2:Z&ranges='Spreedsheet'!A2:Z`, 
+                { headers: { 'Authorization': `Bearer ${tr.access_token}` } }
+              );
               const data = await res.json();
-              const count = processTripsData(data.valueRanges);
-              alert(`${count} trajets synchronisés !`);
+              const tripsRanges = data.valueRanges ? data.valueRanges.slice(0, 3) : [];
+              const count = processTripsData(tripsRanges);
+              
+              if (data.valueRanges && data.valueRanges[3]?.values) {
+                const sheetRows = data.valueRanges[3].values.map(row => ({ values: row.map(v => ({ formattedValue: v })) }));
+                processMaintenanceData(sheetRows);
+                processAccountingSpreadsheet(sheetRows);
+              }
+              alert(`Synchronisation réussie : ${count} trajets et données financières synchronisés !`);
               setIsSyncing(false);
             } catch (err) {
               console.error(err);
