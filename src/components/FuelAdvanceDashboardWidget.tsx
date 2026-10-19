@@ -26,6 +26,8 @@ import { Language } from '../utils/i18n';
 interface FuelAdvanceDashboardWidgetProps {
   advances: FuelAdvance[];
   transactions: AccountingTransaction[];
+  trips?: any[];
+  allTrips?: any[];
   rawCashBalance?: number;
   onAddAdvance?: (advance: FuelAdvance) => void;
   formatCurrency?: (val: number, curr?: string) => string;
@@ -38,6 +40,8 @@ interface FuelAdvanceDashboardWidgetProps {
 export function FuelAdvanceDashboardWidget({
   advances,
   transactions,
+  trips = [],
+  allTrips = [],
   rawCashBalance,
   onAddAdvance,
   formatCurrency,
@@ -49,6 +53,7 @@ export function FuelAdvanceDashboardWidget({
   const isEn = language === "EN";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [selectedCorridor, setSelectedCorridor] = useState<"ALL" | "SAN_PEDRO" | "ABIDJAN">("ALL");
 
   // Sélection de l'avance suivie : par défaut l'avance de 4 000 000 CFA
   const [selectedAdvanceId, setSelectedAdvanceId] = useState<string>("adv-auto-465");
@@ -60,7 +65,8 @@ export function FuelAdvanceDashboardWidget({
   const [formNotes, setFormNotes] = useState("Paiement avance carburant station");
 
   // Formatage monétaire
-  const formatMoney = (val: number) => {
+  const formatMoney = (val: number | null | undefined) => {
+    if (val === null || val === undefined) return "Non disponible";
     if (formatCurrency) return formatCurrency(val, currency);
     return `${Math.round(val).toLocaleString()} ${currency}`;
   };
@@ -69,6 +75,68 @@ export function FuelAdvanceDashboardWidget({
   const summary: FuelCashSummary = useMemo(() => {
     return computeFuelReconciliation(advances, transactions, rawCashBalance, selectedAdvanceId);
   }, [advances, transactions, rawCashBalance, selectedAdvanceId]);
+
+  // Calcul de la répartition du carburant pris à San Pedro vs pris pour Abidjan
+  const corridorStats = useMemo(() => {
+    const source = trips && trips.length > 0 ? trips : allTrips;
+    let sanPedroFuel = 0;
+    let abidjanFuel = 0;
+    let sanPedroTrips = 0;
+    let abidjanTrips = 0;
+
+    const byTruck = {
+      AMARA: { sanPedro: 0, abidjan: 0, spCount: 0, abjCount: 0 },
+      BRAHIMA: { sanPedro: 0, abidjan: 0, spCount: 0, abjCount: 0 },
+      SORO: { sanPedro: 0, abidjan: 0, spCount: 0, abjCount: 0 }
+    };
+
+    (source || []).forEach((r: any) => {
+      const fuelVal = Number(r.fuel_cost_cfa) || 0;
+      if (fuelVal <= 0 && Number(r.tonnage || 0) <= 0) return;
+
+      const dest = String(r.destination || "").toLowerCase();
+      const start = String(r.start || "").toLowerCase();
+      const comment = String(r.comments || r.comment || "").toLowerCase();
+      const isAbidjan = dest.includes("abidjan") || (!dest.includes("pedro") && (start.includes("abidjan") || comment.includes("abidjan")));
+
+      const lbl = String(r.driverLabel || r.chauffeur || "").toUpperCase();
+      let truckKey: "AMARA" | "BRAHIMA" | "SORO" | null = null;
+      if (lbl.includes("AMARA") || lbl.includes("76")) truckKey = "AMARA";
+      else if (lbl.includes("BRAHIMA") || lbl.includes("45")) truckKey = "BRAHIMA";
+      else if (lbl.includes("SORO") || lbl.includes("SORRO") || lbl.includes("52")) truckKey = "SORO";
+
+      if (isAbidjan) {
+        abidjanFuel += fuelVal;
+        if (fuelVal > 0) abidjanTrips += 1;
+        if (truckKey) {
+          byTruck[truckKey].abidjan += fuelVal;
+          if (fuelVal > 0) byTruck[truckKey].abjCount += 1;
+        }
+      } else {
+        sanPedroFuel += fuelVal;
+        if (fuelVal > 0) sanPedroTrips += 1;
+        if (truckKey) {
+          byTruck[truckKey].sanPedro += fuelVal;
+          if (fuelVal > 0) byTruck[truckKey].spCount += 1;
+        }
+      }
+    });
+
+    const totalFuel = sanPedroFuel + abidjanFuel;
+    const spPercent = totalFuel > 0 ? Math.round((sanPedroFuel / totalFuel) * 100) : 0;
+    const abjPercent = totalFuel > 0 ? Math.round((abidjanFuel / totalFuel) * 100) : 0;
+
+    return {
+      sanPedroFuel,
+      abidjanFuel,
+      totalFuel,
+      sanPedroTrips,
+      abidjanTrips,
+      spPercent,
+      abjPercent,
+      byTruck
+    };
+  }, [trips, allTrips]);
 
   const isOverdrawn = summary.totalAmountDue > 0;
 
@@ -353,6 +421,176 @@ export function FuelAdvanceDashboardWidget({
               )}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* OPTION : MONTANT DU CARBURANT PRIS À SAN PEDRO VS PRIS POUR ABIDJAN      */}
+      {/* ========================================================================= */}
+      <div className="mt-5 relative z-10 rounded-2xl bg-black/35 border border-white/10 p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
+              <Fuel className="size-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                  {isEn ? "Fuel Breakdown: San Pedro vs Abidjan" : "Option Carburant : Pris à San Pedro vs Pris pour Abidjan"}
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/10 text-white/70">
+                  {formatMoney(corridorStats.totalFuel)}
+                </span>
+              </div>
+              <p className="text-[11px] text-white/50 mt-0.5">
+                {isEn
+                  ? "Select an option to isolate fuel amounts taken at San Pedro or for Abidjan across your fleet"
+                  : "Sélectionnez une option pour afficher le montant du carburant pris à San Pedro et le montant pris pour Abidjan"}
+              </p>
+            </div>
+          </div>
+
+          {/* SÉLECTEUR D'OPTION : TOUS / SAN PEDRO / ABIDJAN */}
+          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setSelectedCorridor("ALL")}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                selectedCorridor === "ALL"
+                  ? "bg-white text-black shadow-sm"
+                  : "text-white/60 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {isEn ? "Both Options" : "Vue Comparée"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCorridor("SAN_PEDRO")}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCorridor === "SAN_PEDRO"
+                  ? "bg-teal-500 text-black shadow-sm"
+                  : "text-teal-300/70 hover:text-teal-300 hover:bg-teal-500/10"
+              }`}
+            >
+              <span className="size-1.5 rounded-full bg-current" />
+              {isEn ? "San Pedro Fuel" : "Carburant San Pedro"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCorridor("ABIDJAN")}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCorridor === "ABIDJAN"
+                  ? "bg-orange-500 text-black shadow-sm"
+                  : "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/10"
+              }`}
+            >
+              <span className="size-1.5 rounded-full bg-current" />
+              {isEn ? "Abidjan Fuel" : "Carburant Abidjan"}
+            </button>
+          </div>
+        </div>
+
+        {/* BARRE DE PROPORTION VISUELLE */}
+        <div className="mt-3 mb-4">
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider mb-1.5">
+            <span className="text-teal-400">
+              ⛽ {isEn ? "Taken at San Pedro" : "Carburant pris à San Pedro"} ({corridorStats.spPercent}%)
+            </span>
+            <span className="text-orange-400">
+              ⛽ {isEn ? "Taken for Abidjan" : "Carburant pris pour Abidjan"} ({corridorStats.abjPercent}%)
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden flex p-0.5 border border-white/10">
+            <div
+              className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 rounded-l-full transition-all duration-500"
+              style={{ width: `${corridorStats.spPercent}%` }}
+            />
+            <div
+              className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-r-full transition-all duration-500"
+              style={{ width: `${corridorStats.abjPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* CARTES DE DÉTAIL SAN PEDRO & ABIDJAN */}
+        <div className={`grid grid-cols-1 ${selectedCorridor === "ALL" ? "md:grid-cols-2" : ""} gap-4`}>
+          {(selectedCorridor === "ALL" || selectedCorridor === "SAN_PEDRO") && (
+            <div className="rounded-xl bg-teal-500/[0.07] border border-teal-500/25 p-4 flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                    ⛽ {isEn ? "San Pedro Corridor" : "Pris à San Pedro"}
+                  </span>
+                  <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
+                    {formatMoney(corridorStats.sanPedroFuel)}
+                  </p>
+                  <p className="text-[11px] text-white/50 mt-0.5">
+                    {corridorStats.sanPedroTrips} {isEn ? "refuels logged (Lauzoua ↔ San Pedro)" : "prises de carburant enregistrées (Axe San Pedro)"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-teal-400 tabular-nums">{corridorStats.spPercent}%</span>
+                  <p className="text-[9px] text-white/40 uppercase tracking-wider">
+                    {isEn ? "of total fuel" : "du budget gasoil"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Détail par camion pour San Pedro */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-teal-500/15">
+                {(["AMARA", "BRAHIMA", "SORO"] as const).map((truck) => (
+                  <div key={truck} className="bg-black/30 rounded-lg p-2 border border-white/5">
+                    <p className="text-[9px] font-bold text-white/50 uppercase">{truck}</p>
+                    <p className="text-xs font-black text-teal-300 mt-0.5 tabular-nums">
+                      {formatMoney(corridorStats.byTruck[truck].sanPedro)}
+                    </p>
+                    <p className="text-[9px] text-white/35 mt-0.5">
+                      {corridorStats.byTruck[truck].spCount} {isEn ? "trips" : "voyages"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(selectedCorridor === "ALL" || selectedCorridor === "ABIDJAN") && (
+            <div className="rounded-xl bg-orange-500/[0.07] border border-orange-500/25 p-4 flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                    ⛽ {isEn ? "Abidjan Corridor" : "Pris pour Abidjan"}
+                  </span>
+                  <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
+                    {formatMoney(corridorStats.abidjanFuel)}
+                  </p>
+                  <p className="text-[11px] text-white/50 mt-0.5">
+                    {corridorStats.abidjanTrips} {isEn ? "refuels logged (Lauzoua ↔ Abidjan)" : "prises de carburant enregistrées (Axe Abidjan)"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-orange-400 tabular-nums">{corridorStats.abjPercent}%</span>
+                  <p className="text-[9px] text-white/40 uppercase tracking-wider">
+                    {isEn ? "of total fuel" : "du budget gasoil"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Détail par camion pour Abidjan */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-orange-500/15">
+                {(["AMARA", "BRAHIMA", "SORO"] as const).map((truck) => (
+                  <div key={truck} className="bg-black/30 rounded-lg p-2 border border-white/5">
+                    <p className="text-[9px] font-bold text-white/50 uppercase">{truck}</p>
+                    <p className="text-xs font-black text-orange-300 mt-0.5 tabular-nums">
+                      {formatMoney(corridorStats.byTruck[truck].abidjan)}
+                    </p>
+                    <p className="text-[9px] text-white/35 mt-0.5">
+                      {corridorStats.byTruck[truck].abjCount} {isEn ? "trips" : "voyages"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

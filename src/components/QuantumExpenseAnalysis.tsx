@@ -165,6 +165,7 @@ export function QuantumExpenseAnalysis({
   
   // Accordéon / détail étendu par camion
   const [expandedTruck, setExpandedTruck] = useState<string | null>(null);
+  const [expandedFuelTruck, setExpandedFuelTruck] = useState<string | null>(null);
   // Tranche survolée sur le Donut
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -543,6 +544,10 @@ export function QuantumExpenseAnalysis({
       AMARA: {
         ca: 0,
         fuel: 0,
+        fuelSanPedro: 0,
+        fuelAbidjan: 0,
+        tripsSanPedro: 0,
+        tripsAbidjan: 0,
         roadFees: 0, // péages + autoroute
         policeFees: 0,
         foodFees: 0,
@@ -556,6 +561,10 @@ export function QuantumExpenseAnalysis({
       BRAHIMA: {
         ca: 0,
         fuel: 0,
+        fuelSanPedro: 0,
+        fuelAbidjan: 0,
+        tripsSanPedro: 0,
+        tripsAbidjan: 0,
         roadFees: 0,
         policeFees: 0,
         foodFees: 0,
@@ -569,6 +578,10 @@ export function QuantumExpenseAnalysis({
       SORO: {
         ca: 0,
         fuel: 0,
+        fuelSanPedro: 0,
+        fuelAbidjan: 0,
+        tripsSanPedro: 0,
+        tripsAbidjan: 0,
         roadFees: 0,
         policeFees: 0,
         foodFees: 0,
@@ -590,8 +603,22 @@ export function QuantumExpenseAnalysis({
       if (!key) return;
 
       const tObj = trucksData[key];
+      const fuelVal = Number(r.fuel_cost_cfa) || 0;
+      const dest = String(r.destination || "").toLowerCase();
+      const start = String(r.start || "").toLowerCase();
+      const comment = String(r.comments || r.comment || "").toLowerCase();
+
+      const isAbidjan = dest.includes("abidjan") || (!dest.includes("pedro") && (start.includes("abidjan") || comment.includes("abidjan")));
+
       tObj.ca += Number(r.total_gross_cfa) || 0;
-      tObj.fuel += Number(r.fuel_cost_cfa) || 0;
+      tObj.fuel += fuelVal;
+      if (isAbidjan) {
+        tObj.fuelAbidjan += fuelVal;
+        if (fuelVal > 0 || Number(r.tonnage) > 0) tObj.tripsAbidjan += 1;
+      } else {
+        tObj.fuelSanPedro += fuelVal;
+        if (fuelVal > 0 || Number(r.tonnage) > 0) tObj.tripsSanPedro += 1;
+      }
       tObj.roadFees += Number(r.road_fees_cfa) || 0;
       tObj.policeFees += Number(r.police_fees_cfa) || 0;
       tObj.foodFees += Number(r.food_fees_cfa) || 0;
@@ -615,6 +642,10 @@ export function QuantumExpenseAnalysis({
         ...cfg,
         ca,
         fuel,
+        fuelSanPedro: raw.fuelSanPedro,
+        fuelAbidjan: raw.fuelAbidjan,
+        tripsSanPedro: raw.tripsSanPedro,
+        tripsAbidjan: raw.tripsAbidjan,
         totalRouteExpenses,
         maintenance,
         directMaintenance: raw.directMaintenance,
@@ -636,6 +667,10 @@ export function QuantumExpenseAnalysis({
     // D. Totaux Flotte Globaux
     const totalFleetCA = detailedTrucks.reduce((s, t) => s + t.ca, 0);
     const totalFleetFuel = detailedTrucks.reduce((s, t) => s + t.fuel, 0);
+    const totalFleetFuelSanPedro = detailedTrucks.reduce((s, t) => s + t.fuelSanPedro, 0);
+    const totalFleetFuelAbidjan = detailedTrucks.reduce((s, t) => s + t.fuelAbidjan, 0);
+    const totalFleetTripsSanPedro = detailedTrucks.reduce((s, t) => s + t.tripsSanPedro, 0);
+    const totalFleetTripsAbidjan = detailedTrucks.reduce((s, t) => s + t.tripsAbidjan, 0);
     const totalFleetRoute = detailedTrucks.reduce((s, t) => s + t.totalRouteExpenses, 0);
     const totalFleetMaintenance = detailedTrucks.reduce((s, t) => s + t.maintenance, 0);
     const totalFleetExpenses = totalFleetFuel + totalFleetRoute + totalFleetMaintenance;
@@ -669,7 +704,11 @@ export function QuantumExpenseAnalysis({
         value: totalFleetFuel, 
         color: QUANTUM_PALETTE.fuel.color, 
         icon: Fuel, 
-        desc: language === 'EN' ? "Engine fuel" : "Carburant moteur" 
+        desc: language === 'EN' ? "San Pedro & Abidjan corridors" : "Corridors San Pedro & Abidjan",
+        fuelSanPedro: totalFleetFuelSanPedro,
+        fuelAbidjan: totalFleetFuelAbidjan,
+        tripsSanPedro: totalFleetTripsSanPedro,
+        tripsAbidjan: totalFleetTripsAbidjan
       },
       { 
         id: "maintenance", 
@@ -722,6 +761,10 @@ export function QuantumExpenseAnalysis({
       detailedTrucks,
       totalFleetCA,
       totalFleetFuel,
+      totalFleetFuelSanPedro,
+      totalFleetFuelAbidjan,
+      totalFleetTripsSanPedro,
+      totalFleetTripsAbidjan,
       totalFleetRoute,
       totalFleetMaintenance,
       totalFleetExpenses,
@@ -994,15 +1037,27 @@ export function QuantumExpenseAnalysis({
           </div>
 
           <div className="p-4 rounded-2xl bg-cyan-500/[0.04] border border-cyan-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">
-              {language === 'EN' ? "Total Fuel" : "Total Gasoil"}
-            </span>
-            <p className="text-lg font-black font-mono text-cyan-300 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">
+                {language === 'EN' ? "Total Fuel" : "Total Gasoil"}
+              </span>
+              <span className="text-[8px] font-bold text-cyan-400/60">
+                {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% {language === 'EN' ? "of CA" : "du C.A."}
+              </span>
+            </div>
+            <p className="text-lg font-black font-mono text-cyan-300 mt-1.5">
               {formatMoney(financialModel.totalFleetFuel)}
             </p>
-            <span className="text-[9px] text-cyan-400/50 font-medium mt-1">
-              {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% {language === 'EN' ? "of Revenue" : "du C.A."}
-            </span>
+            <div className="mt-2 pt-2 border-t border-cyan-500/15 space-y-1 text-[9px]">
+              <div className="flex items-center justify-between text-teal-300">
+                <span className="font-bold">⛽ San Pedro ({financialModel.totalFleetTripsSanPedro}) :</span>
+                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelSanPedro)}</span>
+              </div>
+              <div className="flex items-center justify-between text-orange-300">
+                <span className="font-bold">⛽ Abidjan ({financialModel.totalFleetTripsAbidjan}) :</span>
+                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelAbidjan)}</span>
+              </div>
+            </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col justify-between">
@@ -1048,7 +1103,7 @@ export function QuantumExpenseAnalysis({
               </h4>
             </div>
             <span className="text-[10px] text-white/40">
-              {language === 'EN' ? "Click on a card to see road expense sub-details" : "Cliquez sur une carte pour voir les sous-détails des frais de route"}
+              {language === 'EN' ? "Click on Fuel or Road Expenses to view sub-details" : "Cliquez sur Carburant ou Frais de Route pour voir les sous-détails"}
             </span>
           </div>
 
@@ -1056,6 +1111,9 @@ export function QuantumExpenseAnalysis({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {financialModel.detailedTrucks.map(truck => {
               const isExpanded = expandedTruck === truck.key;
+              const isFuelExpanded = expandedFuelTruck === truck.key;
+              const spPct = truck.fuel > 0 ? Math.round((truck.fuelSanPedro / truck.fuel) * 100) : 0;
+              const abjPct = truck.fuel > 0 ? Math.round((truck.fuelAbidjan / truck.fuel) * 100) : 0;
 
               return (
                 <div 
@@ -1110,20 +1168,66 @@ export function QuantumExpenseAnalysis({
                         </span>
                       </div>
 
-                      {/* 2. TOTAL CARBURANT */}
-                      <div className="p-2.5 rounded-xl bg-cyan-500/[0.04] border border-cyan-500/15 flex items-center justify-between">
+                      {/* 2. TOTAL CARBURANT (AVEC OPTION SAN PEDRO VS ABIDJAN) */}
+                      <div 
+                        onClick={() => setExpandedFuelTruck(isFuelExpanded ? null : truck.key)}
+                        className="p-2.5 rounded-xl bg-cyan-500/[0.04] border border-cyan-500/15 flex items-center justify-between cursor-pointer hover:bg-cyan-500/10 transition-colors"
+                        title={language === 'EN' ? "Click to view San Pedro vs Abidjan fuel" : "Cliquez pour voir le détail Carburant San Pedro vs Abidjan"}
+                      >
                         <div className="flex items-center gap-2">
                           <div className="size-6 rounded-lg bg-cyan-500/15 flex items-center justify-center text-cyan-400">
                             <Fuel className="size-3.5" />
                           </div>
-                          <span className="text-[11px] font-bold text-cyan-300">
-                            {language === 'EN' ? "Total Fuel" : "Total Carburant"}
-                          </span>
+                          <div>
+                            <span className="text-[11px] font-bold text-cyan-300 block leading-tight">
+                              {language === 'EN' ? "Total Fuel" : "Total Carburant"}
+                            </span>
+                            <span className="text-[8px] text-cyan-400/60 uppercase">
+                              {language === 'EN' ? "San Pedro & Abidjan (Click)" : "San Pedro & Abidjan (Cliquer)"}
+                            </span>
+                          </div>
                         </div>
-                        <span className="font-mono font-black text-sm text-cyan-300">
-                          {formatMoney(truck.fuel)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-black text-sm text-cyan-300">
+                            {formatMoney(truck.fuel)}
+                          </span>
+                          {isFuelExpanded ? <ChevronUp className="size-3.5 text-cyan-400" /> : <ChevronDown className="size-3.5 text-cyan-400" />}
+                        </div>
                       </div>
+
+                      {/* SOUS-DÉTAILS CARBURANT SAN PEDRO VS ABIDJAN */}
+                      {isFuelExpanded && (
+                        <div className="p-3 rounded-xl bg-black/40 border border-cyan-500/20 space-y-2 text-xs animate-in fade-in">
+                          <div className="flex justify-between items-center">
+                            <span className="flex items-center gap-1.5 text-teal-300 font-bold">
+                              <span className="size-2 rounded-full bg-teal-400" />
+                              {language === 'EN' ? "Fuel San Pedro:" : "Carburant San Pedro :"}
+                              <span className="text-[10px] text-white/40 font-normal">({truck.tripsSanPedro} {language === 'EN' ? "trips" : "voy."})</span>
+                            </span>
+                            <span className="font-mono font-black text-teal-300">{formatMoney(truck.fuelSanPedro)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="flex items-center gap-1.5 text-orange-300 font-bold">
+                              <span className="size-2 rounded-full bg-orange-400" />
+                              {language === 'EN' ? "Fuel Abidjan:" : "Carburant Abidjan :"}
+                              <span className="text-[10px] text-white/40 font-normal">({truck.tripsAbidjan} {language === 'EN' ? "trips" : "voy."})</span>
+                            </span>
+                            <span className="font-mono font-black text-orange-300">{formatMoney(truck.fuelAbidjan)}</span>
+                          </div>
+                          {truck.fuel > 0 && (
+                            <div className="pt-1">
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-teal-400 transition-all" style={{ width: `${spPct}%` }} />
+                                <div className="h-full bg-orange-400 transition-all" style={{ width: `${abjPct}%` }} />
+                              </div>
+                              <div className="flex justify-between text-[9px] text-white/40 mt-1 font-mono">
+                                <span>San Pedro: {spPct}%</span>
+                                <span>Abidjan: {abjPct}%</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* 3. TOTAL FRAIS DE ROUTE */}
                       <div 
@@ -1272,7 +1376,7 @@ export function QuantumExpenseAnalysis({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {financialModel.donutNature.map((item, idx) => {
+            {financialModel.donutNature.map((item: any, idx) => {
               const IconComp = item.icon || Layers;
               return (
                 <div 
@@ -1300,7 +1404,7 @@ export function QuantumExpenseAnalysis({
                     </span>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-baseline text-xs">
                       <span className="text-[9px] font-bold text-white/40 uppercase">
                         {language === 'EN' ? "Amount" : "Montant"}
@@ -1313,6 +1417,18 @@ export function QuantumExpenseAnalysis({
                         style={{ width: `${Math.max(4, item.percent)}%`, backgroundColor: item.color }}
                       />
                     </div>
+                    {item.id === "fuel" && (
+                      <div className="mt-2 pt-2 border-t border-white/5 space-y-1 text-[10px]">
+                        <div className="flex items-center justify-between text-teal-300">
+                          <span className="font-bold">⛽ San Pedro ({item.tripsSanPedro}) :</span>
+                          <span className="font-mono font-black">{formatMoney(item.fuelSanPedro)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-orange-300">
+                          <span className="font-bold">⛽ Abidjan ({item.tripsAbidjan}) :</span>
+                          <span className="font-mono font-black">{formatMoney(item.fuelAbidjan)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

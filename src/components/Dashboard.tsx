@@ -262,6 +262,8 @@ export function Dashboard({
         <FuelAdvanceDashboardWidget 
           advances={fuelAdvances}
           transactions={accountingTransactions}
+          trips={syncFilteredData}
+          allTrips={allTrips}
           rawCashBalance={cashBalance}
           onAddAdvance={setFuelAdvances ? (newAdv) => setFuelAdvances(prev => [newAdv, ...(prev || [])]) : undefined}
           formatCurrency={formatCurrency}
