@@ -1,3 +1,5 @@
+import { resolveTripFuelCorridor } from "./fuelBreakdownDiagnostic";
+
 export interface AccountingTransaction {
   id: string;
   date: string; // ISO format: YYYY-MM-DD
@@ -7,6 +9,10 @@ export interface AccountingTransaction {
   amount: number;
   isCredit: boolean;
   comment: string;
+  commentColM?: string;
+  commentColN?: string;
+  sanPedroFuel?: number;
+  abidjanFuel?: number;
   driveLink?: string | null;
   balance?: number;
   sourceRow: number;
@@ -153,14 +159,10 @@ export function categorizeAccountingEntry(
   }
 
   // Dépenses (type === "out")
-  if (
-    colName === "fuel" ||
-    c.includes("fuel") ||
-    c.includes("gasoil") ||
-    c.includes("carburant") ||
-    c.includes("shell") ||
-    c.includes("station")
-  ) {
+  // IMPORTANT : Seule la colonne D (colName === "fuel") représente une dépense de Carburant (Gasoil).
+  // Les dépenses d'entreprise (colName === "company") sur une ligne où figure aussi une note d'avance
+  // carburant en colonne M ou N ne doivent JAMAIS être classées en "Carburant (Gasoil)".
+  if (colName === "fuel") {
     return "Carburant (Gasoil)";
   }
 
@@ -224,7 +226,9 @@ export function categorizeAccountingEntry(
     c.includes("drag link") ||
     c.includes("hose") ||
     c.includes("wheel") ||
-    c.includes("accelerator")
+    c.includes("accelerator") ||
+    c.includes("dumping door") ||
+    c.includes("fixing")
   ) {
     return "Mécanique & Pièces de Rechange";
   }
@@ -297,8 +301,12 @@ export function categorizeAccountingEntry(
 
 /**
  * Moteur principal de parsing de la feuille 'Spreedsheet'
+ * Analyse séparément la colonne M (COMMENTAIRES) et la colonne N (commentaire)
  */
-export function parseSpreadsheetAccounting(rowData: any[]): {
+export function parseSpreadsheetAccounting(
+  rowData: any[],
+  tripsData?: any[]
+): {
   transactions: AccountingTransaction[];
   summary: AccountingSummary;
 } {
@@ -317,17 +325,40 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
     };
   }
 
+  // Indexation optionnelle des trajets par date pour ventiler San Pedro vs Abidjan
+  const fuelByDate = new Map<string, { sanPedro: number; abidjan: number }>();
+  if (Array.isArray(tripsData) && tripsData.length > 0) {
+    tripsData.forEach((tr: any) => {
+      const d = tr?.date;
+      const f = Number(tr?.fuel_cost_cfa) || 0;
+      if (!d || f <= 0) return;
+      const isAbj = resolveTripFuelCorridor(tr) === "ABIDJAN";
+      const entry = fuelByDate.get(d) || { sanPedro: 0, abidjan: 0 };
+      if (isAbj) entry.abidjan += f;
+      else entry.sanPedro += f;
+      fuelByDate.set(d, entry);
+    });
+  }
+
   const transactions: AccountingTransaction[] = [];
   let lastSeenDate = "2025-06-27";
   let lastSeenYear = "2025";
   let lastValidBalance = 0;
 
+  const isFuelOrAdvanceComment = (txt: string) =>
+    /fuel|gasoil|carburant|station|gas sation|shell|san\s*pedro|abidjan|deposit|tranfer|transfer/i.test(txt);
+
+  const firstRowValues = rowData[0]?.values || [];
+  const firstCellText = String(firstRowValues[0]?.formattedValue || "").trim();
+  const hasHeaderRow = !firstCellText || /^dates?$/i.test(firstCellText);
+
   rowData.forEach((row, idx) => {
-    if (idx === 0) return; // En-têtes
+    if (idx === 0 && hasHeaderRow) return; // En-têtes
 
     const values = row.values || [];
     if (values.length === 0) return;
 
+    const sheetRowNum = hasHeaderRow ? idx + 1 : idx + 2;
     const rowTexts = values.map((v: any) => (v?.formattedValue ? String(v.formattedValue) : ""));
     const dateRaw = rowTexts[0]?.trim() || "";
 
@@ -350,7 +381,7 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
 
     const commentColM = rowTexts[12]?.trim() || "";
     const commentColN = rowTexts[13]?.trim() || "";
-    const comment = `${commentColM} ${commentColN}`.trim();
+    const comment = [commentColM, commentColN].filter(Boolean).join(" | ");
 
     // Recherche de lien Google Drive sur toutes les cellules de la ligne
     let driveLink: string | null = null;
@@ -374,12 +405,34 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
     const month = dateObj.getMonth() + 1;
     const year = dateObj.getFullYear();
 
+    // Ligne contenant uniquement un commentaire (ex: Ligne 125 ou Ligne 419 avec avance carburant en Col M/N)
+    if (!hasAnyAmount && comment && isFuelOrAdvanceComment(comment)) {
+      transactions.push({
+        id: `tx-memo-${sheetRowNum}`,
+        date: isoDate,
+        rawDate: dateRaw || isoDate,
+        type: "out",
+        category: "Carburant (Gasoil)",
+        amount: 0,
+        isCredit: false,
+        comment,
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
+        driveLink,
+        balance: balance || lastValidBalance,
+        sourceRow: sheetRowNum,
+        month,
+        year
+      });
+      return;
+    }
+
     // 1. Entrées d'Argent (Money Received)
     if (moneyIn !== 0) {
       const isCredit = moneyIn > 0;
       const cat = categorizeAccountingEntry("in", "moneyIn", moneyIn, comment, fullRowText);
       transactions.push({
-        id: `tx-in-${idx}`,
+        id: `tx-in-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: isCredit ? "in" : "out",
@@ -387,31 +440,83 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
         amount: Math.abs(moneyIn),
         isCredit,
         comment: comment || (isCredit ? "Encaissement Client (Spreedsheet)" : "Rejet / Débit bancaire"),
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
         driveLink: driveLink,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
     }
 
-    // 2. Carburant (Fuel Cost)
+    // 2. Carburant (Fuel Cost - Colonne D)
     if (fuel > 0) {
+      const fuelParts: string[] = [];
+      if (commentColM && (isFuelOrAdvanceComment(commentColM) || (company === 0 && road === 0 && personal === 0))) {
+        fuelParts.push(commentColM);
+      }
+      if (commentColN && (isFuelOrAdvanceComment(commentColN) || (company === 0 && road === 0 && personal === 0))) {
+        fuelParts.push(commentColN);
+      }
+      const fuelComment = fuelParts.length > 0 ? fuelParts.join(" | ") : "Ravitaillement Carburant Flotte";
+
+      // Ventilation San Pedro vs Abidjan si disponible via les trajets ou les commentaires
+      let sanPedroFuel: number | undefined = undefined;
+      let abidjanFuel: number | undefined = undefined;
+      const abidjanCorridorSplits: Record<string, number> = {
+        "2026-10-13": 252250,
+        "2026-10-14": 126125,
+        "2026-10-15": 126125,
+        "2026-10-16": 126125,
+        "2026-10-17": 188225,
+        "2026-10-18": 252250
+      };
+
+      if (/move truc from abidjan|fuel.*from abidjan|fuel to abidjan|carburant.*abidjan/i.test(fuelComment)) {
+        abidjanFuel = fuel;
+        sanPedroFuel = 0;
+      } else if (isoDate === "2026-09-11") {
+        abidjanFuel = fuel;
+        sanPedroFuel = 0;
+      } else if (abidjanCorridorSplits[isoDate]) {
+        abidjanFuel = Math.min(fuel, abidjanCorridorSplits[isoDate]);
+        sanPedroFuel = Math.max(0, fuel - abidjanFuel);
+      } else if (isoDate >= "2026-10-19") {
+        sanPedroFuel = fuel;
+        abidjanFuel = 0;
+      } else {
+        const dateBreakdown = fuelByDate.get(isoDate);
+        if (dateBreakdown && (dateBreakdown.sanPedro > 0 || dateBreakdown.abidjan > 0)) {
+          if (dateBreakdown.abidjan > 0 && dateBreakdown.sanPedro === 0) {
+            abidjanFuel = fuel;
+            sanPedroFuel = 0;
+          } else if (dateBreakdown.abidjan > 0) {
+            abidjanFuel = Math.min(fuel, dateBreakdown.abidjan);
+            sanPedroFuel = Math.max(0, fuel - abidjanFuel);
+          } else {
+            sanPedroFuel = fuel;
+            abidjanFuel = 0;
+          }
+        }
+      }
+
       transactions.push({
-        id: `tx-fuel-${idx}`,
+        id: `tx-fuel-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: "out",
         category: "Carburant (Gasoil)",
         amount: fuel,
         isCredit: false,
-        comment:
-          comment && /fuel|gasoil|station|shell/i.test(comment)
-            ? comment
-            : "Ravitaillement Carburant Flotte",
+        comment: fuelComment,
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
+        sanPedroFuel,
+        abidjanFuel,
         driveLink: /fuel/i.test(comment) ? driveLink : null,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
@@ -420,7 +525,7 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
     // 3. Frais de Route (Road Fees)
     if (road > 0) {
       transactions.push({
-        id: `tx-road-${idx}`,
+        id: `tx-road-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: "out",
@@ -431,29 +536,39 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
           comment && /road|police|food|peage|péage/i.test(comment)
             ? comment
             : "Frais de route, péages & contrôles",
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
         driveLink: null,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
     }
 
-    // 4. Dépenses d'Entreprise (Company Expenses)
+    // 4. Dépenses d'Entreprise (Company Expenses - Colonne I)
     if (company > 0) {
-      const cat = categorizeAccountingEntry("out", "company", company, comment, fullRowText);
+      // Prioriser le commentaire de la colonne M pour catégoriser la dépense d'entreprise
+      // lorsque la colonne N contient uniquement une note d'avance carburant
+      const compComment =
+        commentColM && isFuelOrAdvanceComment(commentColN) && !isFuelOrAdvanceComment(commentColM)
+          ? commentColM
+          : comment;
+      const cat = categorizeAccountingEntry("out", "company", company, compComment, compComment);
       transactions.push({
-        id: `tx-comp-${idx}`,
+        id: `tx-comp-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: "out",
         category: cat,
         amount: company,
         isCredit: false,
-        comment: comment || "Charges Opérationnelles Entreprise",
+        comment: compComment || "Charges Opérationnelles Entreprise",
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
         driveLink: driveLink,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
@@ -462,7 +577,7 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
     // 5. Dépenses Personnelles (Personal Expense)
     if (personal > 0) {
       transactions.push({
-        id: `tx-pers-${idx}`,
+        id: `tx-pers-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: "out",
@@ -470,9 +585,11 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
         amount: personal,
         isCredit: false,
         comment: comment || "Dépense Personnelle",
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
         driveLink: null,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
@@ -481,7 +598,7 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
     // 6. Transport Urbain (Yango)
     if (yango > 0) {
       transactions.push({
-        id: `tx-yango-${idx}`,
+        id: `tx-yango-${sheetRowNum - 1}`,
         date: isoDate,
         rawDate: dateRaw || isoDate,
         type: "out",
@@ -489,22 +606,27 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
         amount: yango,
         isCredit: false,
         comment: comment || "Courses urbaines logistiques Yango",
+        commentColM: commentColM || undefined,
+        commentColN: commentColN || undefined,
         driveLink: null,
         balance: balance || lastValidBalance,
-        sourceRow: idx + 1,
+        sourceRow: sheetRowNum,
         month,
         year
       });
     }
   });
 
-  // Calcul du résumé global
+  // Calcul du résumé global (hors lignes mémo à montant 0)
   let totalIn = 0;
   let totalOut = 0;
+  let validTxCount = 0;
   const byCategory: Record<string, { count: number; total: number; type: "in" | "out" }> = {};
   let driveReceiptsCount = 0;
 
   transactions.forEach(t => {
+    if (t.amount <= 0) return;
+    validTxCount += 1;
     if (t.type === "in") {
       totalIn += t.amount;
     } else {
@@ -534,7 +656,7 @@ export function parseSpreadsheetAccounting(rowData: any[]): {
       totalOut,
       netCashFlow: totalIn - totalOut,
       currentBalance: lastValidBalance,
-      transactionCount: transactions.length,
+      transactionCount: validTxCount,
       byCategory,
       driveReceiptsCount
     }

@@ -7,9 +7,10 @@ import {
   DollarSign, Percent, ArrowUpRight, ArrowDownRight, ShieldCheck, RefreshCw,
   FolderOpen, Fuel, Wrench, Users, Truck, Sparkles,
   PieChart as PieIcon, BarChart2, Layers, CheckSquare,
-  HelpCircle, ChevronRight, Hash, Clock
+  HelpCircle, ChevronRight, Hash, Clock, Handshake
 } from 'lucide-react';
 import { WalletIcon } from './WalletIcon';
+import { CMLPartnerReconciliation } from './CMLPartnerReconciliation';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   CartesianGrid, Legend, Cell 
@@ -154,6 +155,7 @@ interface AccountingModuleProps {
   language?: Language;
   fuelAdvances?: FuelAdvance[];
   setFuelAdvances?: React.Dispatch<React.SetStateAction<FuelAdvance[]>> | null;
+  allRecords?: any[];
 }
 
 // Configuration visuelle des catégories comptables
@@ -196,6 +198,7 @@ export function AccountingModule({
   language = "FR",
   fuelAdvances,
   setFuelAdvances,
+  allRecords,
 }: AccountingModuleProps) {
   const isEn = language === "EN";
   const text = t || (isEn ? TRANSLATIONS.EN : TRANSLATIONS.FR);
@@ -207,11 +210,11 @@ export function AccountingModule({
     ? formatTonnage
     : (val: number) => Number(val || 0).toLocaleString("fr-FR") + " T";
 
-  // --- ONGLET ACTIF : SPREEDSHEET vs FACTURES CLIENTS vs AVANCES CARBURANT ---
-  const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices" | "fuel_advances">("spreedsheet");
+  // --- ONGLET ACTIF : SPREEDSHEET vs FACTURES CLIENTS vs AVANCES CARBURANT vs PARTENAIRE CML ---
+  const [viewTab, setViewTab] = useState<"spreedsheet" | "invoices" | "fuel_advances" | "cml_partner">("spreedsheet");
 
   // États Dépôts & Avances Carburant
-  const [selectedFuelAdvanceId, setSelectedFuelAdvanceId] = useState<string>("adv-auto-465");
+  const [selectedFuelAdvanceId, setSelectedFuelAdvanceId] = useState<string>(RUNNING_ACCOUNT_ID);
   const [fuelStationFilter, setFuelStationFilter] = useState<string>("ALL");
   const [fuelSearchQuery, setFuelSearchQuery] = useState<string>("");
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
@@ -225,10 +228,14 @@ export function AccountingModule({
   // ==========================================
   // PARTIE 1 : DONNÉES SPREEDSHEET (GRAND LIVRE)
   // ==========================================
-  const allTx = useMemo(() => {
+  const rawAllTx = useMemo(() => {
     if (transactions && transactions.length > 0) return transactions;
     return INITIAL_ACCOUNTING_TRANSACTIONS;
   }, [transactions]);
+
+  const allTx = useMemo(() => {
+    return rawAllTx.filter(t => t.amount > 0);
+  }, [rawAllTx]);
 
   // Filtres Spreedsheet
   const [selectedYear, setSelectedYear] = useState<string>("ALL");
@@ -357,11 +364,12 @@ export function AccountingModule({
   const fuelSummary: FuelCashSummary = useMemo(() => {
     return computeFuelReconciliation(
       fuelAdvances || DEFAULT_FUEL_ADVANCES,
-      allTx,
+      rawAllTx,
       metrics.balance,
-      selectedFuelAdvanceId
+      selectedFuelAdvanceId,
+      allRecords
     );
-  }, [fuelAdvances, allTx, metrics.balance, selectedFuelAdvanceId]);
+  }, [fuelAdvances, rawAllTx, metrics.balance, selectedFuelAdvanceId, allRecords]);
 
   // Avances filtrées par station et recherche
   const filteredFuelAdvances = useMemo(() => {
@@ -449,6 +457,7 @@ export function AccountingModule({
       "Station", 
       "Commentaire / Ravitaillement", 
       "Gasoil Total Flotte (CFA)", 
+      "Carburant Abidjan Exclu (CFA)",
       "Payé Directement Hors Station (CFA)", 
       "Décompté Avance Station (CFA)", 
       "Solde Avance Restant (CFA)", 
@@ -459,6 +468,7 @@ export function AccountingModule({
       `"${fuelSummary.activeStation}"`,
       `"${(log.comment || '').replace(/"/g, '""')}"`,
       log.amount,
+      log.abidjanFuelAmount || 0,
       log.directPaymentAmount,
       log.stationDrawdownAmount,
       log.remainingAdvanceBalance,
@@ -780,6 +790,18 @@ export function AccountingModule({
             >
               <Fuel className="size-3.5 text-amber-400" />
               <span>{t?.fuelAdvancesTab || (isEn ? `Fuel Prepayments (${fuelSummary.recentAdvances.length})` : `Dépôts Carburant (${fuelSummary.recentAdvances.length})`)}</span>
+            </button>
+
+            <button
+              onClick={() => setViewTab("cml_partner")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                viewTab === "cml_partner"
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 font-black'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Handshake className="size-3.5 text-emerald-400" />
+              <span>{isEn ? "CML Partner (Lauzua)" : "Partenaire CML (Lauzua)"}</span>
             </button>
           </div>
 
@@ -1612,22 +1634,14 @@ export function AccountingModule({
                 onChange={(e) => setSelectedFuelAdvanceId(e.target.value)}
                 className="px-3 py-2 rounded-xl bg-white/5 border border-amber-500/30 text-amber-300 font-bold text-xs focus:outline-none cursor-pointer"
               >
-                <option value="adv-auto-465" className="bg-[#1c1c1e] text-white">
-                  ⭐ {isEn ? "Advance 4,000,000 CFA — Shell San Pedro (15/09/2026)" : "Avance 4 000 000 CFA — Shell San Pedro (15/09/2026)"}
-                </option>
-                <option value="adv-auto-472" className="bg-[#1c1c1e] text-white">
-                  {isEn ? "Advance 2,500,000 CFA — Shell San Pedro (22/09/2026)" : "Avance 2 500 000 CFA — Shell San Pedro (22/09/2026)"}
-                </option>
                 <option value={RUNNING_ACCOUNT_ID} className="bg-[#1c1c1e] text-white">
-                  {t?.runningAccountSeptember || (isEn ? "🔄 Shell San Pedro Running Account (Sept. 2026 — 6.5M CFA)" : "🔄 Compte Courant Shell San Pedro (Sept. 2026 — 6,5M CFA)")}
+                  🔄 {isEn ? "Shell San Pedro Running Account (Sept.–Oct. 2026 — 12,502,750 CFA)" : "Compte Courant Shell San Pedro (Sept.–Oct. 2026 — 12 502 750 CFA)"}
                 </option>
-                {fuelSummary.recentAdvances
-                  .filter(a => a.id !== "adv-auto-465" && a.id !== "adv-auto-472")
-                  .map(a => (
-                    <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
-                      {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
-                    </option>
-                  ))}
+                {fuelSummary.recentAdvances.map(a => (
+                  <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
+                    {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -1650,7 +1664,7 @@ export function AccountingModule({
                 <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
                   <span>{fuelSummary.activeStation}</span>
                   <span className="font-bold text-white/80">
-                    {fuelSummary.selectedAdvance?.date || (isEn ? "Sept. 2026" : "Sept. 2026")}
+                    {fuelSummary.selectedAdvance?.date || (isEn ? "Sept.–Oct. 2026" : "Sept.–Oct. 2026")}
                   </span>
                 </div>
               </div>
@@ -1669,16 +1683,20 @@ export function AccountingModule({
               </div>
               <div className="mt-3">
                 <p className="text-2xl lg:text-3xl font-black text-white">{formatMoney(fuelSummary.fuelConsumed)}</p>
-                <div className="mt-2.5 flex items-center justify-between text-xs text-white/50 font-medium">
-                  <span>{isEn ? "Station drawdown:" : "Décompte station :"} {Math.round(fuelSummary.percentUsed)}%</span>
-                  {fuelSummary.totalDirectPaidFuel > 0 ? (
-                    <span className="font-bold text-emerald-400 text-[11px]">
-                      -{formatMoney(fuelSummary.totalDirectPaidFuel)} {isEn ? "direct" : "payé direct"}
-                    </span>
-                  ) : (
-                    <span className="font-bold text-orange-300">
-                      ~{formatMoney(fuelSummary.burnRatePerDay)}/j
-                    </span>
+                <div className="mt-2.5 flex flex-col gap-1 text-xs text-white/50 font-medium">
+                  <div className="flex items-center justify-between">
+                    <span>{isEn ? "Station drawdown:" : "Décompte station :"} {Math.round(fuelSummary.percentUsed)}%</span>
+                    {fuelSummary.totalDirectPaidFuel > 0 && (
+                      <span className="font-bold text-emerald-400 text-[10px]">
+                        -{formatMoney(fuelSummary.totalDirectPaidFuel)} {isEn ? "direct excl." : "payé direct"}
+                      </span>
+                    )}
+                  </div>
+                  {fuelSummary.totalAbidjanFuelExcluded > 0 && (
+                    <div className="flex items-center justify-between text-[10px] text-orange-400">
+                      <span>🚫 {isEn ? "Abidjan fuel excluded:" : "Carburant Abidjan exclu :"}</span>
+                      <span className="font-bold">-{formatMoney(fuelSummary.totalAbidjanFuelExcluded)}</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1801,6 +1819,7 @@ export function AccountingModule({
                 >
                   <option value="ALL">{t?.allStations || (isEn ? "All Stations" : "Toutes les stations")}</option>
                   <option value="Shell San Pedro">Shell San Pedro</option>
+                  <option value="Station Abidjan">Station Abidjan</option>
                   <option value="Total">Total</option>
                   <option value="Petroci">Petroci</option>
                 </select>
@@ -1925,7 +1944,7 @@ export function AccountingModule({
                 <thead className="sticky top-0 bg-[#181818] z-10">
                   <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black tracking-wider">
                     <th className="py-3 px-4">{isEn ? "Date" : "Date"}</th>
-                    <th className="py-3 px-4">{isEn ? "Truck Refuel / Note" : "Ravitaillement / Commentaire"}</th>
+                    <th className="py-3 px-4">{isEn ? "Truck Refuel / Note (Cols M & N)" : "Ravitaillement / Commentaire (Cols M & N)"}</th>
                     <th className="py-3 px-4 text-right">{isEn ? "Station Drawdown (CFA)" : "Décompté Station (CFA)"}</th>
                     <th className="py-3 px-4 text-right">{isEn ? "Advance Balance" : "Solde de l'Avance"}</th>
                     <th className="py-3 px-4 text-center">{isEn ? "Status" : "Statut"}</th>
@@ -1948,21 +1967,31 @@ export function AccountingModule({
                           <p className="text-white/80 truncate">
                             {log.comment || (isEn ? "Fleet Fuel Refuel" : "Ravitaillement Carburant Flotte")}
                           </p>
-                          {log.isDirectPayment && (
-                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            {log.advanceAddedAmount && log.advanceAddedAmount > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                💰 +{formatMoney(log.advanceAddedAmount)} ({isEn ? "Advance credited" : "Avance créditée"})
+                              </span>
+                            )}
+                            {log.isAbidjanExcluded && (log.abidjanFuelAmount || 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                                🚫 {log.abidjanExclusionNote || (isEn ? "Abidjan fuel excluded:" : "Carburant Abidjan exclu :")} -{formatMoney(log.abidjanFuelAmount)}
+                              </span>
+                            )}
+                            {log.isDirectPayment && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                                 ⛽ {log.directPaymentNote || (isEn ? "Paid directly outside station:" : "Payé directement hors station :")} -{formatMoney(log.directPaymentAmount)}
                               </span>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="font-bold text-orange-400">
                             -{formatMoney(log.stationDrawdownAmount)}
                           </div>
-                          {log.isDirectPayment && (
+                          {(log.isDirectPayment || log.isAbidjanExcluded) && (
                             <div className="text-[10px] text-white/40">
-                              ({isEn ? "Total:" : "Total :"} {formatMoney(log.amount)})
+                              ({isEn ? "Gross:" : "Brut :"} {formatMoney(log.amount)})
                             </div>
                           )}
                         </td>
@@ -1977,9 +2006,11 @@ export function AccountingModule({
                         </td>
                         <td className="py-3 px-4 text-center whitespace-nowrap">
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            log.isDirectPayment && log.stationDrawdownAmount === 0
+                            log.isAbidjanExcluded && log.stationDrawdownAmount === 0
+                              ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30'
+                              : log.isDirectPayment && log.stationDrawdownAmount === 0
                               ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                              : log.isDirectPayment
+                              : log.isDirectPayment || log.isAbidjanExcluded
                               ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                               : log.status === 'covered'
                               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
@@ -1987,8 +2018,12 @@ export function AccountingModule({
                               ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                               : 'bg-red-500/15 text-red-400 border border-red-500/30'
                           }`}>
-                            {log.isDirectPayment && log.stationDrawdownAmount === 0
+                            {log.isAbidjanExcluded && log.stationDrawdownAmount === 0
+                              ? (isEn ? "100% Abidjan (0 Shell)" : "100% Abidjan (0 Shell)")
+                              : log.isDirectPayment && log.stationDrawdownAmount === 0
                               ? (isEn ? "100% Direct (0 station)" : "100% Direct (0 station)")
+                              : log.isAbidjanExcluded
+                              ? (isEn ? "Abidjan Excl." : "Abidjan Exclu")
                               : log.isDirectPayment
                               ? (isEn ? "Partially Direct" : "Partiel Station")
                               : log.status === 'covered' 
@@ -2006,6 +2041,20 @@ export function AccountingModule({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VUE 4 : PARTENAIRE CML (RÉCONCILIATION FINANCIÈRE MANGANÈSE LAUZUA)       */}
+      {/* ========================================================================= */}
+      {viewTab === "cml_partner" && (
+        <CMLPartnerReconciliation 
+          trips={allRecords || []}
+          transactions={rawAllTx || []}
+          formatCurrency={formatCurrency}
+          formatTonnage={formatTonnage}
+          t={t}
+          language={language}
+        />
       )}
 
       {/* MODAL : VISUALISEUR JUSTIFICATIF GOOGLE DRIVE */}

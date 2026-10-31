@@ -27,6 +27,7 @@ import {
   Tooltip as RechartsTooltip 
 } from "recharts";
 import { FleetTrackerWidget } from "./FleetTrackerWidget";
+import { CurrentMonthWidget } from "./CurrentMonthWidget";
 import { LogisticsCalendar } from "./LogisticsCalendar";
 import { FleetStatus } from "./FleetStatus";
 import { MaintenanceLog } from "./MaintenanceLog";
@@ -38,7 +39,9 @@ import { ActiveTrends } from "./ActiveTrends";
 import { FinancialTrends } from "./FinancialTrends";
 import { OilChangeGaugeWidget } from "./OilChangeGaugeWidget";
 import { FuelAdvanceDashboardWidget } from "./FuelAdvanceDashboardWidget";
+import { DashboardCategoryTabs, DashboardCategory } from "./DashboardCategoryTabs";
 import { FuelAdvance, DEFAULT_FUEL_ADVANCES } from "../utils/fuelAdvanceTracker";
+import { resolveTripFuelCorridor } from "../utils/fuelBreakdownDiagnostic";
 import { INITIAL_ACCOUNTING_TRANSACTIONS } from "../utils/accountingInitialData";
 import {
   getDashboardMetrics,  formatCurrency, 
@@ -66,6 +69,7 @@ type DashboardProps = {
   filterProps?: any;
   maintenanceRecords: any[];
   setMaintenanceRecords?: React.Dispatch<React.SetStateAction<any[]>> | null;
+  expenseRecords?: any[];
   allTrips: any[];
   oilChanges: any;
   setOilChanges?: React.Dispatch<React.SetStateAction<any>> | null;
@@ -79,9 +83,13 @@ type DashboardProps = {
   setFuelAdvances?: React.Dispatch<React.SetStateAction<FuelAdvance[]>> | null;
   accountingTransactions?: any[];
   cashBalance?: number;
+  onSyncTrips?: () => void;
+  isSyncingTrips?: boolean;
+  lastSyncAt?: number | string | null;
 };
 
 export function Dashboard({
+  drivers = [],
   onSelectDriver,
   selectedChauffeur,
   onDateSelect,
@@ -91,6 +99,7 @@ export function Dashboard({
   filterProps,
   maintenanceRecords = [],
   setMaintenanceRecords,
+  expenseRecords = [],
   allTrips = [],
   oilChanges = {},
   setOilChanges,
@@ -105,7 +114,10 @@ export function Dashboard({
   fuelAdvances = DEFAULT_FUEL_ADVANCES,
   setFuelAdvances,
   accountingTransactions = INITIAL_ACCOUNTING_TRANSACTIONS,
-  cashBalance
+  cashBalance,
+  onSyncTrips,
+  isSyncingTrips = false,
+  lastSyncAt = null
 }: DashboardProps) {
 
   // --- ÉTATS PILOTES DU CALENDRIER ---
@@ -148,7 +160,7 @@ export function Dashboard({
       // Filtre Chauffeur/Véhicule
       let chauffeurMatch = true;
       if (selectedChauffeur !== ALL_CHAUFFEURS) {
-        chauffeurMatch = r.vehicle.includes(selectedChauffeur.split(' ')[2]) || r.vehicle.includes(selectedChauffeur.split(' ')[0]);
+        chauffeurMatch = String(r.vehicle || r.driverLabel || "").toUpperCase().includes(selectedChauffeur.split(' ')[2]) || String(r.vehicle || r.driverLabel || "").toUpperCase().includes(selectedChauffeur.split(' ')[0]);
       }
       
       return dateMatch && chauffeurMatch;
@@ -195,6 +207,94 @@ export function Dashboard({
     if (onDateSelect) onDateSelect(null);
   };
 
+  const handlePresetPeriod = (presetKey: string) => {
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
+    
+    if (presetKey === "today") {
+      const todayISO = now.toISOString().split("T")[0];
+      const hasToday = (allTrips || []).some(t => t.date === todayISO);
+      const targetDate = hasToday 
+        ? todayISO 
+        : (allTrips && allTrips.length > 0 ? [...allTrips].sort((a,b)=>a.date.localeCompare(b.date)).pop()?.date : todayISO);
+      if (targetDate) {
+        const dObj = new Date(targetDate);
+        setViewDate(new Date(dObj.getFullYear(), dObj.getMonth(), 1));
+        if (onDateSelect) {
+          onDateSelect({
+            dates: [targetDate],
+            months: [ALL_MONTHS],
+            years: [String(dObj.getFullYear())]
+          });
+        }
+      }
+    } else if (presetKey === "week") {
+      const latestDateStr = allTrips && allTrips.length > 0 ? [...allTrips].sort((a,b)=>a.date.localeCompare(b.date)).pop()?.date : now.toISOString().split("T")[0];
+      const refDate = new Date(latestDateStr);
+      const dayOfWeek = refDate.getDay();
+      const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(refDate);
+      monday.setDate(refDate.getDate() + diffToMon);
+      
+      const weekDates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        weekDates.push(d.toISOString().split("T")[0]);
+      }
+      setViewDate(new Date(refDate.getFullYear(), refDate.getMonth(), 1));
+      if (onDateSelect) {
+        onDateSelect({
+          dates: weekDates,
+          months: [ALL_MONTHS],
+          years: [String(refDate.getFullYear())]
+        });
+      }
+    } else if (presetKey === "month") {
+      setViewDate(new Date(curY, curM - 1, 1));
+      if (onDateSelect) {
+        onDateSelect({
+          dates: [],
+          months: [String(curM)],
+          years: [String(curY)]
+        });
+      }
+    } else if (presetKey === "lastmonth") {
+      const prevM = curM === 1 ? 12 : curM - 1;
+      const prevY = curM === 1 ? curY - 1 : curY;
+      setViewDate(new Date(prevY, prevM - 1, 1));
+      if (onDateSelect) {
+        onDateSelect({
+          dates: [],
+          months: [String(prevM)],
+          years: [String(prevY)]
+        });
+      }
+    } else if (presetKey === "year") {
+      setViewDate(new Date(curY, curM - 1, 1));
+      if (onDateSelect) {
+        onDateSelect({
+          dates: [],
+          months: [ALL_MONTHS],
+          years: [String(curY)]
+        });
+      }
+    } else if (presetKey === "all") {
+      setViewDate(new Date(curY, curM - 1, 1));
+      if (onDateSelect) {
+        onDateSelect({
+          dates: [],
+          months: [ALL_MONTHS],
+          years: [ALL_YEARS]
+        });
+      }
+      if (onSelectDriver) {
+        onSelectDriver(ALL_CHAUFFEURS);
+      }
+    }
+  };
+
   const handleSelectionFromCalendar = (type: 'month' | 'year', values: string[]) => {
       if (onDateSelect) {
           onDateSelect({
@@ -220,17 +320,248 @@ export function Dashboard({
     }
   };
 
+  const isEn = language === "EN";
+
+  const fuelCategoryStats = useMemo(() => {
+    let totalFuel = 0;
+    let spFuel = 0;
+    let abjFuel = 0;
+    (syncFilteredData || []).forEach((r) => {
+      const f = Number(r.fuel_cost_cfa) || 0;
+      if (f <= 0) return;
+      totalFuel += f;
+      if (resolveTripFuelCorridor(r) === "ABIDJAN") abjFuel += f;
+      else spFuel += f;
+    });
+    const spPct = totalFuel > 0 ? Math.round((spFuel / totalFuel) * 100) : 0;
+    const abjPct = totalFuel > 0 ? Math.round((abjFuel / totalFuel) * 100) : 0;
+    return { totalFuel, spFuel, abjFuel, spPct, abjPct };
+  }, [syncFilteredData]);
+
+  const dashboardCategories: DashboardCategory[] = useMemo(
+    () => [
+      {
+        id: "fuel_treasury",
+        icon: <Fuel className="size-5" />,
+        label: isEn ? "Fuel & Cash Reconciliation" : "Carburant & Trésorerie",
+        kpi: formatCurrency(fuelCategoryStats.totalFuel, currency),
+        subKpi: `San Pedro ${fuelCategoryStats.spPct}% • Abidjan ${fuelCategoryStats.abjPct}%`,
+        accent: "amber",
+        content: (
+          <FuelAdvanceDashboardWidget
+            advances={fuelAdvances}
+            transactions={accountingTransactions}
+            trips={syncFilteredData}
+            allTrips={allTrips}
+            rawCashBalance={cashBalance}
+            onAddAdvance={
+              setFuelAdvances
+                ? (newAdv) => setFuelAdvances((prev) => [newAdv, ...(prev || [])])
+                : undefined
+            }
+            onSyncTrips={onSyncTrips}
+            isSyncingTrips={isSyncingTrips}
+            formatCurrency={formatCurrency}
+            currency={currency}
+            t={t}
+            language={language}
+            canEdit={!!setFuelAdvances}
+          />
+        ),
+      },
+      {
+        id: "workshop_alerts",
+        icon: <Wrench className="size-5" />,
+        label: isEn ? "Workshop & Alerts" : "Atelier & Alertes",
+        kpi: formatCurrency(maintenanceTotal, currency),
+        subKpi: isEn
+          ? `${filteredMaintenance.length} workshop record(s)`
+          : `${filteredMaintenance.length} intervention(s) atelier`,
+        accent: "rose",
+        badge: filteredMaintenance.length > 0 ? filteredMaintenance.length : undefined,
+        content: (
+          <div className="space-y-4">
+            <MaintenanceLog
+              records={filteredMaintenance}
+              expenseRecords={expenseRecords}
+              accountingTransactions={accountingTransactions}
+              googleClientId={googleClientId}
+              oilChanges={oilChanges}
+              allTrips={allTrips}
+              t={t}
+              language={language}
+            />
+            <OperationalAlerts
+              records={syncFilteredData}
+              allTrips={allTrips}
+              oilChanges={oilChanges}
+              t={t}
+              language={language}
+            />
+          </div>
+        ),
+      },
+      {
+        id: "trends_volumes",
+        icon: <Activity className="size-5" />,
+        label: isEn ? "Revenue & Tonnage Trends" : "Tendances & Volumes",
+        kpi: formatCurrency(financeStats.revenue, currency),
+        subKpi: `${formatCompactNumber(financeStats.tonnage)} T • ${isEn ? "Margin" : "Marge"} ${financeStats.margin.toFixed(1)}%`,
+        accent: "emerald",
+        content: (
+          <ActiveTrends
+            records={syncFilteredData}
+            formatCurrency={(v) => formatCurrency(v, currency)}
+            t={t}
+            language={language}
+          />
+        ),
+      },
+      {
+        id: "drivers_matrix",
+        icon: <Target className="size-5" />,
+        label: isEn ? "Active Drivers Matrix" : "Matrice Chauffeurs",
+        kpi:
+          selectedChauffeur === ALL_CHAUFFEURS
+            ? isEn
+              ? "All 3 Trucks"
+              : "3 Camions Actifs"
+            : selectedChauffeur.split(" ")[0],
+        subKpi: "AMARA 76 • BRAHIMA 45 • SORO 52",
+        accent: "sky",
+        content: (
+          <div className="rounded-[28px] border border-white/10 bg-black/30 p-5">
+            <div className="flex items-center gap-3 mb-4 px-1">
+              <div className="p-2 rounded-xl bg-[#cf5d56]/10 text-[#cf5d56]">
+                <Target className="size-4" />
+              </div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-white/80 leading-none">
+                {t?.activeDriversMatrix || "Active Drivers Matrix"}
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].map((label) => {
+                const isActive = selectedChauffeur === label;
+                const driverData = syncFilteredData.filter((t) => t.driverLabel === label);
+                const dProfit = driverData.reduce(
+                  (s, r) => s + (Number(r.total_net_cfa) || 0),
+                  0
+                );
+                const dTonnage = driverData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
+                return (
+                  <button
+                    key={label}
+                    onClick={() =>
+                      onSelectDriver(label === selectedChauffeur ? ALL_CHAUFFEURS : label)
+                    }
+                    className={`group rounded-[24px] border p-5 text-left transition-all duration-300 flex flex-col justify-between cursor-pointer ${
+                      isActive
+                        ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl"
+                        : "bg-white/[0.03] border-white/10 hover:bg-white/[0.07] shadow-xl"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div
+                        className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${
+                          isActive
+                            ? "bg-black text-white"
+                            : "bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20"
+                        }`}
+                      >
+                        {label.split(" ")[2]}
+                      </div>
+                      <ArrowUpRight
+                        className={`size-4 transition-colors ${
+                          isActive ? "text-white" : "text-white/20"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${
+                          isActive ? "text-black/60" : "text-[#cf5d56]"
+                        }`}
+                      >
+                        UNIT {label.split(" ")[2]}
+                      </p>
+                      <h4
+                        className={`text-base font-black truncate mb-4 tracking-tight ${
+                          isActive ? "text-black" : "text-white"
+                        }`}
+                      >
+                        {label.split(" ")[0]}
+                      </h4>
+                    </div>
+                    <div
+                      className={`pt-4 border-t flex justify-between items-center ${
+                        isActive ? "border-black/10" : "border-white/5"
+                      }`}
+                    >
+                      <span
+                        className={`text-xs font-black ${
+                          isActive
+                            ? "text-black"
+                            : dProfit >= 0
+                            ? "text-[#9fe3b9]"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {formatCurrency(dProfit, currency)}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold ${
+                          isActive ? "text-black/40" : "text-white/30"
+                        }`}
+                      >
+                        {dTonnage}T
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ),
+      },
+    ],
+    [
+      isEn,
+      fuelCategoryStats,
+      fuelAdvances,
+      accountingTransactions,
+      syncFilteredData,
+      allTrips,
+      cashBalance,
+      setFuelAdvances,
+      onSyncTrips,
+      isSyncingTrips,
+      formatCurrency,
+      currency,
+      t,
+      language,
+      maintenanceTotal,
+      filteredMaintenance,
+      googleClientId,
+      oilChanges,
+      financeStats,
+      formatCompactNumber,
+      selectedChauffeur,
+      onSelectDriver,
+    ]
+  );
+
   return (
     <div className="flex flex-col gap-4 w-full h-full pb-6 font-sans antialiased text-white relative">
 
+      {/* 1. BARRE DE FILTRES GLOBALE */}
       {filterProps && (
          <div className="panel-enter rounded-2xl border border-white/5 bg-[#1c1c1e] p-1.5 shadow-xl">
             <FilterBar {...filterProps} t={t} language={language} />
          </div>
       )}
 
-      {/* GPS / Fleet Widget Header */}
-      <section className={`panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-4 shadow-2xl transition-all duration-700 relative overflow-hidden ${isGpsExpanded ? 'h-[70vh]' : 'h-[110px]'}`}>
+      {/* 2. GPS FLEET LIVE (PLEINE LARGEUR EN TÊTE, À SA PLACE) */}
+      <section className={`panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-4 shadow-2xl transition-all duration-700 relative overflow-hidden ${isGpsExpanded ? 'h-[70vh]' : 'h-[250px]'}`}>
          <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
                  <div className="size-2 rounded-full bg-[#cf5d56] animate-pulse shadow-[0_0_8px_#cf5d56]" />
@@ -240,72 +571,49 @@ export function Dashboard({
                {isGpsExpanded ? <><Minimize className="size-3" /> {t?.reduce || "Réduire"}</> : <><Maximize className="size-3" /> {t?.focusMode || "Focus Mode"}</>}
              </button>
          </div>
-         <FleetTrackerWidget records={allTrips} t={t} language={language} />
+         <FleetTrackerWidget records={allTrips} drivers={drivers} t={t} language={language} />
       </section>
 
       {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
 
-      {/* OIL CHANGE & ODOMETER GAUGE SECTION */}
-      <section className="panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl">
-        <OilChangeGaugeWidget 
-          allTrips={allTrips} 
-          oilChanges={oilChanges} 
-          onUpdateOilChange={handleUpdateOilChange} 
-          canEdit={!!setOilChanges} 
-          t={t} 
-          language={language}
-        />
-      </section>
+      {/* 2.5 NOUVEAU MODULE MOIS EN COURS (KPI MENSUELS EN TEMPS RÉEL DEPUIS LE SPREADSHEET) */}
+      <CurrentMonthWidget
+        allTrips={allTrips}
+        formatCurrency={formatCurrency}
+        formatCompactNumber={formatCompactNumber}
+        currency={currency}
+        onSyncTrips={onSyncTrips}
+        isSyncingTrips={isSyncingTrips}
+        lastSyncAt={lastSyncAt}
+        t={t}
+        language={language}
+      />
 
-      {/* FUEL ADVANCES & CASH RECONCILIATION SECTION */}
-      <section>
-        <FuelAdvanceDashboardWidget 
-          advances={fuelAdvances}
-          transactions={accountingTransactions}
-          trips={syncFilteredData}
-          allTrips={allTrips}
-          rawCashBalance={cashBalance}
-          onAddAdvance={setFuelAdvances ? (newAdv) => setFuelAdvances(prev => [newAdv, ...(prev || [])]) : undefined}
-          formatCurrency={formatCurrency}
-          currency={currency}
-          t={t}
-          language={language}
-          canEdit={!!setFuelAdvances}
-        />
-      </section>
-
+      {/* 3. CALENDRIER À GAUCHE & QUANTUM FINANCE ANALYZER (+ FINANCIAL BREAKDOWN BY TRUCK) À DROITE */}
       <section className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
-        <div className="col-span-12 lg:col-span-5 xl:col-span-4 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col items-stretch min-h-[500px]">
+        <div className="col-span-12 lg:col-span-5 xl:col-span-4 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-5 sm:p-6 shadow-2xl flex flex-col items-stretch min-h-[500px]">
             <div className="flex-1 w-full h-full">
                 <LogisticsCalendar 
-  records={calendarData} 
-  selectedDay={selectedDates.length === 1 ? selectedDates[0] : (isAllYears ? "ALL_YEARS_GLOBAL" : null)} 
-  viewDate={viewDate} 
-  onDayClick={handleDayClick} 
-  onMonthChange={handleMonthChange} 
-  onResetDay={handleResetDay} 
-  isDateFiltered={selectedDates.length > 0} 
-  selectedChauffeur={selectedChauffeur} 
-  onChauffeurChange={onSelectDriver} 
-  chauffeurOptions={filterProps?.chauffeurs}
-  year={filterProps?.year}
-  month={filterProps?.month}
-  selectedDates={selectedDates}
-  onSelection={handleSelectionFromCalendar}
-  t={t}
-  language={language}
-  currency={currency}
-/>
-            </div>
-            <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
-                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">{t?.volume || "Volume"}</p>
-                    <p className="text-base font-black text-white">{formatCompactNumber(financeStats.tonnage)} T</p>
-                </div>
-                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 font-black uppercase tracking-widest leading-none mb-1.5">{t?.netProfit || "Net Profit"}</p>
-                    <p className="text-base font-black text-[#9fe3b9]">{formatCurrency(financeStats.netProfit, currency)}</p>
-                </div>
+                  records={calendarData} 
+                  selectedDay={selectedDates.length === 1 ? selectedDates[0] : (isAllYears ? "ALL_YEARS_GLOBAL" : null)} 
+                  viewDate={viewDate} 
+                  onDayClick={handleDayClick} 
+                  onMonthChange={handleMonthChange} 
+                  onResetDay={handleResetDay} 
+                  isDateFiltered={selectedDates.length > 0} 
+                  selectedChauffeur={selectedChauffeur} 
+                  onChauffeurChange={onSelectDriver} 
+                  chauffeurOptions={filterProps?.chauffeurs}
+                  year={filterProps?.year}
+                  month={filterProps?.month}
+                  selectedDates={selectedDates}
+                  onSelection={handleSelectionFromCalendar}
+                  onPresetPeriod={handlePresetPeriod}
+                  onReset={onReset}
+                  t={t}
+                  language={language}
+                  currency={currency}
+                />
             </div>
         </div>
 
@@ -321,77 +629,25 @@ export function Dashboard({
             </header>
             <div className="flex-1 flex items-center justify-center min-h-[450px] min-w-0">
                 <QuantumExpenseAnalysis 
-                  data={syncFilteredData} 
-                  maintenanceTotal={maintenanceTotal} 
-                  maintenanceRecords={filteredMaintenance}
-                  allMaintenanceRecords={maintenanceRecords}
-                  setMaintenanceRecords={setMaintenanceRecords}
-                  formatCurrency={(v) => formatCurrency(v, currency)} 
-                  currency={currency} 
-                  t={t} 
-                  language={language}
-                  records={syncFilteredData} 
+                  data={allTrips} 
+                  maintenanceTotal={0} 
+                  maintenanceRecords={maintenanceRecords || []}
+                  allMaintenanceRecords={maintenanceRecords || []}
+                  drivers={drivers}
                   allTrips={allTrips}
+                  formatCurrency={formatCurrency}
+                  language={language}
+                  t={t}
                 />
             </div>
         </div>
-        </section>
-
-        {/* ACTIVE TRENDS MODULE */}
-        <section className="mb-4">
-          <ActiveTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} language={language} />
-        </section>
-
-        {/* FINANCIAL TRENDS MODULE */}
-        <section className="mb-4">
-          <FinancialTrends records={syncFilteredData} formatCurrency={(v) => formatCurrency(v, currency)} t={t} language={language} />
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">          <div className="md:col-span-3 panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-6 shadow-2xl flex flex-col">
-              <div className="flex items-center gap-3 mb-6 px-1">
-                  <div className="p-2.5 rounded-2xl bg-[#cf5d56]/10 text-[#cf5d56]"><Target className="size-4" /></div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/80 leading-none">{t?.activeDriversMatrix || "Active Drivers Matrix"}</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
-                {["AMARA TRUCK 76", "BRAHIMA TRUCK 45", "SORO TRUCK 52"].map((label) => {
-                  const isActive = selectedChauffeur === label;
-                  const driverData = syncFilteredData.filter(t => t.driverLabel === label);
-                  const dProfit = driverData.reduce((s, r) => s + (Number(r.total_net_cfa) || 0), 0);
-                  const dTonnage = driverData.reduce((s, r) => s + (Number(r.tonnage) || 0), 0);
-                  return (
-                    <button key={label} onClick={() => onSelectDriver(label === selectedChauffeur ? ALL_CHAUFFEURS : label)} className={`group rounded-[28px] border p-5 text-left transition-all duration-500 flex flex-col justify-between ${isActive ? "bg-[#cf5d56] border-[#cf5d56] shadow-xl" : "bg-white/2 border-white/5 hover:bg-white/5 shadow-xl"}`}>
-                      <div className="flex justify-between items-start mb-4"><div className={`size-9 rounded-xl flex items-center justify-center font-black text-xs transition-all ${isActive ? 'bg-black text-white' : 'bg-[#cf5d56] text-black shadow-lg shadow-[#cf5d56]/20'}`}>{label.split(' ')[2]}</div><ArrowUpRight className={`size-4 transition-colors ${isActive ? 'text-white' : 'text-white/20'}`} /></div>
-                      <div><p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${isActive ? 'text-black/60' : 'text-[#cf5d56]'}`}>UNIT {label.split(' ')[2]}</p><h4 className={`text-base font-black truncate mb-4 tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>{label.split(' ')[0]}</h4></div>
-                      <div className={`pt-4 border-t flex justify-between items-center ${isActive ? 'border-black/10' : 'border-white/5'}`}><span className={`text-xs font-black ${isActive ? 'text-black' : (dProfit >= 0 ? 'text-[#9fe3b9]' : 'text-red-400')}`}>{formatCurrency(dProfit, currency)}</span><span className={`text-[10px] font-bold ${isActive ? 'text-black/40' : 'text-white/30'}`}>{dTonnage}T</span></div>
-                    </button>
-                  );
-                })}
-              </div>
-          </div>
-          <div className="col-span-1 h-full"><FleetStatus totalTrips={metrics.totalTrips} activeDays={metrics.activeDays} profitableTrips={metrics.profitableTrips} driverLabel={selectedChauffeur} profitMargin={formatPercent(financeStats.margin / 100)} t={t} language={language} /></div>
       </section>
 
-      {/* REVENUE TREND & TONNAGE (FULL WIDTH APPLE DESIGN) */}
-      <section className="col-span-12">
-          <MiniCharts 
-            records={syncFilteredData} 
-            formatCurrency={(v) => formatCurrency(v, currency)} 
-            currency={currency} 
-            t={t} 
-            language={language}
-          />
-      </section>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <MaintenanceLog 
-            records={filteredMaintenance} 
-            expenseRecords={syncFilteredData.filter(t => t.tripType === "Google Sheets" || t.category === "Dépense Opérationnelle")} 
-            googleClientId={googleClientId}
-            t={t}
-            language={language}
-          />
-          <OperationalAlerts records={syncFilteredData} allTrips={allTrips} oilChanges={oilChanges} t={t} language={language} />
-      </div>
+      {/* 4. HYBRIDE A+B : CATÉGORIES REPLIABLES AVEC MINI-KPI TOUJOURS VISIBLES */}
+      <DashboardCategoryTabs
+        categories={dashboardCategories}
+        language={language}
+      />
 
     </div>
   );

@@ -20,9 +20,9 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t, langu
 
   // Configuration officielle des 3 camions
   const trucksConfig = [
-    { key: "AMARA TRUCK 76", name: "AMARA", truckNum: "76", color: "#3B82F6", bg: "rgba(59, 130, 246, 0.12)", border: "rgba(59, 130, 246, 0.3)", fallbackKm: 117324 },
-    { key: "BRAHIMA TRUCK 45", name: "BRAHIMA", truckNum: "45", color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", border: "rgba(16, 185, 129, 0.3)", fallbackKm: 110593 },
-    { key: "SORO TRUCK 52", name: "SORO", truckNum: "52", color: "#CF5D56", bg: "rgba(207, 93, 86, 0.12)", border: "rgba(207, 93, 86, 0.3)", fallbackKm: 110975 }
+    { key: "AMARA TRUCK 76", name: "AMARA", truckNum: "76", color: "#3B82F6", bg: "rgba(59, 130, 246, 0.12)", border: "rgba(59, 130, 246, 0.3)", fallbackKm: 125325 },
+    { key: "BRAHIMA TRUCK 45", name: "BRAHIMA", truckNum: "45", color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", border: "rgba(16, 185, 129, 0.3)", fallbackKm: 120334 },
+    { key: "SORO TRUCK 52", name: "SORO", truckNum: "52", color: "#CF5D56", bg: "rgba(207, 93, 86, 0.12)", border: "rgba(207, 93, 86, 0.3)", fallbackKm: 114795 }
   ];
 
   // Calcul haute fidélité des jauges de vidange pour les 3 camions
@@ -68,7 +68,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t, langu
         remaining,
         percent,
         status,
-        lastDate: info?.date || "2026-04-16",
+        lastDate: info?.date || "2026-10-13",
         comment: info?.comment
       };
     });
@@ -249,7 +249,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t, langu
   const locale = t?.months?.[0] === "January" ? "en-US" : "fr-FR";
 
   return (
-    <section className="panel-enter rounded-[36px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 text-white shadow-2xl h-full flex flex-col relative overflow-hidden">
+    <section className="panel-enter rounded-[36px] border border-white/8 bg-[linear-gradient(180deg,#181818_0%,#111111_100%)] p-6 text-white shadow-2xl h-full flex flex-col relative overflow-hidden" style={{ maxHeight: "500px" }}>
       {/* GLOW DE FOND */}
       <div className={`absolute top-0 right-0 w-64 h-64 ${counts.critical > 0 ? 'bg-red-500/5' : 'bg-[#10B981]/5'} rounded-full blur-3xl pointer-events-none`}></div>
 
@@ -350,7 +350,7 @@ export function OperationalAlerts({ records, allTrips = [], oilChanges, t, langu
                 </div>
 
                 <div className="flex items-center justify-between text-[9px] text-white/40">
-                  <span>{truck.driven.toLocaleString(isEn ? "en-US" : "fr-FR")} / 10 000 KM</span>
+                  <span>{truck.driven.toLocaleString(isEn ? "en-US" : "fr-FR")} / {(10000).toLocaleString(isEn ? "en-US" : "fr-FR")} KM</span>
                   <span className="font-mono text-white/60">{truck.currentKm.toLocaleString(isEn ? "en-US" : "fr-FR")} KM {isEn ? "curr." : "act."}</span>
                 </div>
               </div>

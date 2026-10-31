@@ -1,0 +1,57 @@
+{
+  "driveRootFolderId": "1UaUCWlO1Ee0R5SKLY2CutFRrzF1j_5ct",
+  "driveRootFolderName": "SDV_Factures_WhatsApp",
+  "verifyToken": "sdv_whatsapp_verify_2026",
+  "whatsappPhoneNumberId": "",
+  "whatsappAccessToken": "",
+  "autoSyncToApp": true,
+  "organizeBy": "DATE_AND_TYPE",
+  "invoiceTypes": [
+    {
+      "code": "CARBURANT",
+      "label": "Carburant (Gasoil)",
+      "driveFolderName": "01_Carburant_Gasoil",
+      "accountingCategory": "Carburant (Gasoil)",
+      "targetModule": "accounting_fuel"
+    },
+    {
+      "code": "MAINTENANCE",
+      "label": "Maintenance & Pièces",
+      "driveFolderName": "02_Maintenance_Pieces",
+      "accountingCategory": "Maintenance & Pneumatiques",
+      "targetModule": "maintenance"
+    },
+    {
+      "code": "PEAGE_ROUTE",
+      "label": "Péage & Frais de Route",
+      "driveFolderName": "03_Peages_Frais_Route",
+      "accountingCategory": "Frais de Route & Péages",
+      "targetModule": "accounting_expense"
+    },
+    {
+      "code": "FACTURE_CLIENT",
+      "label": "Facture Client & Pesée",
+      "driveFolderName": "04_Factures_Clients_Tonnage",
+      "accountingCategory": "Recettes Transport (Facturation)",
+      "targetModule": "client_invoice"
+    },
+    {
+      "code": "ASSURANCE_DOC",
+      "label": "Assurance & Documents",
+      "driveFolderName": "05_Assurances_Documents",
+      "accountingCategory": "Cartes de Transport & Régularisations",
+      "targetModule": "accounting_expense"
+    },
+    {
+      "code": "AUTRE",
+      "label": "Autres Factures & Reçus",
+      "driveFolderName": "06_Autres_Factures",
+      "accountingCategory": "Charges Générales & Divers",
+      "targetModule": "accounting_expense"
+    }
+  ],
+  "hasServiceAccount": true,
+  "hasGeminiKey": true,
+  "hasOpenAiKey": false,
+  "updatedAt": "2026-10-30T19:40:01.302Z"
+}

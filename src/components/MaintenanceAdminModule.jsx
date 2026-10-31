@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Wrench, Plus, Trash2, Edit2, Save, X, Calendar, Truck, Info,
   Image as ImageIcon, ExternalLink, Sparkles, Loader2, CheckCircle2,
@@ -7,6 +7,7 @@ import {
 import { ALL_CHAUFFEURS } from '../lib/dashboard';
 import { translateComment } from '../utils/i18n';
 import { isSalaryRecord } from '../utils/salaryFilter';
+import { MaintenanceLog } from './MaintenanceLog';
 
 
 // Helper extraction Google Drive
@@ -34,6 +35,7 @@ export function MaintenanceAdminModule({
   records = [], 
   setRecords, 
   expenseRecords = [],
+  accountingTransactions = [],
   drivers = [], 
   googleClientId, 
   oilChanges = {}, 
@@ -124,29 +126,21 @@ export function MaintenanceAdminModule({
         };
       }))).filter(Boolean);
 
-      const geminiKey = debugKey || import.meta.env.VITE_GEMINI_API_KEY;
-      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
-      const modelsData = await modelsRes.json();
-      const flashModel = modelsData.models?.find(m => m.name.includes('flash'))?.name || 'models/gemini-1.5-flash';
+      const promptText = "Voici des fichiers (images ou PDF) d'un dossier de maintenance. L'un d'eux est la facture. Identifie-le et extrais en JSON : { \"invoiceFileName\": \"nom\", \"date\": \"YYYY-MM-DD\", \"vehicle\": \"AMARA TRUCK 76, BRAHIMA TRUCK 45 ou SORO TRUCK 52\", \"description\": \"...\", \"cost\": 0 }. Réponds uniquement en JSON.";
 
-      const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/${flashModel}:generateContent?key=${geminiKey}`, {
+      const aiResponse = await fetch('http://localhost:8787/api/analyze-maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: "Voici des fichiers (images ou PDF) d'un dossier de maintenance. L'un d'eux est la facture. Identifie-le et extrais en JSON : { \"invoiceFileName\": \"nom\", \"date\": \"YYYY-MM-DD\", \"vehicle\": \"AMARA TRUCK 76, BRAHIMA TRUCK 45 ou SORO TRUCK 52\", \"description\": \"...\", \"cost\": 0 }. Réponds uniquement en JSON." },
-              ...imageDataArray.map(img => ({ inline_data: { mime_type: img.mime, data: img.b64 } }))
-            ]
-          }],
-          generationConfig: { response_mime_type: "application/json" }
+          files: imageDataArray,
+          prompt: promptText
         })
       });
 
       if (!aiResponse.ok) throw new Error("Erreur IA");
 
       const aiData = await aiResponse.json();
-      const extracted = JSON.parse(aiData.candidates[0].content.parts[0].text.trim());
+      const extracted = aiData.parsed || JSON.parse(aiData.text.trim());
       const usedImage = imageDataArray.find(img => img.name === extracted.invoiceFileName) || imageDataArray[0];
 
       setPendingAI([{
@@ -419,201 +413,16 @@ export function MaintenanceAdminModule({
         ))}
       </section>
 
-      {/* KPI BANNER ATELIER & FINANCES */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {language === 'EN' ? "Total Expenses (" : "Total Dépenses ("}
-              {activeTab === 'maintenance' ? (language === 'EN' ? 'Workshop' : 'Atelier') : (language === 'EN' ? 'Expenses' : 'Dépenses')})
-            </p>
-            <p className="text-xl font-black text-orange-400 mt-1">{totalCost.toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA</p>
-          </div>
-          <div className="size-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
-            <Wrench className="size-5" />
-          </div>
-        </div>
-        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {language === 'EN' ? "Displayed Rows" : "Lignes Affichées"}
-            </p>
-            <p className="text-xl font-black text-white mt-1">{filteredRecords.length} <span className="text-xs text-white/30 font-normal">/ {baseRecords.length}</span></p>
-          </div>
-          <div className="size-10 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
-            <FileText className="size-5" />
-          </div>
-        </div>
-        <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {language === 'EN' ? "Active Filter" : "Filtre Actif"}
-            </p>
-            <p className="text-sm font-black text-emerald-400 mt-1">{selectedTruck === 'ALL' ? (language === 'EN' ? 'All trucks' : 'Tous les camions') : selectedTruck}</p>
-          </div>
-          <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-            <Truck className="size-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* BARRE DE FILTRES & RECHERCHE FLUIDE */}
-      <div className="bg-[#181818] border border-white/5 p-4 rounded-2xl space-y-3">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-          {/* SÉLECTEUR PAR CAMION */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-            <button
-              onClick={() => setSelectedTruck('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${selectedTruck === 'ALL' ? 'bg-white text-black shadow-md' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'}`}
-            >
-              {language === 'EN' ? "All (" : "Tous ("}{baseRecords.length})
-            </button>
-            <button
-              onClick={() => setSelectedTruck('76')}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '76' ? 'bg-[#3B82F6] text-white shadow-md shadow-[#3B82F6]/30' : 'bg-white/5 text-[#3B82F6] hover:bg-blue-500/10'}`}
-            >
-              <span className="size-2 rounded-full bg-[#3B82F6]" /> AMARA 76
-            </button>
-            <button
-              onClick={() => setSelectedTruck('45')}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '45' ? 'bg-[#10B981] text-white shadow-md shadow-[#10B981]/30' : 'bg-white/5 text-[#10B981] hover:bg-emerald-500/10'}`}
-            >
-              <span className="size-2 rounded-full bg-[#10B981]" /> BRAHIMA 45
-            </button>
-            <button
-              onClick={() => setSelectedTruck('52')}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedTruck === '52' ? 'bg-[#CF5D56] text-white shadow-md shadow-[#CF5D56]/30' : 'bg-white/5 text-[#CF5D56] hover:bg-red-500/10'}`}
-            >
-              <span className="size-2 rounded-full bg-[#CF5D56]" /> SORO 52
-            </button>
-          </div>
-
-          {/* RECHERCHE INSTANTANÉE */}
-          <div className="relative w-full md:w-64">
-            <input
-              type="text"
-              placeholder={language === 'EN' ? "Search part, date, CFA..." : "Rechercher pièce, date, CFA..."}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 bg-black/40 border border-white/10 rounded-xl pl-8 pr-3 text-xs text-white placeholder:text-white/20 outline-none focus:border-orange-500/50"
-            />
-            <span className="absolute left-2.5 top-2.5 text-white/30 text-xs">🔍</span>
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-2 text-white/30 hover:text-white text-xs">✕</button>
-            )}
-          </div>
-        </div>
-
-        {/* CHIPS CATÉGORIES RAPIDES */}
-        <div className="flex items-center gap-2 overflow-x-auto text-[10px] font-bold text-white/60 pt-1">
-          <span className="text-white/30 uppercase tracking-widest text-[9px] mr-1">Type :</span>
-          <button
-            onClick={() => setCategoryFilter('ALL')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'ALL' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "All" : "Toutes"}
-          </button>
-          <button
-            onClick={() => setCategoryFilter('vidange')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'vidange' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "🛢️ Oil & Lubrication" : "🛢️ Vidanges & Huiles"}
-          </button>
-          <button
-            onClick={() => setCategoryFilter('mecanique')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'mecanique' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "⚙️ Parts & Repairs" : "⚙️ Pièces & Réparations"}
-          </button>
-          <button
-            onClick={() => setCategoryFilter('pneu')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'pneu' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "🛞 Tires & Wheels" : "🛞 Pneus & Roues"}
-          </button>
-          <button
-            onClick={() => setCategoryFilter('drive')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'drive' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "📁 Drive Receipts" : "📁 Justificatifs Drive"}
-          </button>
-          <button
-            onClick={() => setCategoryFilter('salaires')}
-            className={`px-2.5 py-1 rounded-lg transition-all ${categoryFilter === 'salaires' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'hover:bg-white/5'}`}
-          >
-            {language === 'EN' ? "💼 Salaries & Payroll" : "💼 Salaires & Frais Salariaux"}
-          </button>
-        </div>
-      </div>
-
-      <section className="panel-enter rounded-[30px] border border-white/7 bg-[#111] overflow-hidden shadow-xl">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-white/[0.01]">
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.date || (language === 'EN' ? "Date" : "Date")}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{activeTab === 'maintenance' ? (t?.vehicle || (language === 'EN' ? 'Vehicle' : 'Véhicule')) : (t?.driver || (language === 'EN' ? 'Driver' : 'Chauffeur'))}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.comments || (language === 'EN' ? "Description" : "Description")}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{t?.amount || (language === 'EN' ? "Cost" : "Coût")}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">{language === 'EN' ? "Proofs / Photos" : "Preuves / Photos"}</th>
-              <th className="px-6 py-4 text-[10px] font-black text-white/20 uppercase tracking-widest text-right">{language === 'EN' ? "Actions" : "Actions"}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {displayRecords.sort((a,b) => b.date.localeCompare(a.date)).map(row => {
-              const rowDate = new Date(row.date);
-              const formattedDate = !isNaN(rowDate.getTime()) 
-                ? rowDate.toLocaleDateString(language === 'EN' ? "en-US" : "fr-FR")
-                : row.date;
-
-              return (
-              <tr key={row.id} className="hover:bg-white/[0.02] transition-colors group">
-                <td className="px-6 py-4 text-xs font-bold text-white/70">{formattedDate}</td>
-                <td className="px-6 py-4 text-xs font-black text-orange-500">{row.vehicle || row.driverLabel}</td>
-                <td className="px-6 py-4 text-xs text-white/50">{translateComment(row.description, language)}</td>
-                <td className="px-6 py-4 text-xs font-black text-white">{(row.cost || row.amount || 0).toLocaleString(language === 'EN' ? 'en-US' : 'fr-FR')} CFA</td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    {(row.imageUrl || row.driveLink) && (
-                      <button
-                        type="button"
-                        onClick={() => setPreviewDoc(row)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-all text-[11px] font-bold"
-                        title={language === 'EN' ? "Direct receipt preview" : "Aperçu direct du justificatif"}
-                      >
-                        <Eye className="size-3.5" />
-                        <span>{language === 'EN' ? "Proof" : "Preuve"}</span>
-                      </button>
-                    )}
-                    {row.workPhotos?.length > 0 && (
-                      <div className="flex -space-x-2">
-                        {row.workPhotos.slice(0, 3).map((p, i) => (
-                          <div key={i} className="size-8 rounded-lg border-2 border-[#111] overflow-hidden bg-white/5">
-                            <img src={p} className="size-full object-cover" />
-                          </div>
-                        ))}
-                        {row.workPhotos.length > 3 && (
-                          <div className="size-8 rounded-lg border-2 border-[#111] bg-white/10 flex items-center justify-center text-[8px] font-black text-white/40">
-                            +{row.workPhotos.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {row.source === "Google Sheets" && (
-                      <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5" title={language === 'EN' ? "Synced from GSheets" : "Synchronisé de GSheets"}>
-                        <Sparkles className="size-4" />
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  <button onClick={() => handleDelete(row.id)} className="p-2 text-white/10 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"><Trash2 className="size-4" /></button>
-                </td>
-              </tr>
-            );
-          })}
-          </tbody>
-        </table>
-      </section>
+      {/* ANALYSE DÉTAILLÉE MAINTENANCE & DÉPENSES (PAR DATE, SEMAINE, MOIS, CHAUFFEUR) */}
+      <MaintenanceLog
+        records={records}
+        expenseRecords={expenseRecords}
+        accountingTransactions={accountingTransactions}
+        googleClientId={googleClientId}
+        oilChanges={oilChanges}
+        t={t}
+        language={language}
+      />
 
       {isAdding && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

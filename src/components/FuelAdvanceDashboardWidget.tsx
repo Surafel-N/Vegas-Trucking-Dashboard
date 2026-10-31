@@ -11,7 +11,11 @@ import {
   Download,
   Info,
   Layers,
-  ArrowDownRight
+  ArrowDownRight,
+  RefreshCw,
+  FileSpreadsheet,
+  FileText,
+  Search
 } from 'lucide-react';
 import { WalletIcon } from './WalletIcon';
 import { 
@@ -22,6 +26,18 @@ import {
 } from '../utils/fuelAdvanceTracker';
 import { AccountingTransaction } from '../utils/accountingParser';
 import { Language } from '../utils/i18n';
+import {
+  DEFAULT_MAX_INACTIVITY_DAYS,
+  analyzeFuelBreakdownSequence,
+  buildTripLookupKey,
+  computeMonthlyFuelBreakdownStats,
+  exportFuelBreakdownToExcel,
+  exportFuelBreakdownToCSV,
+  exportFuelBreakdownToPDF,
+  resolveTripFuelCorridor,
+  DiagnosticTripRecord
+} from '../utils/fuelBreakdownDiagnostic';
+import { INITIAL_TRIPS } from '../utils/tripsInitialData';
 
 interface FuelAdvanceDashboardWidgetProps {
   advances: FuelAdvance[];
@@ -30,6 +46,8 @@ interface FuelAdvanceDashboardWidgetProps {
   allTrips?: any[];
   rawCashBalance?: number;
   onAddAdvance?: (advance: FuelAdvance) => void;
+  onSyncTrips?: () => void;
+  isSyncingTrips?: boolean;
   formatCurrency?: (val: number, curr?: string) => string;
   currency?: string;
   t?: any;
@@ -44,6 +62,8 @@ export function FuelAdvanceDashboardWidget({
   allTrips = [],
   rawCashBalance,
   onAddAdvance,
+  onSyncTrips,
+  isSyncingTrips = false,
   formatCurrency,
   currency = "CFA",
   t,
@@ -55,8 +75,15 @@ export function FuelAdvanceDashboardWidget({
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [selectedCorridor, setSelectedCorridor] = useState<"ALL" | "SAN_PEDRO" | "ABIDJAN">("ALL");
 
-  // Sélection de l'avance suivie : par défaut l'avance de 4 000 000 CFA
-  const [selectedAdvanceId, setSelectedAdvanceId] = useState<string>("adv-auto-465");
+  // --- PARAMÉTRAGE DYNAMIQUE DE L'INACTIVITÉ & DIAGNOSTIC LECTURE SEULE ---
+  const [maxInactivityDays, setMaxInactivityDays] = useState<number>(DEFAULT_MAX_INACTIVITY_DAYS);
+  const [selectedDiagTruck, setSelectedDiagTruck] = useState<"ALL" | "AMARA" | "BRAHIMA" | "SORO">("ALL");
+  const [onlyAnomalies, setOnlyAnomalies] = useState<boolean>(false);
+  const [diagSearch, setDiagSearch] = useState<string>("");
+  const [isDiagTableOpen, setIsDiagTableOpen] = useState<boolean>(true);
+
+  // Sélection de l'avance suivie : par défaut le Compte Courant continu Shell San Pedro (Sept. – Oct. 2026)
+  const [selectedAdvanceId, setSelectedAdvanceId] = useState<string>(RUNNING_ACCOUNT_ID);
 
   // Formulaire d'ajout rapide d'avance
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
@@ -71,14 +98,26 @@ export function FuelAdvanceDashboardWidget({
     return `${Math.round(val).toLocaleString()} ${currency}`;
   };
 
-  // Calcul du résumé du décompte en fonction de l'avance sélectionnée
+  // Source globale des trajets (avec fallback initial certifié si localStorage vide avant 1er sync)
+  const effectiveAllTrips = useMemo(() => {
+    if (allTrips && allTrips.length > 0) return allTrips;
+    if (trips && trips.length > 0) return trips;
+    return INITIAL_TRIPS;
+  }, [allTrips, trips]);
+
+  const effectiveFilteredTrips = useMemo(() => {
+    if (trips && trips.length > 0) return trips;
+    return effectiveAllTrips;
+  }, [trips, effectiveAllTrips]);
+
+  // Calcul du résumé du décompte en fonction de l'avance sélectionnée (en séparant Abidjan et San Pedro)
   const summary: FuelCashSummary = useMemo(() => {
-    return computeFuelReconciliation(advances, transactions, rawCashBalance, selectedAdvanceId);
-  }, [advances, transactions, rawCashBalance, selectedAdvanceId]);
+    return computeFuelReconciliation(advances, transactions, rawCashBalance, selectedAdvanceId, effectiveAllTrips);
+  }, [advances, transactions, rawCashBalance, selectedAdvanceId, effectiveAllTrips]);
 
   // Calcul de la répartition du carburant pris à San Pedro vs pris pour Abidjan
   const corridorStats = useMemo(() => {
-    const source = trips && trips.length > 0 ? trips : allTrips;
+    const source = effectiveFilteredTrips;
     let sanPedroFuel = 0;
     let abidjanFuel = 0;
     let sanPedroTrips = 0;
@@ -94,10 +133,7 @@ export function FuelAdvanceDashboardWidget({
       const fuelVal = Number(r.fuel_cost_cfa) || 0;
       if (fuelVal <= 0 && Number(r.tonnage || 0) <= 0) return;
 
-      const dest = String(r.destination || "").toLowerCase();
-      const start = String(r.start || "").toLowerCase();
-      const comment = String(r.comments || r.comment || "").toLowerCase();
-      const isAbidjan = dest.includes("abidjan") || (!dest.includes("pedro") && (start.includes("abidjan") || comment.includes("abidjan")));
+      const isAbidjan = resolveTripFuelCorridor(r) === "ABIDJAN";
 
       const lbl = String(r.driverLabel || r.chauffeur || "").toUpperCase();
       let truckKey: "AMARA" | "BRAHIMA" | "SORO" | null = null;
@@ -136,7 +172,76 @@ export function FuelAdvanceDashboardWidget({
       abjPercent,
       byTruck
     };
-  }, [trips, allTrips]);
+  }, [effectiveFilteredTrips]);
+
+  // --- ALGORITHME DE DÉTECTION DES ANOMALIES DE SÉQUENCE (LECTURE SEULE) ---
+  // L'analyse chronologique est calculée sur l'historique complet de chaque camion,
+  // puis filtrée selon la vue active de l'utilisateur.
+  const diagnosticResult = useMemo(() => {
+    return analyzeFuelBreakdownSequence(effectiveAllTrips, maxInactivityDays, isEn ? "EN" : "FR");
+  }, [effectiveAllTrips, maxInactivityDays, isEn]);
+
+  const displayedDiagnosticRows: DiagnosticTripRecord[] = useMemo(() => {
+    const activeIds = new Set((effectiveFilteredTrips || []).map((r) => buildTripLookupKey(r)));
+    const activeDateTruckSet = new Set(
+      (effectiveFilteredTrips || []).map(
+        (r) => `${r.date}-${String(r.driverLabel || r.chauffeur || "").toUpperCase().slice(0, 5)}`
+      )
+    );
+
+    return diagnosticResult.records.filter((rec) => {
+      // Respecter le filtre global du Dashboard (dates/mois/années/chauffeur)
+      const matchesFilteredSet =
+        activeIds.has(rec.id) ||
+        activeDateTruckSet.has(`${rec.date}-${rec.truckKey.slice(0, 5)}`);
+      if (!matchesFilteredSet) return false;
+
+      // Filtre Corridor (Tous / San Pedro / Abidjan)
+      if (selectedCorridor !== "ALL" && rec.corridor !== selectedCorridor) return false;
+
+      // Filtre Camion local
+      if (selectedDiagTruck !== "ALL" && rec.truckKey !== selectedDiagTruck) return false;
+
+      // Filtre Anomalies uniquement
+      if (onlyAnomalies && !rec.hasAnomaly) return false;
+
+      // Recherche textuelle
+      if (diagSearch.trim()) {
+        const q = diagSearch.toLowerCase().trim();
+        const hay = `${rec.truckLabel} ${rec.date} ${rec.start} ${rec.destination} ${rec.corridorLabel} ${rec.alertStatus} ${rec.sheetRow || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }, [
+    diagnosticResult.records,
+    effectiveFilteredTrips,
+    selectedCorridor,
+    selectedDiagTruck,
+    onlyAnomalies,
+    diagSearch
+  ]);
+
+  const totalAnomaliesInScope = useMemo(() => {
+    const activeIds = new Set((effectiveFilteredTrips || []).map((r) => buildTripLookupKey(r)));
+    const activeDateTruckSet = new Set(
+      (effectiveFilteredTrips || []).map(
+        (r) => `${r.date}-${String(r.driverLabel || r.chauffeur || "").toUpperCase().slice(0, 5)}`
+      )
+    );
+    return diagnosticResult.anomalies.filter(
+      (rec) =>
+        (activeIds.has(rec.id) ||
+          activeDateTruckSet.has(`${rec.date}-${rec.truckKey.slice(0, 5)}`)) &&
+        (selectedCorridor === "ALL" || rec.corridor === selectedCorridor) &&
+        (selectedDiagTruck === "ALL" || rec.truckKey === selectedDiagTruck)
+    );
+  }, [diagnosticResult.anomalies, effectiveFilteredTrips, selectedCorridor, selectedDiagTruck]);
+
+  const monthlyBreakdownStats = useMemo(() => {
+    return computeMonthlyFuelBreakdownStats(displayedDiagnosticRows, isEn ? "EN" : "FR");
+  }, [displayedDiagnosticRows, isEn]);
 
   const isOverdrawn = summary.totalAmountDue > 0;
 
@@ -234,22 +339,14 @@ export function FuelAdvanceDashboardWidget({
               onChange={(e) => setSelectedAdvanceId(e.target.value)}
               className="bg-transparent text-amber-300 font-bold text-xs focus:outline-none cursor-pointer pr-1"
             >
-              <option value="adv-auto-465" className="bg-[#1c1c1e] text-white">
-                ⭐ {isEn ? "Advance 4,000,000 CFA — Shell San Pedro (15/09/2026)" : "Avance 4 000 000 CFA — Shell San Pedro (15/09/2026)"}
-              </option>
-              <option value="adv-auto-472" className="bg-[#1c1c1e] text-white">
-                {isEn ? "Advance 2,500,000 CFA — Shell San Pedro (22/09/2026)" : "Avance 2 500 000 CFA — Shell San Pedro (22/09/2026)"}
-              </option>
               <option value={RUNNING_ACCOUNT_ID} className="bg-[#1c1c1e] text-white">
-                {t?.runningAccountSeptember || (isEn ? "🔄 Shell San Pedro Running Account (Sept. 2026 — 6.5M CFA)" : "🔄 Compte Courant Shell San Pedro (Sept. 2026 — 6,5M CFA)")}
+                🔄 {isEn ? "Shell San Pedro Running Account (Sept.–Oct. 2026 — 12,502,750 CFA)" : "Compte Courant Shell San Pedro (Sept.–Oct. 2026 — 12 502 750 CFA)"}
               </option>
-              {summary.recentAdvances
-                .filter(a => a.id !== "adv-auto-465" && a.id !== "adv-auto-472")
-                .map(a => (
-                  <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
-                    {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
-                  </option>
-                ))}
+              {summary.recentAdvances.map(a => (
+                <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
+                  {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -318,12 +415,20 @@ export function FuelAdvanceDashboardWidget({
                   style={{ width: `${Math.min(100, summary.percentUsed)}%` }}
                 />
               </div>
+              {summary.totalAbidjanFuelExcluded > 0 && (
+                <div className="flex items-center justify-between text-[10px] text-orange-400/95 pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <span>🚫</span> {isEn ? "Abidjan fuel (excluded from Shell):" : "Carburant Abidjan (non déduit Shell) :"}
+                  </span>
+                  <span className="font-bold">-{formatMoney(summary.totalAbidjanFuelExcluded)} (exclu)</span>
+                </div>
+              )}
               {summary.totalDirectPaidFuel > 0 && (
                 <div className="flex items-center justify-between text-[10px] text-emerald-400/90 pt-0.5">
                   <span className="flex items-center gap-1">
                     <span>⛽</span> {isEn ? "Direct payments outside station:" : "Payé directement hors station :"}
                   </span>
-                  <span className="font-bold">+{formatMoney(summary.totalDirectPaidFuel)} (déduit)</span>
+                  <span className="font-bold">-{formatMoney(summary.totalDirectPaidFuel)} (exclu)</span>
                 </div>
               )}
             </div>
@@ -426,72 +531,99 @@ export function FuelAdvanceDashboardWidget({
 
       {/* ========================================================================= */}
       {/* OPTION : MONTANT DU CARBURANT PRIS À SAN PEDRO VS PRIS POUR ABIDJAN      */}
+      {/* + OUTIL DE DIAGNOSTIC DES SÉQUENCES & INACTIVITÉ (LECTURE SEULE)          */}
       {/* ========================================================================= */}
-      <div className="mt-5 relative z-10 rounded-2xl bg-black/35 border border-white/10 p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+      <div className="mt-5 relative z-10 rounded-2xl bg-black/35 border border-white/10 p-4 sm:p-5 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
               <Fuel className="size-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
-                  {isEn ? "Fuel Breakdown: San Pedro vs Abidjan" : "Option Carburant : Pris à San Pedro vs Pris pour Abidjan"}
+                  {isEn ? "Fuel Breakdown San Pedro versus Abidjan" : "Fuel Breakdown San Pedro versus Abidjan"}
                 </h4>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/10 text-white/70">
                   {formatMoney(corridorStats.totalFuel)}
                 </span>
+                {totalAnomaliesInScope.length > 0 ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse">
+                    <AlertTriangle className="size-3" />
+                    {totalAnomaliesInScope.length} {isEn ? "sequence anomalies" : "incohérence(s) détectée(s)"}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="size-3" />
+                    {isEn ? "Sequences valid" : "Séquences conformes"}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-white/50 mt-0.5">
                 {isEn
-                  ? "Select an option to isolate fuel amounts taken at San Pedro or for Abidjan across your fleet"
-                  : "Sélectionnez une option pour afficher le montant du carburant pris à San Pedro et le montant pris pour Abidjan"}
+                  ? "Read-only sequence diagnostic & fuel breakdown (San Pedro vs Abidjan) extracted from Google Spreadsheet"
+                  : "Répartition du carburant (San Pedro vs Abidjan) & diagnostic en lecture seule des séquences de trajets depuis le Spreadsheet"}
               </p>
             </div>
           </div>
 
           {/* SÉLECTEUR D'OPTION : TOUS / SAN PEDRO / ABIDJAN */}
-          <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setSelectedCorridor("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                selectedCorridor === "ALL"
-                  ? "bg-white text-black shadow-sm"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              {isEn ? "Both Options" : "Vue Comparée"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCorridor("SAN_PEDRO")}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCorridor === "SAN_PEDRO"
-                  ? "bg-teal-500 text-black shadow-sm"
-                  : "text-teal-300/70 hover:text-teal-300 hover:bg-teal-500/10"
-              }`}
-            >
-              <span className="size-1.5 rounded-full bg-current" />
-              {isEn ? "San Pedro Fuel" : "Carburant San Pedro"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCorridor("ABIDJAN")}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCorridor === "ABIDJAN"
-                  ? "bg-orange-500 text-black shadow-sm"
-                  : "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/10"
-              }`}
-            >
-              <span className="size-1.5 rounded-full bg-current" />
-              {isEn ? "Abidjan Fuel" : "Carburant Abidjan"}
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+              <button
+                type="button"
+                onClick={() => setSelectedCorridor("ALL")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedCorridor === "ALL"
+                    ? "bg-white text-black shadow-sm"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {isEn ? "Both Options" : "Vue Comparée"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCorridor("SAN_PEDRO")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedCorridor === "SAN_PEDRO"
+                    ? "bg-teal-500 text-black shadow-sm"
+                    : "text-teal-300/70 hover:text-teal-300 hover:bg-teal-500/10"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-current" />
+                {isEn ? "San Pedro Fuel" : "Carburant San Pedro"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCorridor("ABIDJAN")}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedCorridor === "ABIDJAN"
+                    ? "bg-orange-500 text-black shadow-sm"
+                    : "text-orange-300/70 hover:text-orange-300 hover:bg-orange-500/10"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-current" />
+                {isEn ? "Abidjan Fuel" : "Carburant Abidjan"}
+              </button>
+            </div>
+
+            {onSyncTrips && (
+              <button
+                type="button"
+                onClick={onSyncTrips}
+                disabled={isSyncingTrips}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                title={isEn ? "Reload data from Google Spreadsheet after manual fixes" : "Recharger les données depuis le Google Spreadsheet après vos corrections manuelles"}
+              >
+                <RefreshCw className={`size-3.5 ${isSyncingTrips ? "animate-spin" : ""}`} />
+                <span>{isSyncingTrips ? (isEn ? "Syncing..." : "Sync...") : (isEn ? "Sync Spreadsheet" : "Rafraîchir Spreadsheet")}</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* BARRE DE PROPORTION VISUELLE */}
-        <div className="mt-3 mb-4">
+        <div>
           <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider mb-1.5">
             <span className="text-teal-400">
               ⛽ {isEn ? "Taken at San Pedro" : "Carburant pris à San Pedro"} ({corridorStats.spPercent}%)
@@ -592,6 +724,485 @@ export function FuelAdvanceDashboardWidget({
             </div>
           )}
         </div>
+
+        {/* ===================================================================== */}
+        {/* BARRE DE CONTRÔLE DU DIAGNOSTIC : DÉLAI D'INACTIVITÉ MAX & EXPORTS    */}
+        {/* ===================================================================== */}
+        <div className="rounded-2xl bg-[#141416] border border-white/10 p-4 space-y-4">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-3 border-b border-white/10">
+            {/* 1. CHAMP DE SAISIE NUMÉRIQUE : DÉLAI D'INACTIVITÉ MAX. (JOURS) */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2.5 bg-white/5 border border-white/15 rounded-xl px-3.5 py-2 shadow-inner">
+                <Clock className="size-4 text-amber-400 shrink-0" />
+                <label
+                  htmlFor="max-inactivity-days-input"
+                  className="text-xs font-black text-white whitespace-nowrap"
+                >
+                  {isEn ? "Max. inactivity threshold (days)" : "Délai d'inactivité max. (jours)"} :
+                </label>
+                <input
+                  id="max-inactivity-days-input"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={maxInactivityDays}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setMaxInactivityDays(Number.isFinite(val) && val >= 1 ? val : 1);
+                  }}
+                  className="w-16 px-2 py-1 rounded-lg bg-black/70 border border-amber-500/40 text-amber-300 font-black text-xs text-center focus:outline-none focus:border-amber-400 tabular-nums"
+                />
+                {maxInactivityDays !== DEFAULT_MAX_INACTIVITY_DAYS && (
+                  <button
+                    type="button"
+                    onClick={() => setMaxInactivityDays(DEFAULT_MAX_INACTIVITY_DAYS)}
+                    className="text-[10px] font-bold text-white/50 hover:text-white underline cursor-pointer"
+                  >
+                    {isEn ? "Reset (21d)" : "Défaut (21j)"}
+                  </button>
+                )}
+              </div>
+
+              {/* Filtres rapides : Tous vs Anomalies + Camion + Recherche */}
+              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setOnlyAnomalies(false)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    !onlyAnomalies
+                      ? "bg-white text-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  {isEn ? `All Trips (${displayedDiagnosticRows.length})` : `Tous les trajets (${ !onlyAnomalies ? displayedDiagnosticRows.length : diagnosticResult.records.length })`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlyAnomalies(true)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    onlyAnomalies
+                      ? "bg-red-500 text-white shadow-sm"
+                      : "text-red-400 hover:bg-red-500/15"
+                  }`}
+                >
+                  <AlertTriangle className="size-3" />
+                  <span>
+                    {isEn
+                      ? `Anomalies Only (${totalAnomaliesInScope.length})`
+                      : `Anomalies (${totalAnomaliesInScope.length})`}
+                  </span>
+                </button>
+              </div>
+
+              <select
+                value={selectedDiagTruck}
+                onChange={(e) => setSelectedDiagTruck(e.target.value as any)}
+                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold focus:outline-none focus:border-teal-400 cursor-pointer"
+              >
+                <option value="ALL" className="bg-[#1c1c1e]">{isEn ? "All Trucks (3)" : "Tous les camions (3)"}</option>
+                <option value="AMARA" className="bg-[#1c1c1e]">AMARA TRUCK 76</option>
+                <option value="BRAHIMA" className="bg-[#1c1c1e]">BRAHIMA TRUCK 45</option>
+                <option value="SORO" className="bg-[#1c1c1e]">SORO TRUCK 52</option>
+              </select>
+
+              <div className="relative">
+                <Search className="size-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={diagSearch}
+                  onChange={(e) => setDiagSearch(e.target.value)}
+                  placeholder={isEn ? "Filter date, start, row..." : "Filtrer date, départ, ligne..."}
+                  className="pl-8 pr-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-teal-400 w-44"
+                />
+              </div>
+            </div>
+
+            {/* 3. BOUTONS D'EXPORTATION : EXCEL (.XLSX), CSV (.CSV), PDF (.PDF) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  exportFuelBreakdownToExcel(
+                    displayedDiagnosticRows,
+                    maxInactivityDays,
+                    isEn ? "EN" : "FR"
+                  )
+                }
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-black transition-all cursor-pointer active:scale-95"
+                title={isEn ? "Download table as Excel (.xlsx) with Alert/Status column" : "Télécharger le tableau sous format Excel (.xlsx) avec colonne Alerte/Statut"}
+              >
+                <FileSpreadsheet className="size-3.5" />
+                <span>Excel (.xlsx)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  exportFuelBreakdownToCSV(
+                    displayedDiagnosticRows,
+                    maxInactivityDays,
+                    isEn ? "EN" : "FR"
+                  )
+                }
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white/80 hover:text-white text-xs font-bold transition-all cursor-pointer active:scale-95"
+                title={isEn ? "Download table as CSV (.csv) with Alert/Status column" : "Télécharger le tableau sous format CSV (.csv) avec colonne Alerte/Statut"}
+              >
+                <Download className="size-3.5" />
+                <span>CSV (.csv)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  exportFuelBreakdownToPDF(
+                    displayedDiagnosticRows,
+                    maxInactivityDays,
+                    {
+                      sanPedroFuel: corridorStats.sanPedroFuel,
+                      abidjanFuel: corridorStats.abidjanFuel,
+                      totalFuel: corridorStats.totalFuel,
+                      anomalyCount: displayedDiagnosticRows.filter((r) => r.hasAnomaly).length
+                    },
+                    isEn ? "EN" : "FR"
+                  )
+                }
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-black transition-all cursor-pointer active:scale-95"
+                title={isEn ? "Download table as PDF (.pdf) with highlighted anomalies" : "Télécharger le tableau sous format PDF (.pdf) avec anomalies en surbrillance"}
+              >
+                <FileText className="size-3.5" />
+                <span>PDF (.pdf)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDiagTableOpen(!isDiagTableOpen)}
+                className="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-[11px] font-bold transition-all cursor-pointer"
+              >
+                {isDiagTableOpen ? (isEn ? "Hide Table" : "Masquer Tableau") : (isEn ? "Show Table" : "Afficher Tableau")}
+              </button>
+            </div>
+          </div>
+
+          {/* BANNIÈRE D'EXPLICATION RÈGLE MÉTIER & LECTURE SEULE */}
+          <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+            totalAnomaliesInScope.length > 0
+              ? "bg-red-500/10 border-red-500/30 text-red-200"
+              : "bg-emerald-500/10 border-emerald-500/25 text-emerald-200"
+          }`}>
+            <div className="flex items-start sm:items-center gap-2.5">
+              {totalAnomaliesInScope.length > 0 ? (
+                <AlertTriangle className="size-4 text-red-400 shrink-0 mt-0.5 sm:mt-0" />
+              ) : (
+                <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+              )}
+              <p className="text-[11px] leading-relaxed">
+                {isEn ? (
+                  <>
+                    <strong>Read-Only Diagnostic Rule:</strong> Base of operations is <strong>Abidjan</strong>. After any total inactivity exceeding{" "}
+                    <strong>{maxInactivityDays} days</strong> (no refuel, no trip), the next trip's departure point must be <strong>"Abidjan"</strong>.{" "}
+                    {totalAnomaliesInScope.length > 0 && (
+                      <span className="text-red-300 font-bold">
+                        ({totalAnomaliesInScope.length} record(s) flagged — fix them directly in your Google Spreadsheet then click "Sync Spreadsheet").
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <strong>Règle Métier (Diagnostic en Lecture Seule) :</strong> Après une absence totale d'activité (aucun plein, aucun trajet) supérieure à{" "}
+                    <strong>{maxInactivityDays} jours</strong>, le point de départ du trajet suivant doit obligatoirement être <strong>« Abidjan »</strong>.{" "}
+                    {totalAnomaliesInScope.length > 0 && (
+                      <span className="text-red-300 font-bold">
+                        ({totalAnomaliesInScope.length} ligne(s) suspecte(s) détectée(s) — corrigez-les dans votre Google Spreadsheet source puis cliquez sur « Rafraîchir Spreadsheet »).
+                      </span>
+                    )}
+                  </>
+                )}
+              </p>
+            </div>
+            <span className="px-2 py-0.5 rounded-md bg-black/40 border border-white/10 text-[10px] font-mono text-white/60 shrink-0 self-start sm:self-center">
+              {isEn ? "Strictly Read-Only" : "Strictement Lecture Seule"}
+            </span>
+          </div>
+
+          {/* 2A. TABLEAU DE SYNTHÈSE MENSUELLE (CODES COULEURS PAR COLONNE, SANS RÉPÉTITION) */}
+          {monthlyBreakdownStats.length > 0 && (
+            <div className="rounded-xl border border-white/15 bg-black/50 overflow-hidden shadow-lg">
+              <div className="px-4 py-2.5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                  {isEn
+                    ? "Monthly Fuel Summary (By Column Color Code)"
+                    : "Synthèse Mensuelle Carburant (Lecture par Code Couleur)"}
+                </span>
+                <span className="text-[11px] font-mono text-white/60">
+                  {monthlyBreakdownStats.length} {isEn ? "month(s)" : "mois"}
+                </span>
+              </div>
+              <div className="overflow-x-auto max-h-[240px] overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="sticky top-0 z-10 text-[10px] font-black uppercase tracking-wider">
+                    <tr className="border-b border-white/15">
+                      <th className="py-3 px-4 bg-blue-950/90 text-blue-200 border-r border-white/10">
+                        {isEn ? "Month" : "Mois"}
+                      </th>
+                      <th className="py-3 px-4 bg-amber-950/90 text-amber-200 text-right border-r border-white/10">
+                        {isEn ? "Total Fuel" : "Total"}
+                      </th>
+                      <th className="py-3 px-4 bg-violet-950/90 text-violet-200 text-center border-r border-white/10">
+                        {isEn ? "Total Refuels" : "Total prise"}
+                      </th>
+                      <th className="py-3 px-4 bg-emerald-950/90 text-emerald-200 text-right border-r border-white/10">
+                        {isEn ? "Highest Refuel" : "Montant supérieur prise"}
+                      </th>
+                      <th className="py-3 px-4 bg-sky-950/90 text-sky-200 text-right border-r border-white/10">
+                        {isEn ? "Lowest Refuel" : "Montant inférieur"}
+                      </th>
+                      <th className="py-3 px-4 bg-teal-950/90 text-teal-200 text-right border-r border-white/10">
+                        {isEn ? "San Pedro" : "San Pedro"}
+                      </th>
+                      <th className="py-3 px-4 bg-orange-950/90 text-orange-200 text-right">
+                        {isEn ? "Abidjan" : "Abidjan"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {monthlyBreakdownStats.map((m) => (
+                      <tr key={m.monthKey} className="hover:brightness-110 transition-all">
+                        <td className="py-3 px-4 bg-blue-500/10 text-blue-200 font-black whitespace-nowrap border-r border-white/5">
+                          {m.monthLabel}
+                        </td>
+                        <td className="py-3 px-4 bg-amber-500/10 text-amber-300 font-mono font-black text-right whitespace-nowrap tabular-nums border-r border-white/5">
+                          {formatMoney(m.totalFuelCfa)}
+                        </td>
+                        <td className="py-3 px-4 bg-violet-500/10 text-violet-200 font-mono font-black text-center whitespace-nowrap border-r border-white/5">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-violet-500/25 border border-violet-400/30 text-violet-200 text-xs">
+                            {m.refuelCount}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 bg-emerald-500/10 text-emerald-300 font-mono font-black text-right whitespace-nowrap tabular-nums border-r border-white/5">
+                          {formatMoney(m.maxRefuelCfa)}
+                        </td>
+                        <td className="py-3 px-4 bg-sky-500/10 text-sky-300 font-mono font-black text-right whitespace-nowrap tabular-nums border-r border-white/5">
+                          {formatMoney(m.minRefuelCfa)}
+                        </td>
+                        <td className="py-3 px-4 bg-teal-500/10 text-teal-300 font-mono font-bold text-right whitespace-nowrap tabular-nums border-r border-white/5">
+                          {formatMoney(m.sanPedroFuelCfa)}
+                        </td>
+                        <td className="py-3 px-4 bg-orange-500/10 text-orange-300 font-mono font-bold text-right whitespace-nowrap tabular-nums">
+                          {formatMoney(m.abidjanFuelCfa)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 2B. TABLEAU DÉTAILLÉ DES SÉQUENCES DE TRAJETS (COLONNES COLORÉES & AÉRÉES) */}
+          {isDiagTableOpen && (
+            <div className="overflow-x-auto max-h-[460px] overflow-y-auto custom-scrollbar rounded-xl border border-white/15 bg-black/50 shadow-lg">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 z-10 text-[10px] font-black uppercase tracking-wider border-b border-white/15">
+                  <tr>
+                    <th className="py-3 px-3 bg-slate-900 text-slate-300 text-center border-r border-white/10">
+                      {isEn ? "Row" : "Ligne"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-blue-950 text-blue-200 border-r border-white/10">
+                      {isEn ? "Date" : "Date"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-slate-900 text-white border-r border-white/10">
+                      {isEn ? "Truck" : "Camion"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-slate-900 text-slate-200 border-r border-white/10">
+                      {isEn ? "Departure" : "Départ"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-slate-900 text-slate-200 border-r border-white/10">
+                      {isEn ? "Destination" : "Destination"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-teal-950 text-teal-200 text-center border-r border-white/10">
+                      {isEn ? "Corridor" : "Corridor"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-amber-950 text-amber-200 text-right border-r border-white/10">
+                      {isEn ? "Fuel (CFA)" : "Carburant (CFA)"}
+                    </th>
+                    <th className="py-3 px-3 bg-sky-950 text-sky-200 text-right border-r border-white/10">
+                      {isEn ? "Tonnage" : "Tonnage"}
+                    </th>
+                    <th className="py-3 px-3 bg-violet-950 text-violet-200 text-center border-r border-white/10">
+                      {isEn ? "Inactivity" : "Inactivité"}
+                    </th>
+                    <th className="py-3 px-3.5 bg-emerald-950 text-emerald-200 text-center">
+                      {isEn ? "Status / Alert" : "Statut / Alerte"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {displayedDiagnosticRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-10 text-center text-white/40 italic">
+                        {onlyAnomalies
+                          ? isEn
+                            ? `No sequence anomalies detected for a threshold of ${maxInactivityDays} days.`
+                            : `Aucune incohérence de séquence détectée pour un délai d'inactivité max. de ${maxInactivityDays} jours.`
+                          : isEn
+                          ? "No trips match the current filters."
+                          : "Aucun trajet ne correspond aux filtres sélectionnés."}
+                      </td>
+                    </tr>
+                  ) : (
+                    monthlyBreakdownStats.map((monthGroup) => (
+                      <React.Fragment key={monthGroup.monthKey}>
+                        {/* BANDEAU DE SÉPARATION DU MOIS AÉRÉ */}
+                        <tr className="bg-slate-900/95 border-y border-white/20">
+                          <td colSpan={10} className="py-2.5 px-4">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                              <span className="font-black text-blue-300 uppercase tracking-wide">
+                                📅 {monthGroup.monthLabel}
+                              </span>
+                              <span className="text-white/25">•</span>
+                              <span className="text-amber-300 font-bold">
+                                Total : <strong className="font-mono">{formatMoney(monthGroup.totalFuelCfa)}</strong>
+                              </span>
+                              <span className="text-white/25">•</span>
+                              <span className="text-violet-300 font-bold">
+                                {isEn ? "Total refuels :" : "Total prise :"}{" "}
+                                <strong className="font-mono">{monthGroup.refuelCount}</strong>
+                              </span>
+                              <span className="text-white/25">•</span>
+                              <span className="text-emerald-300 font-bold">
+                                {isEn ? "Highest :" : "Montant supérieur prise :"}{" "}
+                                <strong className="font-mono">{formatMoney(monthGroup.maxRefuelCfa)}</strong>
+                              </span>
+                              <span className="text-white/25">•</span>
+                              <span className="text-sky-300 font-bold">
+                                {isEn ? "Lowest :" : "Montant inférieur :"}{" "}
+                                <strong className="font-mono">{formatMoney(monthGroup.minRefuelCfa)}</strong>
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                        {monthGroup.records.map((row) => {
+                          const truckBadgeClass =
+                            row.truckKey === "AMARA"
+                              ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                              : row.truckKey === "BRAHIMA"
+                              ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                              : "bg-amber-500/20 text-amber-300 border-amber-500/30";
+
+                          return (
+                            <tr
+                              key={row.id}
+                              className={`transition-colors ${
+                                row.hasAnomaly
+                                  ? "bg-red-500/20 hover:bg-red-500/30 border-l-4 border-l-red-500"
+                                  : "hover:bg-white/[0.04]"
+                              }`}
+                            >
+                              {/* Colonne 1 : Ligne Sheet (Ardoise) */}
+                              <td className="py-3 px-3 text-center font-mono text-[11px] text-slate-400 bg-slate-500/5 border-r border-white/5 whitespace-nowrap">
+                                {row.sheetRow ? `#${row.sheetRow}` : "—"}
+                              </td>
+
+                              {/* Colonne 2 : Date (Bleu) */}
+                              <td className="py-3 px-3.5 font-mono font-bold text-[11px] text-blue-200 bg-blue-500/5 border-r border-white/5 whitespace-nowrap">
+                                {row.displayDate}
+                              </td>
+
+                              {/* Colonne 3 : Camion (Badge couleur dédié par camion) */}
+                              <td className="py-3 px-3.5 border-r border-white/5 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-md border text-[11px] font-black ${truckBadgeClass}`}
+                                >
+                                  {row.shortTruckLabel}
+                                </span>
+                              </td>
+
+                              {/* Colonne 4 : Départ */}
+                              <td
+                                className={`py-3 px-3.5 font-bold whitespace-nowrap border-r border-white/5 ${
+                                  row.hasAnomaly
+                                    ? "text-red-300 underline decoration-red-400"
+                                    : "text-white/90"
+                                }`}
+                              >
+                                {row.start}
+                              </td>
+
+                              {/* Colonne 5 : Destination */}
+                              <td className="py-3 px-3.5 text-white/80 whitespace-nowrap border-r border-white/5">
+                                {row.destination}
+                              </td>
+
+                              {/* Colonne 6 : Corridor (Turquoise San Pedro / Orange Abidjan) */}
+                              <td className="py-3 px-3.5 text-center whitespace-nowrap border-r border-white/5">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                    row.corridor === "ABIDJAN"
+                                      ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                                      : "bg-teal-500/20 text-teal-300 border border-teal-500/30"
+                                  }`}
+                                >
+                                  {row.corridorLabel}
+                                </span>
+                              </td>
+
+                              {/* Colonne 7 : Carburant CFA (Ambre / Or) */}
+                              <td className="py-3 px-3.5 text-right font-mono font-black text-amber-300 bg-amber-500/5 whitespace-nowrap tabular-nums border-r border-white/5">
+                                {row.fuelCostCfa > 0 ? formatMoney(row.fuelCostCfa) : <span className="text-white/25">—</span>}
+                              </td>
+
+                              {/* Colonne 8 : Tonnage (Bleu Ciel / Cyan) */}
+                              <td className="py-3 px-3 text-right font-mono font-bold text-sky-300 bg-sky-500/5 whitespace-nowrap tabular-nums border-r border-white/5">
+                                {row.tonnage > 0 ? `${row.tonnage} T` : <span className="text-white/25">—</span>}
+                              </td>
+
+                              {/* Colonne 9 : Inactivité (Violet / Rouge) */}
+                              <td className="py-3 px-3 text-center whitespace-nowrap bg-violet-500/5 border-r border-white/5">
+                                {row.inactivityDays > 1 ? (
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                      row.inactivityDays > maxInactivityDays
+                                        ? "bg-red-500/30 text-red-200 border border-red-500/50"
+                                        : "bg-violet-500/20 text-violet-200 border border-violet-500/30"
+                                    }`}
+                                    title={
+                                      row.previousActiveDate
+                                        ? `Dernière activité : ${row.previousActiveDate}`
+                                        : undefined
+                                    }
+                                  >
+                                    {row.inactivityDays} j
+                                  </span>
+                                ) : (
+                                  <span className="text-white/25">—</span>
+                                )}
+                              </td>
+
+                              {/* Colonne 10 : Statut / Alerte (Vert OK / Rouge Anomalie) */}
+                              <td className="py-3 px-3.5 text-center">
+                                {row.hasAnomaly ? (
+                                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/25 border border-red-500/50 text-red-200 font-black text-[11px] text-left">
+                                    <AlertTriangle className="size-3.5 text-red-400 shrink-0" />
+                                    <span>{row.alertStatus}</span>
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 font-black text-[10px]">
+                                    <CheckCircle2 className="size-3" />
+                                    <span>OK</span>
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -624,22 +1235,14 @@ export function FuelAdvanceDashboardWidget({
                     onChange={(e) => setSelectedAdvanceId(e.target.value)}
                     className="bg-transparent text-amber-300 font-bold text-xs focus:outline-none cursor-pointer"
                   >
-                    <option value="adv-auto-465" className="bg-[#1c1c1e] text-white">
-                      ⭐ {isEn ? "Advance 4,000,000 CFA (15/09)" : "Avance 4 000 000 CFA (15/09)"}
-                    </option>
-                    <option value="adv-auto-472" className="bg-[#1c1c1e] text-white">
-                      {isEn ? "Advance 2,500,000 CFA (22/09)" : "Avance 2 500 000 CFA (22/09)"}
-                    </option>
                     <option value={RUNNING_ACCOUNT_ID} className="bg-[#1c1c1e] text-white">
-                      {isEn ? "🔄 Running Account (Sept. 6.5M)" : "🔄 Compte Courant (Sept. 6,5M)"}
+                      🔄 {isEn ? "Running Account (Sept.–Oct. 12.5M)" : "Compte Courant (Sept.–Oct. 12,5M)"}
                     </option>
-                    {summary.recentAdvances
-                      .filter(a => a.id !== "adv-auto-465" && a.id !== "adv-auto-472")
-                      .map(a => (
-                        <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
-                          {a.amount.toLocaleString()} CFA ({a.date})
-                        </option>
-                      ))}
+                    {summary.recentAdvances.map(a => (
+                      <option key={a.id} value={a.id} className="bg-[#1c1c1e] text-white">
+                        {a.amount.toLocaleString()} CFA — {a.station} ({a.date})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -753,30 +1356,37 @@ export function FuelAdvanceDashboardWidget({
             )}
 
             {/* BANDEAU SYNTHÈSE DU DÉCOMPTE SÉLECTIONNÉ */}
-            <div className="p-4 rounded-2xl bg-white/3 border border-white/5 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-white/3 border border-white/5 mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
                 <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Advance Amount" : "Montant Avance"}</p>
-                <p className="text-lg font-black text-amber-400">{formatMoney(summary.advanceAmount)}</p>
+                <p className="text-base sm:text-lg font-black text-amber-400">{formatMoney(summary.advanceAmount)}</p>
                 <p className="text-[9px] text-white/30">{summary.activeStation}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Total Fleet Fuel" : "Gasoil Total Flotte"}</p>
-                <p className="text-lg font-black text-white">{formatMoney(summary.totalFuelLogged)}</p>
-                <p className="text-[9px] text-white/30">{isEn ? "Total recorded" : "Consommation brute"}</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase">{isEn ? "Total Fleet Fuel" : "Gasoil Brut Flotte"}</p>
+                <p className="text-base sm:text-lg font-black text-white">{formatMoney(summary.totalFuelLogged)}</p>
+                <p className="text-[9px] text-white/30">{isEn ? "San Pedro + Abidjan" : "San Pedro + Abidjan"}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase">{isEn ? "Paid Directly" : "Payé Directement"}</p>
-                <p className="text-lg font-black text-emerald-400">-{formatMoney(summary.totalDirectPaidFuel)}</p>
+                <p className="text-[10px] font-bold text-orange-400 uppercase">{isEn ? "Abidjan Fuel (Excl.)" : "Carburant Abidjan (Exclu)"}</p>
+                <p className="text-base sm:text-lg font-black text-orange-400">-{formatMoney(summary.totalAbidjanFuelExcluded)}</p>
+                <p className="text-[9px] text-orange-400/60">{isEn ? "Not deducted from Shell" : "Non déduit de Shell"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase">{isEn ? "Paid Directly (Excl.)" : "Payé Direct Hors Shell"}</p>
+                <p className="text-base sm:text-lg font-black text-emerald-400">-{formatMoney(summary.totalDirectPaidFuel)}</p>
                 <p className="text-[9px] text-emerald-400/60">{isEn ? "Excluded from station" : "Exclu de l'avance Shell"}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold text-white/40 uppercase">
                   {isOverdrawn ? (isEn ? "Remaining Due" : "Reste à Régler") : (isEn ? "Available Balance" : "Solde Dépôt Restant")}
                 </p>
-                <p className={`text-lg font-black ${isOverdrawn ? 'text-red-400' : 'text-emerald-400'}`}>
+                <p className={`text-base sm:text-lg font-black ${isOverdrawn ? 'text-red-400' : 'text-emerald-400'}`}>
                   {isOverdrawn ? `-${formatMoney(summary.totalAmountDue)}` : `+${formatMoney(summary.currentDepositBalance)}`}
                 </p>
-                <p className="text-[9px] text-white/30">{summary.estimatedDaysCoverage} {isEn ? "days reserve" : "j autonomie"}</p>
+                <p className="text-[9px] text-white/40">
+                  {isEn ? "Deducted:" : "Décompté :"} {formatMoney(summary.fuelConsumed)}
+                </p>
               </div>
             </div>
 
@@ -787,7 +1397,7 @@ export function FuelAdvanceDashboardWidget({
                   <thead className="sticky top-0 bg-[#161618] z-10">
                     <tr className="border-b border-white/8 text-white/40 text-[10px] uppercase font-black">
                       <th className="py-2.5 px-3">{isEn ? "Date" : "Date"}</th>
-                      <th className="py-2.5 px-3">{isEn ? "Refuel Description / Analysis" : "Ravitaillement Flotte / Analyse"}</th>
+                      <th className="py-2.5 px-3">{isEn ? "Refuel Description / Analysis (Cols M & N)" : "Ravitaillement Flotte / Analyse (Cols M & N)"}</th>
                       <th className="py-2.5 px-3 text-right">{isEn ? "Station Drawdown" : "Décompté Station"}</th>
                       <th className="py-2.5 px-3 text-right">{isEn ? "Advance Balance" : "Solde de l'Avance"}</th>
                       <th className="py-2.5 px-3 text-center">{isEn ? "Status" : "Statut"}</th>
@@ -806,21 +1416,31 @@ export function FuelAdvanceDashboardWidget({
                           <td className="py-2.5 px-3 text-white/70 font-mono text-[11px] whitespace-nowrap">{log.date}</td>
                           <td className="py-2.5 px-3 max-w-sm">
                             <p className="text-white/80 truncate">{log.comment}</p>
-                            {log.isDirectPayment && (
-                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              {log.advanceAddedAmount && log.advanceAddedAmount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  💰 +{formatMoney(log.advanceAddedAmount)} ({isEn ? "Advance credited" : "Avance créditée"})
+                                </span>
+                              )}
+                              {log.isAbidjanExcluded && (log.abidjanFuelAmount || 0) > 0 && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                                  🚫 {log.abidjanExclusionNote || (isEn ? "Abidjan fuel excluded:" : "Carburant Abidjan exclu :")} -{formatMoney(log.abidjanFuelAmount)}
+                                </span>
+                              )}
+                              {log.isDirectPayment && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                                   ⛽ {log.directPaymentNote || (isEn ? "Paid directly outside station:" : "Payé directement hors station :")} -{formatMoney(log.directPaymentAmount)}
                                 </span>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             <div className="font-bold text-orange-400">
                               -{formatMoney(log.stationDrawdownAmount)}
                             </div>
-                            {log.isDirectPayment && (
+                            {(log.isDirectPayment || log.isAbidjanExcluded) && (
                               <div className="text-[9px] text-white/40">
-                                ({isEn ? "Total:" : "Total :"} {formatMoney(log.amount)})
+                                ({isEn ? "Gross:" : "Brut :"} {formatMoney(log.amount)})
                               </div>
                             )}
                           </td>
@@ -831,9 +1451,11 @@ export function FuelAdvanceDashboardWidget({
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              log.isDirectPayment && log.stationDrawdownAmount === 0
+                              log.isAbidjanExcluded && log.stationDrawdownAmount === 0
+                                ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30'
+                                : log.isDirectPayment && log.stationDrawdownAmount === 0
                                 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                                : log.isDirectPayment
+                                : log.isDirectPayment || log.isAbidjanExcluded
                                 ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                                 : log.status === 'covered' 
                                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
@@ -841,8 +1463,12 @@ export function FuelAdvanceDashboardWidget({
                                 ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' 
                                 : 'bg-red-500/15 text-red-400 border border-red-500/30'
                             }`}>
-                              {log.isDirectPayment && log.stationDrawdownAmount === 0
+                              {log.isAbidjanExcluded && log.stationDrawdownAmount === 0
+                                ? (isEn ? "100% Abidjan (0 Shell)" : "100% Abidjan (0 Shell)")
+                                : log.isDirectPayment && log.stationDrawdownAmount === 0
                                 ? (isEn ? "100% Direct" : "100% Direct")
+                                : log.isAbidjanExcluded
+                                ? (isEn ? "Abidjan Excl." : "Abidjan Exclu")
                                 : log.isDirectPayment
                                 ? (isEn ? "Partially Direct" : "Partiel Station")
                                 : log.status === 'covered' 

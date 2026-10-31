@@ -1,15 +1,40 @@
 import { useMemo, useState } from 'react';
 import { Route, Truck, Maximize2, Minimize2 } from 'lucide-react';
 
-const FLEET_INFO = {
-  "AMARA": { driver: "AMARA", plate: "AA-672-PS", truckNum: "TRUCK 76", color: "text-blue-400", bg: "bg-blue-400" },
-  "BRAHIMA": { driver: "BRAHIMA", plate: "AA-736-PK", truckNum: "TRUCK 45", color: "text-emerald-400", bg: "bg-emerald-400" },
-  "SORO": { driver: "SORRO", plate: "AA-579-PJ", truckNum: "TRUCK 52", color: "text-[#cf5d56]", bg: "bg-[#cf5d56]" },
-  "SORRO": { driver: "SORRO", plate: "AA-579-PJ", truckNum: "TRUCK 52", color: "text-[#cf5d56]", bg: "bg-[#cf5d56]" }
-};
 
-export function FleetTrackerWidget({ records, t }) {
+export function FleetTrackerWidget({ records, drivers = [], t }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+
+  const dynamicFleetInfo = useMemo(() => {
+    const info = {};
+    const defaultColors = [
+      { color: "text-blue-400", bg: "bg-blue-400" },
+      { color: "text-emerald-400", bg: "bg-emerald-400" },
+      { color: "text-[#cf5d56]", bg: "bg-[#cf5d56]" },
+      { color: "text-purple-400", bg: "bg-purple-400" },
+      { color: "text-amber-400", bg: "bg-amber-400" },
+    ];
+    
+    drivers.forEach((d, i) => {
+      const key = d.name.toUpperCase();
+      const style = defaultColors[i % defaultColors.length];
+      info[key] = {
+        driver: key,
+        plate: d.vehicle || "N/A",
+        truckNum: d.sdv || "TRUCK",
+        color: style.color,
+        bg: style.bg
+      };
+    });
+    
+    // Add fallback for SORRO
+    if (info["SORO"] && !info["SORRO"]) {
+      info["SORRO"] = { ...info["SORO"], driver: "SORRO" };
+    }
+    
+    return info;
+  }, [drivers]);
 
   const trackerData = useMemo(() => {
     const data = {};
@@ -28,7 +53,7 @@ export function FleetTrackerWidget({ records, t }) {
 
       if (!data[driverKey]) {
         // On ajoute un champ lastDate pour l'affichage
-        data[driverKey] = { km: 0, info: FLEET_INFO[driverKey], lastDate: null };
+        data[driverKey] = { km: 0, info: dynamicFleetInfo[driverKey], lastDate: null };
       }
       
       // 💡 LE SECRET EST ICI : Au lieu de +=, on utilise =
@@ -51,7 +76,7 @@ export function FleetTrackerWidget({ records, t }) {
   if (trackerData.list.length === 0) return null;
 
   return (
-    <div className={`relative transition-all duration-500 rounded-[30px] overflow-hidden border border-white/5 ${isFullscreen ? 'fixed inset-0 z-[500] m-4' : 'h-full w-full min-h-[500px] md:min-h-[600px]'}`}>
+    <div className={`relative transition-all duration-500 rounded-[30px] overflow-hidden border border-white/5 ${isFullscreen ? 'fixed inset-0 z-[500] m-4' : 'h-full w-full '}`}>
       
       {/* PARTIE 1 : LA CARTE GPS FNIOT (Iframe) en plein écran */}
       <div className="absolute inset-0 w-full h-full bg-[#111] overflow-hidden">

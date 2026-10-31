@@ -113,6 +113,11 @@ export const TRANSLATIONS = {
     vol: "Vol",
     prof: "Prof",
     fleetSatellite: "Liaison Satellite FNIOT",
+    currentMonth: "Mois en cours",
+    liveOps: "Opérations en direct",
+    totalTonnage: "Chargements",
+    netRevenue: "Chiffre d'Affaires Net",
+    calendar: "Calendrier",
 
     // Active Trends
     totalLoadedMonth: "Total Chargé ce Mois",
@@ -341,6 +346,16 @@ export const TRANSLATIONS = {
     commentPlaceholder: "Ex: Facture révision ou encaissement...",
     optionalDriveLink: "Lien Google Drive (Optionnel)",
     addClientInvoice: "Ajouter une Facture Client",
+
+    // Réconciliation Partenaire CML
+    cmlPartnerTab: "Partenaire CML (Lauzua)",
+    cmlReconciliation: "Réconciliation Financière Partenaire CML",
+    cmlTotalBilled: "Total Transport Facturé CML",
+    cmlTotalPaid: "Total Encaissé / Payé par CML",
+    cmlRemainingDue: "Reste à Payer (Créance CML)",
+    cmlPendingDepositNote: "facture restant à déposer",
+    cmlCorridorSanPedro: "Mine de Lauzua -> San Pedro",
+    cmlCorridorAbidjan: "Mine de Lauzua -> Abidjan",
 
     // Dépôts & Avances Carburant & Trésorerie
     fuelAdvancesTab: "Dépôts & Avances Carburant",
@@ -580,6 +595,11 @@ export const TRANSLATIONS = {
     vol: "Vol",
     prof: "Prof",
     fleetSatellite: "FNIOT Satellite Link",
+    currentMonth: "Current Month",
+    liveOps: "Live",
+    totalTonnage: "Tonnage Loaded",
+    netRevenue: "Net Turnover",
+    calendar: "Calendar",
 
     // Active Trends
     totalLoadedMonth: "Total Hauled this Month",
@@ -808,6 +828,16 @@ export const TRANSLATIONS = {
     commentPlaceholder: "Ex: Service invoice or customer payment...",
     optionalDriveLink: "Google Drive Link (Optional)",
     addClientInvoice: "Add Client Invoice",
+
+    // CML Partner Reconciliation
+    cmlPartnerTab: "CML Partner (Lauzua)",
+    cmlReconciliation: "CML Partner Financial Reconciliation",
+    cmlTotalBilled: "Total CML Transport Billed",
+    cmlTotalPaid: "Total Collected / Paid by CML",
+    cmlRemainingDue: "Outstanding Balance Due from CML",
+    cmlPendingDepositNote: "invoice pending submission",
+    cmlCorridorSanPedro: "Lauzua Mine -> San Pedro",
+    cmlCorridorAbidjan: "Lauzua Mine -> Abidjan",
 
     // Fuel Advances, Deposits & Cash Reconciliation
     fuelAdvancesTab: "Fuel Advances & Deposits",

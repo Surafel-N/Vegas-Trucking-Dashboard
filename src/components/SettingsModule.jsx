@@ -38,7 +38,9 @@ export function SettingsModule({
   onPurgeRange,
   onPurgeMaintenance,
   t,
-  language = "FR"
+  language = "FR",
+  canEdit = true,
+  canDelete = false
 }) {
   const isEn = language === "EN";
   const [activeTab, setActiveSection] = useState("drivers");
@@ -167,8 +169,8 @@ export function SettingsModule({
           </div>
           {["drivers", "vehicles", "destinations"].includes(activeTab) && (
             <button 
-              onClick={activeTab === "drivers" ? addDriver : activeTab === "vehicles" ? addVehicle : addDestination}
-              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full border border-white/10 text-sm transition"
+              onClick={canEdit ? (activeTab === "drivers" ? addDriver : activeTab === "vehicles" ? addVehicle : addDestination) : null}
+              disabled={!canEdit} className="disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full border border-white/10 text-sm transition"
             >
               <Plus className="size-4" /> {isEn ? "Add" : "Ajouter"}
             </button>
@@ -188,7 +190,7 @@ export function SettingsModule({
                     <p className="text-xs text-white/30">{driver.sdv}</p>
                   </div>
                 </div>
-                <button onClick={() => removeDriver(driver.id)} className="p-2 text-white/20 hover:text-red-400 transition">
+                <button onClick={() => removeDriver(driver.id)} disabled={!canDelete} className="disabled:opacity-20 disabled:cursor-not-allowed p-2 text-white/20 hover:text-red-400 transition">
                   <Trash2 className="size-4" />
                 </button>
               </div>
@@ -207,7 +209,7 @@ export function SettingsModule({
                     <p className="text-xs text-white/30">{v.model}</p>
                   </div>
                 </div>
-                <button onClick={() => removeVehicle(v.id)} className="p-2 text-white/20 hover:text-red-400 transition">
+                <button onClick={() => removeVehicle(v.id)} disabled={!canDelete} className="disabled:opacity-20 disabled:cursor-not-allowed p-2 text-white/20 hover:text-red-400 transition">
                   <Trash2 className="size-4" />
                 </button>
               </div>
@@ -220,7 +222,7 @@ export function SettingsModule({
             {destinationsList.map(dest => (
               <div key={dest} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                 <span className="font-medium">{dest}</span>
-                <button onClick={() => removeDestination(dest)} className="text-white/20 hover:text-red-400 transition">
+                <button onClick={() => removeDestination(dest)} disabled={!canDelete} className="disabled:opacity-20 disabled:cursor-not-allowed text-white/20 hover:text-red-400 transition">
                   <Trash2 className="size-4" />
                 </button>
               </div>
@@ -236,7 +238,7 @@ export function SettingsModule({
                 <input 
                   type="number" 
                   value={businessRules.voyageThreshold} 
-                  onChange={(e) => updateRule("voyageThreshold", e.target.value)}
+                  disabled={!canEdit} onChange={(e) => updateRule("voyageThreshold", e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#cf5d56]"
                 />
               </label>
@@ -246,7 +248,7 @@ export function SettingsModule({
                   type="number" 
                   step="0.01"
                   value={businessRules.targetMargin} 
-                  onChange={(e) => updateRule("targetMargin", e.target.value)}
+                  disabled={!canEdit} onChange={(e) => updateRule("targetMargin", e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[#cf5d56]"
                 />
               </label>
@@ -365,7 +367,7 @@ export function SettingsModule({
                 </div>
                   <button 
                     onClick={() => onPurgeRange(purgeRange.start, purgeRange.end, purgeRange.year)}
-                    className="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all"
                   >
                     {isEn ? "Purge this period" : "Purger cette période"}
                   </button>
@@ -400,23 +402,23 @@ export function SettingsModule({
                   </div>
                   <button 
                     onClick={() => onPurgeMaintenance(maintPurge.year, maintPurge.month, maintPurge.day)}
-                    className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
                   >
                     {isEn ? "Purge Maintenance" : "Purger Maintenances"}
                   </button>
                 </div>
                 
                 <button 
-                  onClick={onPurgeTrips}
-                  className="w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
+                  onClick={onPurgeTrips} disabled={!canDelete}
+                  className="disabled:opacity-50 disabled:cursor-not-allowed w-full py-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-500 font-bold hover:bg-orange-500/20 transition-all flex items-center justify-center gap-3 mb-4"
                 >
                   <Database className="size-5" />
                   {isEn ? "PURGE ONLY TRIPS (2026)" : "PURGER UNIQUEMENT LES TRAJETS (2026)"}
                 </button>
 
               <button 
-                onClick={onClearAllStorage}
-                className="w-full py-4 rounded-2xl bg-red-500 text-white font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center justify-center gap-3"
+                onClick={onClearAllStorage} disabled={!canDelete}
+                className="disabled:opacity-50 disabled:cursor-not-allowed w-full py-4 rounded-2xl bg-red-500 text-white font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center justify-center gap-3"
               >
                 <Trash2 className="size-5" />
                 {isEn ? "RESET ALL DATA" : "RÉINITIALISER TOUTES LES DONNÉES"}

@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { type Language, translateComment } from '../utils/i18n';
 import { isSalaryRecord } from '../utils/salaryFilter';
+import { resolveTripFuelCorridor } from '../utils/fuelBreakdownDiagnostic';
 
 // Helper extraction Google Drive
 function getDriveId(link: string | null | undefined): string | null {
@@ -604,11 +605,7 @@ export function QuantumExpenseAnalysis({
 
       const tObj = trucksData[key];
       const fuelVal = Number(r.fuel_cost_cfa) || 0;
-      const dest = String(r.destination || "").toLowerCase();
-      const start = String(r.start || "").toLowerCase();
-      const comment = String(r.comments || r.comment || "").toLowerCase();
-
-      const isAbidjan = dest.includes("abidjan") || (!dest.includes("pedro") && (start.includes("abidjan") || comment.includes("abidjan")));
+      const isAbidjan = resolveTripFuelCorridor(r) === "ABIDJAN";
 
       tObj.ca += Number(r.total_gross_cfa) || 0;
       tObj.fuel += fuelVal;
@@ -939,158 +936,6 @@ export function QuantumExpenseAnalysis({
       </div>
 
       {/* ======================================================== */}
-      {/* 2. ZONE DONUT COMPARATIF + SYNTHÈSE GLOBALE */}
-      {/* ======================================================== */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
-        
-        {/* LE DONUT INTERACTIF (4 COLONNES) */}
-        <div className="xl:col-span-4 relative flex items-center justify-center min-h-[300px] w-full">
-          <div className="relative w-full h-[300px] max-w-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip content={() => null} />
-                <Pie 
-                  data={activeDonutData} 
-                  innerRadius={85} 
-                  outerRadius={120} 
-                  paddingAngle={3} 
-                  dataKey="value" 
-                  stroke="#1c1c1e"
-                  strokeWidth={3}
-                  animationBegin={0}
-                  animationDuration={800}
-                  onMouseEnter={(_, index) => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(null)}
-                >
-                  {activeDonutData.map((entry, index) => {
-                    const isHovered = activeIndex === index;
-                    return (
-                      <Cell 
-                        key={entry.id} 
-                        fill={entry.color} 
-                        opacity={activeIndex === null || isHovered ? 1 : 0.4}
-                        className="transition-all duration-300 cursor-pointer"
-                        style={{
-                          filter: isHovered ? `drop-shadow(0 0 10px ${entry.color})` : 'none',
-                          transform: isHovered ? 'scale(1.03)' : 'scale(1)',
-                          transformOrigin: 'center center'
-                        }}
-                      />
-                    );
-                  })}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-
-            {/* CENTRE DYNAMIQUE DU DONUT */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
-              {hoveredSlice ? (
-                <div className="animate-in fade-in zoom-in-95 duration-150 flex flex-col items-center">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <div className="size-2 rounded-full" style={{ backgroundColor: hoveredSlice.color }} />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-white truncate max-w-[150px]">
-                      {hoveredSlice.name}
-                    </span>
-                  </div>
-                  <p className="text-lg font-black font-mono text-white tracking-tight leading-none my-1">
-                    {formatMoney(hoveredSlice.value)}
-                  </p>
-                  <span 
-                    className="inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full font-mono"
-                    style={{ backgroundColor: `${hoveredSlice.color}25`, color: hoveredSlice.color }}
-                  >
-                    {hoveredSlice.percent.toFixed(1)}% {language === 'EN' ? "of costs" : "des coûts"}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] mb-1">
-                    {perspective === "driver" 
-                      ? (language === 'EN' ? "Total Fleet Costs" : "Coûts Flotte Totaux") 
-                      : (language === 'EN' ? "Total Expenses" : "Dépenses Totales")}
-                  </p>
-                  <span className="text-xl font-black font-mono text-white tracking-tight drop-shadow-lg">
-                    {formatMoney(financialModel.totalFleetExpenses)}
-                  </span>
-                  <span className="inline-block mt-1 text-[8px] font-bold text-white/40 uppercase tracking-widest">
-                    {activeDonutData.length} {language === 'EN' ? "active entities" : "entités actives"}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* PANNEAU BILAN GLOBALE DE LA PÉRIODE (8 COLONNES) */}
-        <div className="xl:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          
-          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/8 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">
-              {language === 'EN' ? "Global Revenue" : "C.A. Global"}
-            </span>
-            <p className="text-lg font-black font-mono text-white mt-2">
-              {formatMoney(financialModel.totalFleetCA)}
-            </p>
-            <span className="text-[9px] text-white/30 font-medium mt-1">
-              {language === 'EN' ? "Total revenue generated" : "Revenu total généré"}
-            </span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-cyan-500/[0.04] border border-cyan-500/20 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">
-                {language === 'EN' ? "Total Fuel" : "Total Gasoil"}
-              </span>
-              <span className="text-[8px] font-bold text-cyan-400/60">
-                {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% {language === 'EN' ? "of CA" : "du C.A."}
-              </span>
-            </div>
-            <p className="text-lg font-black font-mono text-cyan-300 mt-1.5">
-              {formatMoney(financialModel.totalFleetFuel)}
-            </p>
-            <div className="mt-2 pt-2 border-t border-cyan-500/15 space-y-1 text-[9px]">
-              <div className="flex items-center justify-between text-teal-300">
-                <span className="font-bold">⛽ San Pedro ({financialModel.totalFleetTripsSanPedro}) :</span>
-                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelSanPedro)}</span>
-              </div>
-              <div className="flex items-center justify-between text-orange-300">
-                <span className="font-bold">⛽ Abidjan ({financialModel.totalFleetTripsAbidjan}) :</span>
-                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelAbidjan)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">
-              {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
-            </span>
-            <p className="text-lg font-black font-mono text-amber-300 mt-2">
-              {formatMoney(financialModel.totalFleetMaintenance)}
-            </p>
-            <span className="text-[9px] text-amber-400/50 font-medium mt-1">
-              {language === 'EN' ? "Repairs & parts" : "Réparations & pièces"}
-            </span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/20 flex flex-col justify-between">
-            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">
-              {language === 'EN' ? "Fleet Net Profit" : "Bénéfice Net Flotte"}
-            </span>
-            <p className={`text-lg font-black font-mono mt-2 ${
-              financialModel.totalFleetNet >= 0 ? "text-[#30D158]" : "text-red-400"
-            }`}>
-              {formatMoney(financialModel.totalFleetNet)}
-            </p>
-            <span className="text-[9px] text-emerald-400/60 font-bold mt-1">
-              {language === 'EN' ? "Net Margin: " : "Marge Nette : "}{financialModel.totalFleetMargin.toFixed(1)}%
-            </span>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* ======================================================== */}
       {/* 3. VUE PRINCIPALE : LES 3 CARTES DÉTAILLÉES PAR CAMION   */}
       {/* ======================================================== */}
       {perspective === "driver" && (
@@ -1360,6 +1205,158 @@ export function QuantumExpenseAnalysis({
           </div>
         </div>
       )}
+
+      {/* ======================================================== */}
+      {/* 2. ZONE DONUT COMPARATIF + SYNTHÈSE GLOBALE */}
+      {/* ======================================================== */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
+        
+        {/* LE DONUT INTERACTIF (4 COLONNES) */}
+        <div className="xl:col-span-4 relative flex items-center justify-center min-h-[300px] w-full">
+          <div className="relative w-full h-[300px] max-w-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip content={() => null} />
+                <Pie 
+                  data={activeDonutData} 
+                  innerRadius={85} 
+                  outerRadius={120} 
+                  paddingAngle={3} 
+                  dataKey="value" 
+                  stroke="#1c1c1e"
+                  strokeWidth={3}
+                  animationBegin={0}
+                  animationDuration={800}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                >
+                  {activeDonutData.map((entry, index) => {
+                    const isHovered = activeIndex === index;
+                    return (
+                      <Cell 
+                        key={entry.id} 
+                        fill={entry.color} 
+                        opacity={activeIndex === null || isHovered ? 1 : 0.4}
+                        className="transition-all duration-300 cursor-pointer"
+                        style={{
+                          filter: isHovered ? `drop-shadow(0 0 10px ${entry.color})` : 'none',
+                          transform: isHovered ? 'scale(1.03)' : 'scale(1)',
+                          transformOrigin: 'center center'
+                        }}
+                      />
+                    );
+                  })}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* CENTRE DYNAMIQUE DU DONUT */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+              {hoveredSlice ? (
+                <div className="animate-in fade-in zoom-in-95 duration-150 flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="size-2 rounded-full" style={{ backgroundColor: hoveredSlice.color }} />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-white truncate max-w-[150px]">
+                      {hoveredSlice.name}
+                    </span>
+                  </div>
+                  <p className="text-lg font-black font-mono text-white tracking-tight leading-none my-1">
+                    {formatMoney(hoveredSlice.value)}
+                  </p>
+                  <span 
+                    className="inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full font-mono"
+                    style={{ backgroundColor: `${hoveredSlice.color}25`, color: hoveredSlice.color }}
+                  >
+                    {hoveredSlice.percent.toFixed(1)}% {language === 'EN' ? "of costs" : "des coûts"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] mb-1">
+                    {perspective === "driver" 
+                      ? (language === 'EN' ? "Total Fleet Costs" : "Coûts Flotte Totaux") 
+                      : (language === 'EN' ? "Total Expenses" : "Dépenses Totales")}
+                  </p>
+                  <span className="text-xl font-black font-mono text-white tracking-tight drop-shadow-lg">
+                    {formatMoney(financialModel.totalFleetExpenses)}
+                  </span>
+                  <span className="inline-block mt-1 text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                    {activeDonutData.length} {language === 'EN' ? "active entities" : "entités actives"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* PANNEAU BILAN GLOBALE DE LA PÉRIODE (8 COLONNES) */}
+        <div className="xl:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/8 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">
+              {language === 'EN' ? "Global Revenue" : "C.A. Global"}
+            </span>
+            <p className="text-lg font-black font-mono text-white mt-2">
+              {formatMoney(financialModel.totalFleetCA)}
+            </p>
+            <span className="text-[9px] text-white/30 font-medium mt-1">
+              {language === 'EN' ? "Total revenue generated" : "Revenu total généré"}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-cyan-500/[0.04] border border-cyan-500/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase text-cyan-400 tracking-wider">
+                {language === 'EN' ? "Total Fuel" : "Total Gasoil"}
+              </span>
+              <span className="text-[8px] font-bold text-cyan-400/60">
+                {((financialModel.totalFleetFuel / (financialModel.totalFleetCA || 1)) * 100).toFixed(1)}% {language === 'EN' ? "of CA" : "du C.A."}
+              </span>
+            </div>
+            <p className="text-lg font-black font-mono text-cyan-300 mt-1.5">
+              {formatMoney(financialModel.totalFleetFuel)}
+            </p>
+            <div className="mt-2 pt-2 border-t border-cyan-500/15 space-y-1 text-[9px]">
+              <div className="flex items-center justify-between text-teal-300">
+                <span className="font-bold">⛽ San Pedro ({financialModel.totalFleetTripsSanPedro}) :</span>
+                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelSanPedro)}</span>
+              </div>
+              <div className="flex items-center justify-between text-orange-300">
+                <span className="font-bold">⛽ Abidjan ({financialModel.totalFleetTripsAbidjan}) :</span>
+                <span className="font-mono font-black">{formatMoney(financialModel.totalFleetFuelAbidjan)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">
+              {language === 'EN' ? "Total Maintenance" : "Total Maintenance"}
+            </span>
+            <p className="text-lg font-black font-mono text-amber-300 mt-2">
+              {formatMoney(financialModel.totalFleetMaintenance)}
+            </p>
+            <span className="text-[9px] text-amber-400/50 font-medium mt-1">
+              {language === 'EN' ? "Repairs & parts" : "Réparations & pièces"}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-500/[0.04] border border-emerald-500/20 flex flex-col justify-between">
+            <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">
+              {language === 'EN' ? "Fleet Net Profit" : "Bénéfice Net Flotte"}
+            </span>
+            <p className={`text-lg font-black font-mono mt-2 ${
+              financialModel.totalFleetNet >= 0 ? "text-[#30D158]" : "text-red-400"
+            }`}>
+              {formatMoney(financialModel.totalFleetNet)}
+            </p>
+            <span className="text-[9px] text-emerald-400/60 font-bold mt-1">
+              {language === 'EN' ? "Net Margin: " : "Marge Nette : "}{financialModel.totalFleetMargin.toFixed(1)}%
+            </span>
+          </div>
+
+        </div>
+
+      </div>
 
       {/* ======================================================== */}
       {/* 4. VUE PAR NATURE (GRILLE DÉTAILLÉE DES POSTES DE COÛTS) */}

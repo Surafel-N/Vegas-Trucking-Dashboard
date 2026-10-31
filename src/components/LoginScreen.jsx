@@ -1,21 +1,32 @@
 import React, { useState } from 'react';
 import { Truck, Lock, ArrowRight } from 'lucide-react';
-import { PASSWORDS } from '../utils/auth';
 
 export default function LoginScreen({ onLogin }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const user = PASSWORDS[code.toUpperCase()]; // Accepte les minuscules/majuscules
-    
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Code d\'accès invalide');
-      setCode('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim().toUpperCase() })
+      });
+      
+      if (res.ok) {
+        const user = await res.json();
+        onLogin(user);
+      } else {
+        setError('Code d\'accès invalide');
+        setCode('');
+      }
+    } catch (err) {
+      setError('Erreur de connexion');
     }
+    setLoading(false);
   };
 
   return (
@@ -49,9 +60,12 @@ export default function LoginScreen({ onLogin }) {
 
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#cf5d56] py-3 font-bold text-white transition-all hover:bg-[#b04a44]"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#cf5d56] py-3 font-bold text-white transition-all hover:bg-[#b04a44] disabled:opacity-50"
           >
-            Se connecter <ArrowRight className="size-4" />
+            {loading ? "Connexion..." : (
+              <>Se connecter <ArrowRight className="size-4" /></>
+            )}
           </button>
         </form>
 

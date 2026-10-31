@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { QuantumExpenseAnalysis } from "./QuantumExpenseAnalysis";
 import { 
   Cloud, 
   CloudUpload, 
@@ -46,7 +47,7 @@ const initialFormState = {
   manualDriveLink: ""
 };
 
-export default function ExpenseModule({ expenses = [], setExpenses, drivers = [], formatCurrency, onSync, isSyncing, t, language = 'FR' }) {
+export default function ExpenseModule({ expenses = [], setExpenses, drivers = [], maintenanceRecords = [], trips = [], formatCurrency, onSync, isSyncing, t, language = 'FR' }) {
   const isEn = language === 'EN';
   const locale = isEn ? 'en-US' : 'fr-FR';
   const safeExpenses = expenses || [];
@@ -265,7 +266,11 @@ export default function ExpenseModule({ expenses = [], setExpenses, drivers = []
       {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3"><AlertCircle className="size-5" /><p className="text-sm font-medium">{error}</p></div>}
       {success && <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-2xl flex items-center gap-3"><CheckCircle2 className="size-5" /><p className="text-sm font-medium">{success}</p></div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <div className="mb-6">
+        <QuantumExpenseAnalysis data={trips} allTrips={trips} maintenanceRecords={maintenanceRecords} allMaintenanceRecords={maintenanceRecords} drivers={drivers} formatCurrency={formatCurrency} t={t} language={language} />
+      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* FORM */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-[#181818] border border-white/5 rounded-[30px] p-8 shadow-2xl relative overflow-hidden">

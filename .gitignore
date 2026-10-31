@@ -12,3 +12,6 @@ __pycache__/
 .vscode
 .idea
 *.log
+data/whatsapp_auth_session/
+data/whatsapp_uploads/
+data/whatsapp_inbox.json

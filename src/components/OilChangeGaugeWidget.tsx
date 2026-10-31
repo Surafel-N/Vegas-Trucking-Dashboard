@@ -29,9 +29,9 @@ const FLEET_DEFINITIONS = [
     driver: "AMARA",
     unit: "76",
     plate: "AA-672-PS",
-    fallbackKm: 117324,
-    defaultServiceKm: 100312,
-    defaultServiceDate: "2026-04-16",
+    fallbackKm: 125325,
+    defaultServiceKm: 123930,
+    defaultServiceDate: "2026-10-13",
     color: "#4285F4"
   },
   {
@@ -40,9 +40,9 @@ const FLEET_DEFINITIONS = [
     driver: "BRAHIMA",
     unit: "45",
     plate: "AA-736-PK",
-    fallbackKm: 110593,
-    defaultServiceKm: 93962,
-    defaultServiceDate: "2026-04-16",
+    fallbackKm: 120334,
+    defaultServiceKm: 117572,
+    defaultServiceDate: "2026-10-13",
     color: "#34A853"
   },
   {
@@ -51,9 +51,9 @@ const FLEET_DEFINITIONS = [
     driver: "SORO",
     unit: "52",
     plate: "AA-579-PJ",
-    fallbackKm: 110975,
-    defaultServiceKm: 91000,
-    defaultServiceDate: "2026-04-24",
+    fallbackKm: 114795,
+    defaultServiceKm: 112085,
+    defaultServiceDate: "2026-10-13",
     color: "#cf5d56"
   }
 ];
