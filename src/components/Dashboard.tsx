@@ -14,8 +14,6 @@ import {
   CircleDollarSign,
   Zap,
   Layout,
-  Maximize,
-  Minimize,
   X,
   Wrench
 } from "lucide-react";
@@ -561,20 +559,16 @@ export function Dashboard({
       )}
 
       {/* 2. GPS FLEET LIVE (PLEINE LARGEUR EN TÊTE, À SA PLACE) */}
-      <section className={`panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-4 shadow-2xl transition-all duration-700 relative overflow-hidden ${isGpsExpanded ? 'h-[70vh]' : 'h-[250px]'}`}>
-         <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
-             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
-                 <div className="size-2 rounded-full bg-[#cf5d56] animate-pulse shadow-[0_0_8px_#cf5d56]" />
-                 <span className="text-[10px] font-black uppercase tracking-widest text-white/90 italic">{t?.fleetLive || "Fleet Live"}</span>
-             </div>
-             <button onClick={() => setIsGpsExpanded(!isGpsExpanded)} className="px-3 py-1 rounded-xl bg-white/5 hover:bg-[#cf5d56] hover:text-white text-[9px] font-black uppercase tracking-tighter transition-all flex items-center gap-2 border border-white/10">
-               {isGpsExpanded ? <><Minimize className="size-3" /> {t?.reduce || "Réduire"}</> : <><Maximize className="size-3" /> {t?.focusMode || "Focus Mode"}</>}
-             </button>
-         </div>
-         <FleetTrackerWidget records={allTrips} drivers={drivers} t={t} language={language} />
+      <section className={`panel-enter rounded-[32px] border border-white/10 bg-[#1c1c1e] p-2 sm:p-3 shadow-2xl transition-[height] duration-500 ease-in-out relative overflow-hidden ${isGpsExpanded ? 'h-[72vh] min-h-[500px]' : 'h-[280px]'}`}>
+         <FleetTrackerWidget 
+            records={allTrips} 
+            drivers={drivers} 
+            t={t} 
+            language={language}
+            isExpanded={isGpsExpanded}
+            onToggleExpand={() => setIsGpsExpanded(!isGpsExpanded)}
+         />
       </section>
-
-      {isGpsExpanded && <div className="h-[28vh] min-h-[250px]" />}
 
       {/* 2.5 NOUVEAU MODULE MOIS EN COURS (KPI MENSUELS EN TEMPS RÉEL DEPUIS LE SPREADSHEET) */}
       <CurrentMonthWidget

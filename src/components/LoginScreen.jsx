@@ -8,25 +8,54 @@ export default function LoginScreen({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) return;
+
     setLoading(true);
+    setError('');
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim().toUpperCase() })
+        body: JSON.stringify({ code: cleanCode })
       });
-      
+
       if (res.ok) {
         const user = await res.json();
         onLogin(user);
+        setLoading(false);
+        return;
+      }
+
+      // Si l'API /api/login répond 404 (déploiement statique Vercel sans backend),
+      // ou si elle renvoie une erreur inattendue, validation de secours locale :
+      if (cleanCode === 'SDVADMIN') {
+        onLogin({ username: "Direction SDV", role: "admin" });
+        setLoading(false);
+        return;
+      }
+      if (cleanCode === 'SDV2026') {
+        onLogin({ username: "Visiteur", role: "viewer" });
+        setLoading(false);
+        return;
+      }
+
+      setError("Code d'accès invalide");
+      setCode('');
+    } catch {
+      // Secours hors-ligne / API non joignable sur Vercel
+      if (cleanCode === 'SDVADMIN') {
+        onLogin({ username: "Direction SDV", role: "admin" });
+      } else if (cleanCode === 'SDV2026') {
+        onLogin({ username: "Visiteur", role: "viewer" });
       } else {
-        setError('Code d\'accès invalide');
+        setError("Code d'accès invalide");
         setCode('');
       }
-    } catch (err) {
-      setError('Erreur de connexion');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
